@@ -50,13 +50,17 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-WORKDIR /app/apps/web
-COPY --from=builder /app/apps/web/public ./public
+WORKDIR /app
+# Copy the entire standalone output (includes node_modules and server structure)
 COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./.next/static
+# Copy static files to the correct location
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+# Copy public files
+COPY --from=builder /app/apps/web/public ./apps/web/public
 RUN chown -R nextjs:nodejs /app
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+# server.js is at apps/web/server.js in monorepo standalone output
+CMD ["node", "apps/web/server.js"]
