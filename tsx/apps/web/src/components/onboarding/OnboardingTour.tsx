@@ -124,132 +124,141 @@ const TOUR_STEPS: TourStep[] = [
 
 /**
  * Custom CSS styles for the tour
- * Matches AuraStream brand colors (purple/violet theme with orange accents)
+ * Matches AuraStream brand colors (purple/violet theme)
+ * Uses !important to override driver.js default white theme
  */
 const TOUR_STYLES = `
   .driver-popover {
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    border-radius: 16px;
-    box-shadow: 0 0 60px rgba(139, 92, 246, 0.25), 0 8px 32px rgba(0, 0, 0, 0.5);
-    color: #f8fafc;
-    max-width: 380px;
-    padding: 1.25rem;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%) !important;
+    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 0 60px rgba(139, 92, 246, 0.25), 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    color: #f8fafc !important;
+    max-width: 380px !important;
+    padding: 1.25rem !important;
+  }
+
+  .driver-popover * {
+    color: inherit;
   }
 
   .driver-popover-title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #f8fafc;
-    margin-bottom: 0.75rem;
-    letter-spacing: -0.01em;
+    font-size: 1.25rem !important;
+    font-weight: 700 !important;
+    color: #f8fafc !important;
+    margin-bottom: 0.75rem !important;
+    letter-spacing: -0.01em !important;
   }
 
   .driver-popover-description {
-    font-size: 0.9rem;
-    color: #cbd5e1;
-    line-height: 1.6;
+    font-size: 0.9rem !important;
+    color: #cbd5e1 !important;
+    line-height: 1.6 !important;
   }
 
   .driver-popover-progress-text {
-    font-size: 0.75rem;
-    color: #8b5cf6;
-    font-weight: 500;
+    font-size: 0.75rem !important;
+    color: #8b5cf6 !important;
+    font-weight: 500 !important;
   }
 
   .driver-popover-navigation-btns {
-    gap: 0.75rem;
-    margin-top: 1rem;
+    gap: 0.75rem !important;
+    margin-top: 1rem !important;
   }
 
   .driver-popover-prev-btn,
   .driver-popover-next-btn {
-    padding: 0.625rem 1.25rem;
-    border-radius: 10px;
-    font-size: 0.875rem;
-    font-weight: 600;
-    transition: all 0.2s ease;
-    cursor: pointer;
+    padding: 0.625rem 1.25rem !important;
+    border-radius: 10px !important;
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
   }
 
   .driver-popover-prev-btn {
-    background: rgba(139, 92, 246, 0.15);
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    color: #c4b5fd;
+    background: rgba(139, 92, 246, 0.15) !important;
+    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+    color: #c4b5fd !important;
   }
 
   .driver-popover-prev-btn:hover {
-    background: rgba(139, 92, 246, 0.25);
-    border-color: rgba(139, 92, 246, 0.6);
+    background: rgba(139, 92, 246, 0.25) !important;
+    border-color: rgba(139, 92, 246, 0.6) !important;
     transform: translateY(-1px);
   }
 
   .driver-popover-next-btn {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-    border: none;
-    color: white;
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+    border: none !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4) !important;
   }
 
   .driver-popover-next-btn:hover {
-    background: linear-gradient(135deg, #9d6efa 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, #9d6efa 0%, #8b5cf6 100%) !important;
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.5);
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.5) !important;
   }
 
   .driver-popover-close-btn {
-    color: #64748b;
-    transition: all 0.2s ease;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
+    color: #94a3b8 !important;
+    transition: all 0.2s ease !important;
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
   }
 
   .driver-popover-close-btn:hover {
-    color: #f8fafc;
-    background: rgba(139, 92, 246, 0.2);
+    color: #f8fafc !important;
+    background: rgba(139, 92, 246, 0.2) !important;
   }
 
-  .driver-popover-arrow-side-left.driver-popover-arrow,
-  .driver-popover-arrow-side-right.driver-popover-arrow,
-  .driver-popover-arrow-side-top.driver-popover-arrow,
-  .driver-popover-arrow-side-bottom.driver-popover-arrow {
-    border-color: transparent;
+  .driver-popover-arrow {
+    border: none !important;
   }
 
   .driver-popover-arrow-side-left.driver-popover-arrow {
-    border-right-color: #0f0f1a;
+    border-right: 8px solid #0f0f1a !important;
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
   }
 
   .driver-popover-arrow-side-right.driver-popover-arrow {
-    border-left-color: #0f0f1a;
+    border-left: 8px solid #0f0f1a !important;
+    border-top: 8px solid transparent !important;
+    border-bottom: 8px solid transparent !important;
   }
 
   .driver-popover-arrow-side-top.driver-popover-arrow {
-    border-bottom-color: #0f0f1a;
+    border-bottom: 8px solid #0f0f1a !important;
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
   }
 
   .driver-popover-arrow-side-bottom.driver-popover-arrow {
-    border-top-color: #0f0f1a;
+    border-top: 8px solid #0f0f1a !important;
+    border-left: 8px solid transparent !important;
+    border-right: 8px solid transparent !important;
   }
 
   .driver-overlay {
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.8) !important;
   }
 
   .driver-active-element {
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.5), 0 0 30px rgba(139, 92, 246, 0.4);
-    border-radius: 12px;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.5), 0 0 30px rgba(139, 92, 246, 0.4) !important;
+    border-radius: 12px !important;
   }
 
-  /* AuraStream branding footer */
   .driver-popover-footer {
-    border-top: 1px solid rgba(139, 92, 246, 0.2);
-    padding-top: 0.75rem;
-    margin-top: 0.75rem;
+    border-top: 1px solid rgba(139, 92, 246, 0.2) !important;
+    padding-top: 0.75rem !important;
+    margin-top: 0.75rem !important;
   }
 `;
 
@@ -376,14 +385,30 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
     const initDriver = async () => {
       try {
         const { driver } = await import('driver.js');
-        // CSS is imported via link tag in the head instead of dynamic import
-        // to avoid TypeScript module resolution issues
+        
+        // Load driver.js CSS first
         if (!document.querySelector('link[href*="driver.css"]')) {
           const link = document.createElement('link');
           link.rel = 'stylesheet';
           link.href = 'https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css';
           document.head.appendChild(link);
+          
+          // Wait for CSS to load before continuing
+          await new Promise((resolve) => {
+            link.onload = resolve;
+            // Fallback timeout in case onload doesn't fire
+            setTimeout(resolve, 500);
+          });
         }
+
+        // Re-inject our custom styles AFTER driver.js CSS to ensure override
+        if (styleRef.current) {
+          styleRef.current.remove();
+        }
+        const style = document.createElement('style');
+        style.textContent = TOUR_STYLES;
+        document.head.appendChild(style);
+        styleRef.current = style;
 
         // Create driver instance
         const driverInstance = driver({
