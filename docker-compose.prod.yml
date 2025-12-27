@@ -104,7 +104,7 @@ services:
       dockerfile: apps/web/Dockerfile
       target: prod
       args:
-        - NEXT_PUBLIC_API_URL=https://aurastream.shop/api
+        - NEXT_PUBLIC_API_URL=https://aurastream.shop
         - NEXT_PUBLIC_APP_URL=https://aurastream.shop
         - NEXT_PUBLIC_SUPABASE_URL=https://qgyvdadgdomnubngfpun.supabase.co
         - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFneXZkYWRnZG9tbnVibmdmcHVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NDEzMzIsImV4cCI6MjA4MjExNzMzMn0.prP5BzHMW9DaM3MY7CjfWiMOgVjCnYADmjcSacqrA00

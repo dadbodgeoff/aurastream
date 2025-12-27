@@ -27,9 +27,12 @@ Set in DigitalOcean App Platform or `.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://qgyvdadgdomnubngfpun.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
-NEXT_PUBLIC_API_URL=https://aurastream.shop/api
+NEXT_PUBLIC_API_URL=https://aurastream.shop
 NEXT_PUBLIC_APP_URL=https://aurastream.shop
 ```
+
+⚠️ **IMPORTANT**: `NEXT_PUBLIC_API_URL` should NOT include `/api` suffix!
+The API client already adds `/api/v1/...` paths to requests.
 
 ### 3. ⚠️ IMPORTANT: Generate New JWT Secret
 
@@ -54,6 +57,26 @@ Update webhook endpoint in Stripe Dashboard:
 ---
 
 ## DigitalOcean App Platform Setup
+
+### ⚠️ CRITICAL: API Routing Configuration
+
+In DigitalOcean App Platform, you need to configure routing so `/api/*` requests go to the backend:
+
+1. Go to your App → Settings → App Spec
+2. Add route rules to your backend component:
+
+```yaml
+services:
+  - name: api
+    # ... other config ...
+    routes:
+      - path: /api
+        preserve_path_prefix: true
+      - path: /health
+```
+
+Or via the DO Console:
+- Backend service → Routes → Add route `/api` with "Preserve path prefix" enabled
 
 ### Backend (Python/FastAPI)
 
