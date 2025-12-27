@@ -288,15 +288,23 @@ class GenerationService:
                 custom_prompt=custom_prompt,
                 brand_context=brand_context
             )
+        elif custom_prompt:
+            # Direct prompt from coach or user - use it directly
+            # Just add brand context if brand kit is provided
+            if brand_kit:
+                from backend.services.prompt_engine import BrandContextResolver
+                context = BrandContextResolver.resolve(brand_kit, brand_customization)
+                brand_context = prompt_engine.build_brand_context_prompt(context)
+                prompt = f"{brand_context}\n\n{custom_prompt}"
+            else:
+                # Use the custom prompt as-is (from coach session)
+                prompt = custom_prompt
         else:
-            # Standard prompt building flow
-            # Use the enhanced prompt builder that handles all brand kit data
-            # including colors_extended, typography, voice, etc.
-            # If no brand kit, use AI defaults
+            # No custom prompt - use template-based prompt building
             if brand_kit:
                 prompt = prompt_engine.build_prompt_v2(
                     asset_type=AssetType(asset_type),
-                    brand_kit=brand_kit,  # Pass full brand kit dict
+                    brand_kit=brand_kit,
                     customization=brand_customization,
                     custom_prompt=custom_prompt
                 )

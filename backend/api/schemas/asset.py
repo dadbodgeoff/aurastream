@@ -16,7 +16,33 @@ from datetime import datetime
 # Type Definitions
 # ============================================================================
 
-AssetTypeEnum = Literal["thumbnail", "overlay", "banner", "story_graphic", "clip_cover"]
+AssetTypeEnum = Literal[
+    # Original types
+    "thumbnail", 
+    "overlay", 
+    "banner", 
+    "story_graphic", 
+    "clip_cover",
+    "logo",
+    # Twitch types
+    "twitch_emote",
+    "twitch_emote_112",
+    "twitch_emote_56",
+    "twitch_emote_28",
+    "twitch_badge",
+    "twitch_panel",
+    "twitch_banner",
+    "twitch_offline",
+    # TikTok types
+    "tiktok_emote",
+    "tiktok_emote_300",
+    "tiktok_emote_200",
+    "tiktok_emote_100",
+    # Social types
+    "tiktok_story",
+    "instagram_story",
+    "instagram_reel",
+]
 
 
 # ============================================================================

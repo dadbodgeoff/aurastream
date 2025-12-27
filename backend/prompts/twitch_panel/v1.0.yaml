@@ -1,0 +1,22 @@
+name: twitch_panel
+version: "1.0"
+base_prompt: |
+  Create a Twitch channel panel header with {tone} style.
+  Use colors: {primary_colors}.
+  Accent colors: {accent_colors}.
+  Style reference: {style_reference}
+  The panel should be 320x160 pixels, professional, and match Twitch profile aesthetics.
+  {custom_prompt}
+quality_modifiers:
+  - "clean design"
+  - "professional"
+  - "Twitch panel style"
+  - "320x160 pixels"
+  - "consistent branding"
+  - "readable text"
+placeholders:
+  - tone
+  - primary_colors
+  - accent_colors
+  - style_reference
+  - custom_prompt

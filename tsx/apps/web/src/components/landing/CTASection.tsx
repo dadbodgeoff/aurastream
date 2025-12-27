@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ArrowRightIcon } from './icons';
+import { useSiteAnalytics } from '@aurastream/shared';
 
 // =============================================================================
 // CTA Section
@@ -23,6 +24,11 @@ const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
 export function CTASection() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+  const { trackFunnel } = useSiteAnalytics();
+
+  const handleCtaClick = () => {
+    trackFunnel('cta_click', { location: 'cta_section' });
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -98,6 +104,7 @@ export function CTASection() {
             </p>
             <Link
               href="/signup"
+              onClick={handleCtaClick}
               className={cn(
                 'inline-flex items-center gap-2',
                 'px-8 py-4 rounded-xl font-semibold text-base',

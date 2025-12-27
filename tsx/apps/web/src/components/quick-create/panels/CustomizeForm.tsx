@@ -176,6 +176,9 @@ export function CustomizeForm(props: CustomizeFormProps) {
                   className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600"
                 />
               )}
+              {field.hint && (
+                <p className="mt-1.5 text-xs text-text-tertiary">{field.hint}</p>
+              )}
             </div>
           )})}
         </div>

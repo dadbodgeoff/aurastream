@@ -8,11 +8,7 @@ import type {
   JobResponse,
   JobListResponse,
   AssetResponse,
-  AssetListResponse,
   JobFilters,
-  AssetFilters,
-  AssetVisibilityUpdate,
-  BrandCustomization,
 } from '../types/generation';
 
 // ============================================================================
@@ -40,38 +36,8 @@ export function useGenerateAsset() {
 
   return useMutation({
     mutationFn: (data: GenerateRequest) => {
-      // Transform the request to snake_case for the API
-      const transformedData = {
-        asset_type: data.assetType,
-        brand_kit_id: data.brandKitId,
-        custom_prompt: data.customPrompt,
-        brand_customization: data.brandCustomization ? {
-          colors: data.brandCustomization.colors ? {
-            primary_index: data.brandCustomization.colors.primary_index,
-            secondary_index: data.brandCustomization.colors.secondary_index,
-            accent_index: data.brandCustomization.colors.accent_index,
-            use_gradient: data.brandCustomization.colors.use_gradient,
-          } : undefined,
-          typography: data.brandCustomization.typography ? {
-            level: data.brandCustomization.typography.level,
-          } : undefined,
-          voice: data.brandCustomization.voice ? {
-            use_tagline: data.brandCustomization.voice.use_tagline,
-            use_catchphrase: data.brandCustomization.voice.use_catchphrase,
-          } : undefined,
-          include_logo: data.brandCustomization.include_logo,
-          logo_type: data.brandCustomization.logo_type,
-          logo_position: data.brandCustomization.logo_position,
-          logo_size: data.brandCustomization.logo_size,
-          brand_intensity: data.brandCustomization.brand_intensity,
-        } : undefined,
-        // Legacy fields (deprecated)
-        include_logo: data.includeLogo,
-        logo_position: data.logoPosition,
-        logo_size: data.logoSize,
-        logo_type: data.logoType,
-      };
-      return apiClient.generation.create(transformedData as unknown as GenerateRequest);
+      // Pass data directly to the client - it handles transformation
+      return apiClient.generation.create(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: generationKeys.jobs() });

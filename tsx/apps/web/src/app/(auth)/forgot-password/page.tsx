@@ -58,8 +58,8 @@ export default function ForgotPasswordPage() {
         onSuccess: () => {
           setIsSubmitted(true);
         },
-        onError: (err) => {
-          console.log('Password reset request failed:', err.message);
+        onError: () => {
+          // Error is displayed via the error state from the mutation
         },
       }
     );

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@aurastream/shared';
 import { DashboardShell, LoadingState } from '@/components/dashboard';
 import { CelebrationOverlay } from '@/components/celebrations/CelebrationOverlay';
+import { OnboardingProvider } from '@/providers/OnboardingProvider';
+import { UndoToastContainer } from '@/components/undo';
 
 // Admin email whitelist
 const ADMIN_EMAILS = ['dadbodgeoff@gmail.com'];
@@ -50,20 +52,23 @@ export default function DashboardLayout({
   const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
 
   return (
-    <>
-      <DashboardShell
-        user={user ? {
-          displayName: user.displayName,
-          email: user.email,
-          avatarUrl: user.avatarUrl ?? undefined,
-          subscriptionTier: user.subscriptionTier,
-        } : undefined}
-        isAdmin={isAdmin}
-        onLogout={handleLogout}
-      >
-        {children}
-      </DashboardShell>
-      <CelebrationOverlay />
-    </>
+    <OnboardingProvider>
+      <>
+        <DashboardShell
+          user={user ? {
+            displayName: user.displayName,
+            email: user.email,
+            avatarUrl: user.avatarUrl ?? undefined,
+            subscriptionTier: user.subscriptionTier,
+          } : undefined}
+          isAdmin={isAdmin}
+          onLogout={handleLogout}
+        >
+          {children}
+        </DashboardShell>
+        <CelebrationOverlay />
+        <UndoToastContainer />
+      </>
+    </OnboardingProvider>
   );
 }

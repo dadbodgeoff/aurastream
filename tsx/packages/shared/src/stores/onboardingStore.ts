@@ -27,7 +27,7 @@ const SCHEMA_VERSION = 1;
 /**
  * Total number of steps in the onboarding tour
  */
-export const TOTAL_ONBOARDING_STEPS = 5;
+export const TOTAL_ONBOARDING_STEPS = 6;
 
 /**
  * Onboarding store state interface
@@ -35,6 +35,8 @@ export const TOTAL_ONBOARDING_STEPS = 5;
 export interface OnboardingState {
   /** Whether the user has completed the onboarding tour */
   hasCompletedOnboarding: boolean;
+  /** Whether the user has opted out of seeing the tour */
+  neverShowAgain: boolean;
   /** Current step index (0-based) */
   currentStep: number;
   /** Total number of steps in the tour */
@@ -50,13 +52,15 @@ export interface OnboardingState {
   /** Move to the previous step */
   prevStep: () => void;
   /** Skip the tour without completing */
-  skipTour: () => void;
+  skipTour: (neverShow?: boolean) => void;
   /** Complete the tour successfully */
   completeTour: () => void;
   /** Reset the tour to initial state (for testing or re-onboarding) */
   resetTour: () => void;
   /** Set the current step directly */
   setStep: (step: number) => void;
+  /** Set never show again preference */
+  setNeverShowAgain: (value: boolean) => void;
 }
 
 /**
@@ -64,6 +68,7 @@ export interface OnboardingState {
  */
 interface PersistedOnboardingState {
   hasCompletedOnboarding: boolean;
+  neverShowAgain: boolean;
 }
 
 /**
@@ -71,6 +76,7 @@ interface PersistedOnboardingState {
  */
 const DEFAULT_STATE: PersistedOnboardingState = {
   hasCompletedOnboarding: false,
+  neverShowAgain: false,
 };
 
 /**
@@ -129,12 +135,18 @@ export const useOnboardingStore = create<OnboardingState>()(
     (set, get) => ({
       // Initial state
       hasCompletedOnboarding: false,
+      neverShowAgain: false,
       currentStep: 0,
       totalSteps: TOTAL_ONBOARDING_STEPS,
       isActive: false,
 
       // Actions
       startTour: () => {
+        const { neverShowAgain, hasCompletedOnboarding } = get();
+        // Don't start if user opted out or already completed
+        if (neverShowAgain || hasCompletedOnboarding) {
+          return;
+        }
         set({
           isActive: true,
           currentStep: 0,
@@ -160,10 +172,11 @@ export const useOnboardingStore = create<OnboardingState>()(
         }
       },
 
-      skipTour: () => {
+      skipTour: (neverShow = false) => {
         set({
           isActive: false,
           hasCompletedOnboarding: true,
+          neverShowAgain: neverShow,
           currentStep: 0,
         });
       },
@@ -179,6 +192,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       resetTour: () => {
         set({
           hasCompletedOnboarding: false,
+          neverShowAgain: false,
           currentStep: 0,
           isActive: false,
         });
@@ -190,15 +204,20 @@ export const useOnboardingStore = create<OnboardingState>()(
         const clampedStep = Math.max(0, Math.min(step, totalSteps - 1));
         set({ currentStep: clampedStep });
       },
+
+      setNeverShowAgain: (value: boolean) => {
+        set({ neverShowAgain: value });
+      },
     }),
     {
       name: ONBOARDING_STORAGE_KEY,
       version: SCHEMA_VERSION,
       storage: createJSONStorage(() => localStorage),
       migrate: migrateState,
-      // Only persist the completion state, not the active tour state
+      // Persist completion state and never show preference
       partialize: (state): PersistedOnboardingState => ({
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        neverShowAgain: state.neverShowAgain,
       }),
     }
   )

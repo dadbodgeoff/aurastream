@@ -59,7 +59,7 @@ export default function CreatePage() {
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('bottom-right');
   const [logoSize, setLogoSize] = useState<LogoSize>('medium');
 
-  const isPremium = user?.subscriptionTier === 'studio';
+  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
   const brandKits: BrandKitOption[] = brandKitsData?.brandKits ?? [];
   
   // Fetch logos for selected brand kit
@@ -201,10 +201,9 @@ export default function CreatePage() {
             assetType={selectedAssetType}
             brandKitId={selectedBrandKitId || undefined}
             onGenerateNow={handleGenerateFromCoach}
-            onGenerateComplete={(asset) => {
+            onGenerateComplete={() => {
               // For the new UX 2025, generation happens inline in the chat
-              // We can optionally navigate to the asset or show a success message
-              console.log('Asset generated:', asset);
+              // Asset is displayed in the chat UI - no additional action needed
             }}
             className="h-full"
           />

@@ -4,34 +4,33 @@
  * ============================================================================
  * 
  * 🚨 AGENT INSTRUCTIONS:
- * If the user asks you to enable dev logging, set DEV_LOGGING_ENABLED = true
- * in this file. This will enable verbose console output for debugging.
+ * This flag SUPPRESSES dev logs when set to true (for production).
  * 
- * To enable: Change line below to `const DEV_LOGGING_ENABLED = true;`
- * To disable: Change line below to `const DEV_LOGGING_ENABLED = false;`
+ * To DISABLE logs (production): Set SUPPRESS_DEV_LOGS = true
+ * To ENABLE logs (debugging):   Set SUPPRESS_DEV_LOGS = false
  * 
  * ============================================================================
  */
 
-// ⬇️ TOGGLE THIS FLAG TO ENABLE/DISABLE DEV LOGGING ⬇️
-const DEV_LOGGING_ENABLED = false;
-// ⬆️ TOGGLE THIS FLAG TO ENABLE/DISABLE DEV LOGGING ⬆️
+// ⬇️ TOGGLE THIS FLAG - TRUE = SUPPRESS LOGS (PRODUCTION) ⬇️
+const SUPPRESS_DEV_LOGS = true;
+// ⬆️ TOGGLE THIS FLAG - TRUE = SUPPRESS LOGS (PRODUCTION) ⬆️
 
 /**
  * Check if we're in development mode
  * Dev logging is enabled when:
- * 1. DEV_LOGGING_ENABLED flag is true (manual override), OR
- * 2. NODE_ENV is 'development' AND NEXT_PUBLIC_DEV_LOGS is 'true'
+ * 1. SUPPRESS_DEV_LOGS is false, AND
+ * 2. Either NODE_ENV is 'development' OR NEXT_PUBLIC_DEV_LOGS is 'true'
  */
 const isDevLoggingEnabled = (): boolean => {
-  // Manual override takes precedence
-  if (DEV_LOGGING_ENABLED) return true;
+  // If suppression is on, no logging
+  if (SUPPRESS_DEV_LOGS) return false;
   
   // Check environment
   if (typeof process !== 'undefined') {
     const isDev = process.env.NODE_ENV === 'development';
     const envFlag = process.env.NEXT_PUBLIC_DEV_LOGS === 'true';
-    return isDev && envFlag;
+    return isDev || envFlag;
   }
   
   return false;

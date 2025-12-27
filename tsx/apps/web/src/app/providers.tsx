@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState, useMemo } from 'react';
-import { AnalyticsProvider } from '@aurastream/shared';
+import { AnalyticsProvider, SiteAnalyticsProvider } from '@aurastream/shared';
 import { KeyboardShortcutsProvider, useKeyboardShortcutsContext } from '@/providers/KeyboardShortcutsProvider';
 import { CommandPaletteProvider } from '@/providers/CommandPaletteProvider';
 import { ImageLightbox } from '@/components/lightbox';
@@ -48,14 +48,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AnalyticsProvider config={analyticsConfig}>
-        <KeyboardShortcutsProvider>
-          <InnerProviders>
-            {children}
-            <ImageLightbox />
-          </InnerProviders>
-        </KeyboardShortcutsProvider>
-      </AnalyticsProvider>
+      <SiteAnalyticsProvider
+        endpoint={`${API_BASE}/api/v1/site-analytics`}
+        debug={process.env.NODE_ENV === 'development'}
+        trackScrollDepth={true}
+        trackTimeOnPage={true}
+      >
+        <AnalyticsProvider config={analyticsConfig}>
+          <KeyboardShortcutsProvider>
+            <InnerProviders>
+              {children}
+              <ImageLightbox />
+            </InnerProviders>
+          </KeyboardShortcutsProvider>
+        </AnalyticsProvider>
+      </SiteAnalyticsProvider>
     </QueryClientProvider>
   );
 }

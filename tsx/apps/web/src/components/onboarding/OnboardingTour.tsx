@@ -10,14 +10,14 @@
  * - Step-by-step guided tour
  * - AuraStream brand styling (purple/violet theme)
  * - Progress indicator
- * - Skip button
+ * - Skip button with "Don't show again" option
  * - Celebration on completion
  * - Keyboard navigation support
  *
  * @module components/onboarding/OnboardingTour
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useOnboardingStore, usePolishStore } from '@aurastream/shared';
 
 // Dynamic import for driver.js to avoid SSR issues
@@ -85,6 +85,18 @@ const TOUR_STEPS: TourStep[] = [
     description: 'Asset Library link',
   },
   {
+    element: '[data-tour="coach"]',
+    popover: {
+      title: '🤖 Your Free AI Coach Session',
+      description:
+        'Get AI-powered help crafting the perfect prompt. You have 1 free trial session included with your account!',
+      side: 'right',
+      align: 'start',
+    },
+    title: 'Prompt Coach',
+    description: 'AI Coach with free trial',
+  },
+  {
     element: 'body',
     popover: {
       title: '⌨️ Pro Tip: Command Palette',
@@ -112,78 +124,93 @@ const TOUR_STEPS: TourStep[] = [
 
 /**
  * Custom CSS styles for the tour
- * Matches AuraStream brand colors (purple/violet theme)
+ * Matches AuraStream brand colors (purple/violet theme with orange accents)
  */
 const TOUR_STYLES = `
   .driver-popover {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid rgba(139, 92, 246, 0.3);
-    border-radius: 12px;
-    box-shadow: 0 0 40px rgba(139, 92, 246, 0.2), 0 4px 20px rgba(0, 0, 0, 0.4);
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    border-radius: 16px;
+    box-shadow: 0 0 60px rgba(139, 92, 246, 0.25), 0 8px 32px rgba(0, 0, 0, 0.5);
     color: #f8fafc;
-    max-width: 340px;
+    max-width: 380px;
+    padding: 1.25rem;
   }
 
   .driver-popover-title {
-    font-size: 1.125rem;
-    font-weight: 600;
+    font-size: 1.25rem;
+    font-weight: 700;
     color: #f8fafc;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.01em;
   }
 
   .driver-popover-description {
-    font-size: 0.875rem;
+    font-size: 0.9rem;
     color: #cbd5e1;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
   .driver-popover-progress-text {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: #8b5cf6;
+    font-weight: 500;
   }
 
   .driver-popover-navigation-btns {
-    gap: 0.5rem;
+    gap: 0.75rem;
+    margin-top: 1rem;
   }
 
   .driver-popover-prev-btn,
   .driver-popover-next-btn {
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
+    padding: 0.625rem 1.25rem;
+    border-radius: 10px;
     font-size: 0.875rem;
-    font-weight: 500;
+    font-weight: 600;
     transition: all 0.2s ease;
+    cursor: pointer;
   }
 
   .driver-popover-prev-btn {
-    background: rgba(139, 92, 246, 0.1);
-    border: 1px solid rgba(139, 92, 246, 0.3);
+    background: rgba(139, 92, 246, 0.15);
+    border: 1px solid rgba(139, 92, 246, 0.4);
     color: #c4b5fd;
   }
 
   .driver-popover-prev-btn:hover {
-    background: rgba(139, 92, 246, 0.2);
-    border-color: rgba(139, 92, 246, 0.5);
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.6);
+    transform: translateY(-1px);
   }
 
   .driver-popover-next-btn {
     background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
     border: none;
     color: white;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
   }
 
   .driver-popover-next-btn:hover {
     background: linear-gradient(135deg, #9d6efa 0%, #8b5cf6 100%);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.5);
   }
 
   .driver-popover-close-btn {
-    color: #94a3b8;
-    transition: color 0.2s ease;
+    color: #64748b;
+    transition: all 0.2s ease;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
   }
 
   .driver-popover-close-btn:hover {
     color: #f8fafc;
+    background: rgba(139, 92, 246, 0.2);
   }
 
   .driver-popover-arrow-side-left.driver-popover-arrow,
@@ -194,28 +221,35 @@ const TOUR_STYLES = `
   }
 
   .driver-popover-arrow-side-left.driver-popover-arrow {
-    border-right-color: #1a1a2e;
+    border-right-color: #0f0f1a;
   }
 
   .driver-popover-arrow-side-right.driver-popover-arrow {
-    border-left-color: #1a1a2e;
+    border-left-color: #0f0f1a;
   }
 
   .driver-popover-arrow-side-top.driver-popover-arrow {
-    border-bottom-color: #1a1a2e;
+    border-bottom-color: #0f0f1a;
   }
 
   .driver-popover-arrow-side-bottom.driver-popover-arrow {
-    border-top-color: #1a1a2e;
+    border-top-color: #0f0f1a;
   }
 
   .driver-overlay {
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
   }
 
   .driver-active-element {
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.4), 0 0 20px rgba(139, 92, 246, 0.3);
-    border-radius: 8px;
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.5), 0 0 30px rgba(139, 92, 246, 0.4);
+    border-radius: 12px;
+  }
+
+  /* AuraStream branding footer */
+  .driver-popover-footer {
+    border-top: 1px solid rgba(139, 92, 246, 0.2);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
   }
 `;
 
@@ -243,6 +277,8 @@ export interface OnboardingTourProps {
 export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element | null {
   const driverRef = useRef<DriverType | null>(null);
   const styleRef = useRef<HTMLStyleElement | null>(null);
+  const [showSkipModal, setShowSkipModal] = useState(false);
+  const [neverShowChecked, setNeverShowChecked] = useState(false);
 
   // Onboarding store
   const isActive = useOnboardingStore((state) => state.isActive);
@@ -272,14 +308,35 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
   }, [completeTour, queueCelebration]);
 
   /**
-   * Handle tour skip
+   * Handle tour skip - show confirmation modal
    */
-  const handleSkip = useCallback(() => {
+  const handleSkipClick = useCallback(() => {
     if (driverRef.current) {
       driverRef.current.destroy();
     }
-    skipTour();
-  }, [skipTour]);
+    setShowSkipModal(true);
+  }, []);
+
+  /**
+   * Confirm skip with optional "never show again"
+   */
+  const confirmSkip = useCallback(() => {
+    skipTour(neverShowChecked);
+    setShowSkipModal(false);
+    setNeverShowChecked(false);
+  }, [skipTour, neverShowChecked]);
+
+  /**
+   * Cancel skip and resume tour
+   */
+  const cancelSkip = useCallback(() => {
+    setShowSkipModal(false);
+    setNeverShowChecked(false);
+    // Resume the tour
+    if (driverRef.current) {
+      driverRef.current.drive(currentStep);
+    }
+  }, [currentStep]);
 
   /**
    * Initialize driver.js and inject custom styles
@@ -362,12 +419,12 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
             }
           },
           onCloseClick: () => {
-            handleSkip();
+            handleSkipClick();
           },
           onDestroyStarted: () => {
-            // Only skip if not completing normally
+            // Only show skip modal if not completing normally
             if (driverInstance.getActiveIndex() !== totalSteps - 1) {
-              handleSkip();
+              handleSkipClick();
             }
           },
         });
@@ -389,9 +446,60 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
         driverRef.current = null;
       }
     };
-  }, [isActive, currentStep, totalSteps, setStep, handleComplete, handleSkip]);
+  }, [isActive, currentStep, totalSteps, setStep, handleComplete, handleSkipClick]);
 
-  // This component doesn't render anything visible
+  // Render skip confirmation modal
+  if (showSkipModal) {
+    return (
+      <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="mx-4 w-full max-w-md rounded-2xl border border-violet-500/30 bg-gradient-to-br from-[#0f0f1a] to-[#1a1a2e] p-6 shadow-2xl shadow-violet-500/20">
+          {/* AuraStream Logo/Header */}
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600">
+              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <span className="text-lg font-bold text-white">AuraStream</span>
+          </div>
+
+          <h3 className="mb-2 text-xl font-bold text-white">Skip the Tour?</h3>
+          <p className="mb-6 text-sm leading-relaxed text-slate-400">
+            You can always restart the tour from Settings if you change your mind.
+          </p>
+
+          {/* Don't show again checkbox */}
+          <label className="mb-6 flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/30 p-3 transition-colors hover:border-violet-500/30 hover:bg-slate-800/50">
+            <input
+              type="checkbox"
+              checked={neverShowChecked}
+              onChange={(e) => setNeverShowChecked(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500 focus:ring-offset-0"
+            />
+            <span className="text-sm text-slate-300">Don&apos;t show this tour again</span>
+          </label>
+
+          {/* Action buttons */}
+          <div className="flex gap-3">
+            <button
+              onClick={cancelSkip}
+              className="flex-1 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm font-semibold text-violet-300 transition-all hover:border-violet-500/50 hover:bg-violet-500/20"
+            >
+              Continue Tour
+            </button>
+            <button
+              onClick={confirmSkip}
+              className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition-all hover:from-violet-500 hover:to-purple-500 hover:shadow-violet-500/40"
+            >
+              Skip Tour
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // This component doesn't render anything visible when tour is active
   // driver.js handles all the UI
   return null;
 }

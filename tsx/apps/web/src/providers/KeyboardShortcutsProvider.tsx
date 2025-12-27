@@ -194,7 +194,8 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
           break;
         default:
           // Unknown action - could be a custom shortcut
-          console.log(`Shortcut action: ${action}`);
+          // No-op for unhandled shortcuts
+          break;
       }
     },
     [router, openModal, closeModal, openCommandPalette]

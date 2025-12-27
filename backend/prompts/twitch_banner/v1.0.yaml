@@ -1,0 +1,22 @@
+name: twitch_banner
+version: "1.0"
+base_prompt: |
+  Create a Twitch channel banner with {tone} style.
+  Use colors: {primary_colors}.
+  Accent colors: {accent_colors}.
+  Style reference: {style_reference}
+  The banner should be 1200x480 pixels, eye-catching, and represent the channel brand.
+  {custom_prompt}
+quality_modifiers:
+  - "banner style"
+  - "eye-catching"
+  - "1200x480 pixels"
+  - "channel branding"
+  - "Twitch profile ready"
+  - "professional"
+placeholders:
+  - tone
+  - primary_colors
+  - accent_colors
+  - style_reference
+  - custom_prompt

@@ -139,8 +139,8 @@ function ResetPasswordForm() {
         onSuccess: () => {
           setIsSuccess(true);
         },
-        onError: (err) => {
-          console.log('Password reset failed:', err.message);
+        onError: () => {
+          // Error is displayed via the error state from the mutation
         },
       }
     );

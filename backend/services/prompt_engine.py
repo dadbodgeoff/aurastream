@@ -34,6 +34,16 @@ class AssetType(str, Enum):
     STORY_GRAPHIC = "story_graphic"
     CLIP_COVER = "clip_cover"
     LOGO = "logo"
+    # Twitch-specific types
+    TWITCH_EMOTE = "twitch_emote"
+    TWITCH_BADGE = "twitch_badge"
+    TWITCH_PANEL = "twitch_panel"
+    TWITCH_BANNER = "twitch_banner"
+    TWITCH_OFFLINE = "twitch_offline"
+    # Social types
+    TIKTOK_STORY = "tiktok_story"
+    INSTAGRAM_STORY = "instagram_story"
+    INSTAGRAM_REEL = "instagram_reel"
 
 
 @dataclass

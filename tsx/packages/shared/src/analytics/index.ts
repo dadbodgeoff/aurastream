@@ -96,3 +96,11 @@ export {
   sanitizeProperties,
   getPerformanceTiming,
 } from './utils';
+
+// =============================================================================
+// Site Analytics (Production Visitor/Session/Funnel Tracking)
+// =============================================================================
+
+export { siteTracker, type FunnelStep, type SiteTrackerConfig } from './siteTracker';
+export { SiteAnalyticsProvider } from './SiteAnalyticsProvider';
+export { useSiteAnalytics } from './useSiteAnalytics';

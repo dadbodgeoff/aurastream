@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@aurastream/shared';
+import { useAuth, useSiteAnalytics } from '@aurastream/shared';
 
 // OAuth provider icons
 const GoogleIcon = () => (
@@ -109,6 +109,7 @@ function calculatePasswordStrength(password: string): PasswordStrength {
 export default function SignupPage() {
   const router = useRouter();
   const { signup, isLoading, error, clearError } = useAuth();
+  const { trackFunnel } = useSiteAnalytics();
   const emailInputRef = useRef<HTMLInputElement>(null);
   
   const [email, setEmail] = useState('');
@@ -125,6 +126,11 @@ export default function SignupPage() {
     displayName?: string;
     terms?: string;
   }>({});
+  
+  // Track signup_start funnel event on mount
+  useEffect(() => {
+    trackFunnel('signup_start');
+  }, [trackFunnel]);
   
   // Password strength calculation
   const passwordStrength = useMemo(() => {
@@ -188,6 +194,8 @@ export default function SignupPage() {
     clearError();
     try {
       await signup(email, password, displayName, acceptTerms);
+      // Track signup_complete funnel event
+      trackFunnel('signup_complete');
       router.push('/login?registered=true');
     } catch (err) {
       // Error is handled by the store

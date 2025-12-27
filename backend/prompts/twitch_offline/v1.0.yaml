@@ -1,0 +1,22 @@
+name: twitch_offline
+version: "1.0"
+base_prompt: |
+  Create a Twitch offline screen with {tone} style.
+  Use colors: {primary_colors}.
+  Accent colors: {accent_colors}.
+  Style reference: {style_reference}
+  The screen should be 1920x1080 pixels, informative, and branded.
+  {custom_prompt}
+quality_modifiers:
+  - "offline aesthetic"
+  - "branded placeholder"
+  - "informative"
+  - "professional"
+  - "1920x1080 pixels"
+  - "Twitch channel ready"
+placeholders:
+  - tone
+  - primary_colors
+  - accent_colors
+  - style_reference
+  - custom_prompt

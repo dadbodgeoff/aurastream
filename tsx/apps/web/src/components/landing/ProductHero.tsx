@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { HeroShowcase } from './HeroShowcase';
 import { PlayIcon, ArrowRightIcon, TwitchIcon, YouTubeIcon, TikTokIcon, KickIcon } from './icons';
 import { useIsMobile, useTouchDevice } from '@/hooks';
-import { useReducedMotion } from '@aurastream/shared';
+import { useReducedMotion, useSiteAnalytics } from '@aurastream/shared';
 
 // =============================================================================
 // Product Hero Section
@@ -30,6 +30,12 @@ export function ProductHero() {
   const isMobile = useIsMobile();
   const isTouch = useTouchDevice();
   const prefersReducedMotion = useReducedMotion();
+  const { trackFunnel } = useSiteAnalytics();
+
+  // Track CTA click
+  const handleCtaClick = () => {
+    trackFunnel('cta_click', { location: 'hero' });
+  };
 
   // Staggered fade-in on mount
   useEffect(() => {
@@ -163,6 +169,7 @@ export function ProductHero() {
               >
                 <Link
                   href="/signup"
+                  onClick={handleCtaClick}
                   className={cn(
                     'w-full sm:w-auto inline-flex items-center justify-center gap-2',
                     'px-8 py-4 rounded-xl font-semibold text-base',

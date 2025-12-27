@@ -8,7 +8,26 @@ import type {
   LogoType,
 } from './brand-kit-enhanced';
 
-export type AssetType = 'thumbnail' | 'overlay' | 'banner' | 'story_graphic' | 'clip_cover';
+export type AssetType = 
+  | 'thumbnail' 
+  | 'overlay' 
+  | 'banner' 
+  | 'story_graphic' 
+  | 'clip_cover'
+  // Twitch emotes
+  | 'twitch_emote'
+  | 'twitch_emote_112'
+  | 'twitch_emote_56'
+  | 'twitch_emote_28'
+  // TikTok emotes
+  | 'tiktok_emote'
+  | 'tiktok_emote_300'
+  | 'tiktok_emote_200'
+  | 'tiktok_emote_100'
+  // Other Twitch assets
+  | 'twitch_badge'
+  | 'twitch_panel'
+  | 'twitch_offline';
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'partial';
 
 // Re-export brand customization types for convenience
@@ -116,6 +135,20 @@ export const ASSET_DIMENSIONS: Record<AssetType, { width: number; height: number
   banner: { width: 1200, height: 480 },
   story_graphic: { width: 1080, height: 1920 },
   clip_cover: { width: 1080, height: 1080 },
+  // Twitch emotes
+  twitch_emote: { width: 512, height: 512 },
+  twitch_emote_112: { width: 112, height: 112 },
+  twitch_emote_56: { width: 56, height: 56 },
+  twitch_emote_28: { width: 28, height: 28 },
+  // TikTok emotes
+  tiktok_emote: { width: 300, height: 300 },
+  tiktok_emote_300: { width: 300, height: 300 },
+  tiktok_emote_200: { width: 200, height: 200 },
+  tiktok_emote_100: { width: 100, height: 100 },
+  // Other Twitch assets
+  twitch_badge: { width: 72, height: 72 },
+  twitch_panel: { width: 320, height: 160 },
+  twitch_offline: { width: 1920, height: 1080 },
 };
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -124,4 +157,18 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   banner: 'Channel Banner',
   story_graphic: 'Story Graphic',
   clip_cover: 'Clip Cover',
+  // Twitch emotes
+  twitch_emote: 'Twitch Emote',
+  twitch_emote_112: 'Twitch Emote (112px)',
+  twitch_emote_56: 'Twitch Emote (56px)',
+  twitch_emote_28: 'Twitch Emote (28px)',
+  // TikTok emotes
+  tiktok_emote: 'TikTok Emote',
+  tiktok_emote_300: 'TikTok Emote (300px)',
+  tiktok_emote_200: 'TikTok Emote (200px)',
+  tiktok_emote_100: 'TikTok Emote (100px)',
+  // Other Twitch assets
+  twitch_badge: 'Twitch Badge',
+  twitch_panel: 'Twitch Panel',
+  twitch_offline: 'Offline Screen',
 };

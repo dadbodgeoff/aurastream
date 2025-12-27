@@ -106,7 +106,7 @@ function ProfileTab({ user }: { user: any }) {
 // =============================================================================
 
 function BillingTab({ user }: { user: any }) {
-  const isPremium = user?.subscriptionTier === 'studio';
+  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
 
   const plans = [
     {

@@ -154,7 +154,7 @@ export default function CoachPage() {
    * Check if user has premium access.
    * Premium tier is 'studio' in this system.
    */
-  const isPremium = user?.subscriptionTier === 'studio';
+  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
 
   /**
    * Handle starting the chat from context form.

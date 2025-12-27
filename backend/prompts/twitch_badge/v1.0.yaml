@@ -1,0 +1,22 @@
+name: twitch_badge
+version: "1.0"
+base_prompt: |
+  Create a Twitch subscriber badge with {tone} style.
+  Use colors: {primary_colors}.
+  Accent colors: {accent_colors}.
+  Style reference: {style_reference}
+  The badge should be small (18x18, 36x36, 72x72 pixels), iconic, and recognizable.
+  {custom_prompt}
+quality_modifiers:
+  - "badge style"
+  - "iconic"
+  - "small-size optimized"
+  - "subscriber badge"
+  - "Twitch ready"
+  - "clear at small sizes"
+placeholders:
+  - tone
+  - primary_colors
+  - accent_colors
+  - style_reference
+  - custom_prompt

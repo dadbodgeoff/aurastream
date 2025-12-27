@@ -16,6 +16,8 @@ export interface TemplateField {
   options?: { value: string; label: string }[];
   required?: boolean;
   maxLength?: number;
+  /** Helper text shown below the field */
+  hint?: string;
   /** For dynamic_select: which field this depends on */
   dependsOn?: string;
   /** For dynamic_select: map of parent value -> options */

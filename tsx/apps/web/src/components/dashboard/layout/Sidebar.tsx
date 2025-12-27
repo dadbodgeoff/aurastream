@@ -23,6 +23,7 @@ export interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
   adminOnly?: boolean;
+  dataTour?: string;
 }
 
 export interface SidebarProps {
@@ -39,14 +40,14 @@ export interface SidebarProps {
 
 const mainNavItems: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: DashboardIcon },
-  { name: 'Quick Create', href: '/dashboard/quick-create', icon: QuickCreateIcon, badge: 'New' },
+  { name: 'Quick Create', href: '/dashboard/quick-create', icon: QuickCreateIcon, badge: 'New', dataTour: 'quick-create' },
   { name: 'Create', href: '/dashboard/create', icon: CreateIcon },
-  { name: 'Brand Studio', href: '/dashboard/brand-kits', icon: BrandIcon },
-  { name: 'Asset Library', href: '/dashboard/assets', icon: LibraryIcon },
+  { name: 'Brand Studio', href: '/dashboard/brand-kits', icon: BrandIcon, dataTour: 'brand-kits' },
+  { name: 'Asset Library', href: '/dashboard/assets', icon: LibraryIcon, dataTour: 'assets' },
 ];
 
 const toolsNavItems: NavItem[] = [
-  { name: 'Prompt Coach', href: '/dashboard/coach', icon: CoachIcon, badge: 'Pro' },
+  { name: 'Prompt Coach', href: '/dashboard/coach', icon: CoachIcon, badge: 'Pro', dataTour: 'coach' },
 ];
 
 const settingsNavItems: NavItem[] = [
@@ -59,6 +60,7 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   return (
     <Link
       href={item.href}
+      data-tour={item.dataTour}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium',
         'transition-all duration-75',

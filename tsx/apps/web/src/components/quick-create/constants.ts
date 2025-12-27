@@ -59,8 +59,8 @@ export const TEMPLATES: QuickTemplate[] = [
     id: 'schedule', name: 'Weekly Schedule', tagline: 'Streaming calendar', category: 'stream',
     assetType: 'banner', dimensions: '1200×480', emoji: '📅',
     fields: [
-      { id: 'days', label: 'Days', type: 'text', placeholder: 'Mon, Wed, Fri', required: true },
-      { id: 'times', label: 'Times', type: 'text', placeholder: '7-10 PM EST' },
+      { id: 'days', label: 'Streaming Days', type: 'text', placeholder: 'Mon, Wed, Fri', required: true, maxLength: 50, hint: 'Enter your streaming days separated by commas' },
+      { id: 'times', label: 'Stream Time', type: 'text', placeholder: '7 PM EST', maxLength: 30, hint: 'Your typical stream time' },
     ],
     previewStyle: 'Horizontal banner for Twitch panels & social headers',
     vibes: [

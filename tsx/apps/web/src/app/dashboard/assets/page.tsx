@@ -8,6 +8,7 @@ import {
   useOptimisticAssetDeletion,
   useOptimisticBulkAssetDeletion,
 } from '@aurastream/api-client';
+import { useAuth } from '@aurastream/shared';
 import {
   PageContainer,
   AssetCard,
@@ -16,16 +17,17 @@ import {
   FilterDropdown,
   ViewToggle,
   EmptyState,
-  LoadingState,
   ErrorState,
   AssetPreview,
   ConfirmDialog,
   LibraryIcon,
   TrashIcon,
-  DownloadIcon,
 } from '@/components/dashboard';
+import { AssetsEmptyState } from '@/components/empty-states';
+import { AssetGridSkeleton } from '@/components/ui/skeletons';
 import { toast } from '@/components/ui/Toast';
 import type { ViewMode } from '@/components/dashboard';
+import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
 
 // =============================================================================
@@ -52,6 +54,7 @@ export default function AssetsPage() {
   const searchParams = useSearchParams();
   const jobIdParam = searchParams.get('job');
   const assetIdParam = searchParams.get('asset');
+  const { user } = useAuth();
 
   // State
   const [search, setSearch] = useState('');
@@ -163,7 +166,17 @@ export default function AssetsPage() {
   if (assetsLoading) {
     return (
       <PageContainer title="Asset Library">
-        <LoadingState message="Loading assets..." />
+        {/* Filters Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="h-10 w-64 bg-white/5 rounded-lg skeleton-shimmer" />
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-28 bg-white/5 rounded-lg skeleton-shimmer" />
+            <div className="h-10 w-20 bg-white/5 rounded-lg skeleton-shimmer" />
+          </div>
+        </div>
+        
+        {/* Asset Grid Skeleton */}
+        <AssetGridSkeleton count={12} columns={4} />
       </PageContainer>
     );
   }
@@ -254,12 +267,17 @@ export default function AssetsPage() {
             />
           ))}
         </div>
-      ) : (
+      ) : search || typeFilter ? (
         <EmptyState
           icon={<LibraryIcon className="w-8 h-8" />}
           title="No assets found"
-          description={search || typeFilter ? 'Try adjusting your filters' : 'Create your first asset to see it here'}
-          action={!search && !typeFilter ? { label: 'Create Asset', href: '/dashboard/create' } : undefined}
+          description="Try adjusting your filters"
+        />
+      ) : (
+        <AssetsEmptyState
+          tier={user?.subscriptionTier as SubscriptionTier}
+          onCreateAsset={() => router.push('/dashboard/create')}
+          onBrowseTemplates={() => router.push('/dashboard/templates')}
         />
       )}
 

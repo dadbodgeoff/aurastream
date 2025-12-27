@@ -9,19 +9,21 @@ import {
   useOptimisticBrandKitActivation,
   useOptimisticBrandKitDeletion,
 } from '@aurastream/api-client';
+import { useAuth } from '@aurastream/shared';
 import {
   PageContainer,
   BrandKitCard,
   SearchInput,
   EmptyState,
-  LoadingState,
   ErrorState,
   ConfirmDialog,
   Modal,
-  BrandIcon,
   PlusIcon,
 } from '@/components/dashboard';
+import { BrandKitsEmptyState } from '@/components/empty-states';
+import { BrandKitCardSkeleton } from '@/components/ui/skeletons';
 import { toast } from '@/components/ui/Toast';
+import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
 
 // =============================================================================
@@ -196,6 +198,7 @@ function BrandKitForm({ isOpen, onClose, brandKit, onSave }: BrandKitFormProps) 
 
 export default function BrandKitsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const { data, isLoading, error, refetch } = useBrandKits();
   const createBrandKit = useCreateBrandKit();
   const updateBrandKit = useUpdateBrandKit();
@@ -258,7 +261,11 @@ export default function BrandKitsPage() {
   if (isLoading) {
     return (
       <PageContainer title="Brand Studio">
-        <LoadingState message="Loading brand kits..." />
+        {/* Search Skeleton */}
+        <div className="h-10 w-64 bg-white/5 rounded-lg skeleton-shimmer" />
+        
+        {/* Brand Kit Cards Skeleton */}
+        <BrandKitCardSkeleton count={6} />
       </PageContainer>
     );
   }
@@ -322,12 +329,16 @@ export default function BrandKitsPage() {
             />
           ))}
         </div>
-      ) : (
+      ) : search ? (
         <EmptyState
-          icon={<BrandIcon className="w-8 h-8" />}
-          title={search ? 'No brand kits found' : 'No brand kits yet'}
-          description={search ? 'Try a different search term' : 'Create your first brand kit to get started with consistent branding'}
-          action={!search ? { label: 'Create Brand Kit', onClick: () => setShowCreateForm(true) } : undefined}
+          title="No brand kits found"
+          description="Try a different search term"
+        />
+      ) : (
+        <BrandKitsEmptyState
+          tier={user?.subscriptionTier as SubscriptionTier}
+          onCreateBrandKit={() => setShowCreateForm(true)}
+          onLearnMore={() => window.open('/docs/brand-kits', '_blank')}
         />
       )}
 

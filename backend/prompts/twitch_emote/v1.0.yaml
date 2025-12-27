@@ -1,0 +1,26 @@
+name: twitch_emote
+version: "1.0"
+base_prompt: |
+  Create a Twitch emote with {tone} style.
+  Use colors: {primary_colors}.
+  Accent colors: {accent_colors}.
+  Style reference: {style_reference}
+  The emote should be expressive, readable at small sizes (28px, 56px, 112px), and have a clear silhouette.
+  Use a transparent or solid color background suitable for Twitch chat.
+  {custom_prompt}
+quality_modifiers:
+  - "emote style"
+  - "expressive"
+  - "small-size optimized"
+  - "clear silhouette"
+  - "Twitch chat ready"
+  - "112x112 pixels"
+  - "transparent background"
+  - "bold colors"
+  - "readable at all sizes"
+placeholders:
+  - tone
+  - primary_colors
+  - accent_colors
+  - style_reference
+  - custom_prompt
