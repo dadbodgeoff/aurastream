@@ -9,6 +9,7 @@ import type {
   JobListResponse,
   AssetResponse,
   JobFilters,
+  AssetFilters,
 } from '../types/generation';
 
 // ============================================================================
