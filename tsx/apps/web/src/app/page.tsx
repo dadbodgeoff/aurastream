@@ -20,7 +20,7 @@ import '@/components/landing/animations.css';
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-background-base relative">
+    <main className="min-h-screen bg-background-base relative overflow-x-hidden">
       {/* Background layer effects */}
       <BackgroundEffects 
         enableNoise={true}

@@ -64,7 +64,7 @@ export function ProductHero() {
     <section 
       ref={heroRef}
       id="main-content"
-      className="relative min-h-screen flex flex-col"
+      className="relative min-h-screen flex flex-col overflow-hidden"
     >
       {/* Main hero content */}
       <div className="flex-1 flex items-center pt-24 sm:pt-28 lg:pt-32 px-4 sm:px-6 lg:px-8">

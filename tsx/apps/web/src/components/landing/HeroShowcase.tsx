@@ -143,7 +143,8 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
                   <ChromaKeyImage
                     src={currentAsset.src}
                     alt={currentAsset.label}
-                    className="max-w-full max-h-full rounded"
+                    className="w-full h-full"
+                    containerClassName="w-full h-full"
                     tolerance={80}
                     smoothing={25}
                   />
@@ -153,7 +154,7 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
                     alt={currentAsset.label}
                     loading="eager"
                     decoding="async"
-                    className="max-w-full max-h-full object-contain rounded transition-all duration-500"
+                    className="w-full h-full object-contain rounded transition-all duration-500"
                   />
                 )}
               </div>
@@ -177,8 +178,8 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
       </div>
       
       {/* Floating accent elements */}
-      <div className="absolute -top-4 -right-4 w-20 h-20 bg-interactive-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '3s' }} />
-      <div className="absolute -bottom-4 -left-4 w-24 h-24 bg-accent-500/15 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '4s', animationDelay: '1s' }} />
+      <div className="absolute -top-4 -right-4 w-20 h-20 bg-interactive-500/20 rounded-full blur-2xl animate-pulse pointer-events-none" style={{ animationDuration: '3s' }} />
+      <div className="absolute -bottom-4 -left-4 w-24 h-24 bg-accent-500/15 rounded-full blur-2xl animate-pulse pointer-events-none" style={{ animationDuration: '4s', animationDelay: '1s' }} />
     </div>
   );
 }

@@ -9,8 +9,11 @@ import {
   useGenerateTwitchAsset,
 } from '@aurastream/api-client';
 import type { LogoPosition, LogoSize } from '@aurastream/api-client';
-import { useUser } from '@aurastream/shared';
+import { useUser, createDevLogger } from '@aurastream/shared';
 import { cn } from '@/lib/utils';
+
+// Dev logger for this page
+const log = createDevLogger({ prefix: '[CreatePage]' });
 import {
   PlatformFilter,
   AssetTypeSelector,
@@ -117,8 +120,8 @@ export default function CreatePage() {
   }, []);
 
   const handleGenerateFromCoach = useCallback((refinedPrompt: string) => {
-    console.log('[CreatePage] handleGenerateFromCoach called with:', refinedPrompt);
-    console.log('[CreatePage] This should NOT be called when using new UX!');
+    log.info('handleGenerateFromCoach called with:', refinedPrompt);
+    log.warn('This should NOT be called when using new UX!');
     setPrompt(refinedPrompt);
     handleGenerate(refinedPrompt);
   }, []);

@@ -13,13 +13,16 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useUser } from '@aurastream/shared';
+import { useUser, createDevLogger } from '@aurastream/shared';
 import { CoachContextForm } from '../../../components/coach/CoachContextForm';
 import { CoachChatIntegrated, COACH_UX_2025_ENABLED } from '../../../components/coach';
 import { CoachChat } from '../../../components/coach/CoachChat';
 import { CoachTips } from '../../../components/coach/CoachTips';
 import type { StartCoachRequest } from '../../../hooks/useCoachContext';
 import type { Asset } from '../../../components/coach/generation';
+
+// Dev logger for this page
+const log = createDevLogger({ prefix: '[CoachPage]' });
 
 // ============================================================================
 // Type Definitions
@@ -175,7 +178,7 @@ export default function CoachPage() {
    * Handle generation complete from CoachChatIntegrated (new UX).
    */
   const handleGenerateComplete = useCallback((asset: Asset) => {
-    console.log('[CoachPage] Asset generated:', asset);
+    log.info('Asset generated:', asset);
     // Asset is saved automatically by the generation service
     // User can continue chatting or navigate to assets
   }, []);

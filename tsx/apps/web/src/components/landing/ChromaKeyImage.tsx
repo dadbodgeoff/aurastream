@@ -13,6 +13,8 @@ interface ChromaKeyImageProps {
   src: string;
   alt: string;
   className?: string;
+  /** Class name for the container div */
+  containerClassName?: string;
   /** Green tolerance (0-255), higher = more aggressive removal */
   tolerance?: number;
   /** Smoothing for edge blending */
@@ -23,10 +25,12 @@ export function ChromaKeyImage({
   src, 
   alt, 
   className,
+  containerClassName,
   tolerance = 100,
   smoothing = 20,
 }: ChromaKeyImageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const isMobile = useIsMobile();
@@ -98,7 +102,7 @@ export function ChromaKeyImage({
   }, [src, tolerance, smoothing, isMobile]);
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className={cn("relative flex items-center justify-center", containerClassName)}>
       {/* Loading skeleton */}
       {!isLoaded && (
         <div 
@@ -119,6 +123,8 @@ export function ChromaKeyImage({
         style={{
           maxWidth: '100%',
           maxHeight: '100%',
+          width: 'auto',
+          height: 'auto',
           objectFit: 'contain',
           filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))',
         }}

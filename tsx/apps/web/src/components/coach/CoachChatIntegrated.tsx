@@ -16,7 +16,10 @@
 
 import React, { memo, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { useReducedMotion } from '@aurastream/shared';
+import { useReducedMotion, createDevLogger } from '@aurastream/shared';
+
+// Dev logger for this component
+const log = createDevLogger({ prefix: '[CoachChat]' });
 
 // Hooks
 import { useCoachChat } from '../../hooks/useCoachChat';
@@ -52,10 +55,10 @@ import { useLightbox } from '../lightbox';
 
 const COACH_UX_2025_ENABLED = process.env.NEXT_PUBLIC_COACH_UX_2025 !== 'false';
 
-// Debug logging
+// Debug logging (only when dev logging is enabled)
 if (typeof window !== 'undefined') {
-  console.log('[CoachChatIntegrated] COACH_UX_2025_ENABLED:', COACH_UX_2025_ENABLED);
-  console.log('[CoachChatIntegrated] NEXT_PUBLIC_COACH_UX_2025:', process.env.NEXT_PUBLIC_COACH_UX_2025);
+  log.info('COACH_UX_2025_ENABLED:', COACH_UX_2025_ENABLED);
+  log.debug('NEXT_PUBLIC_COACH_UX_2025:', process.env.NEXT_PUBLIC_COACH_UX_2025);
 }
 
 // ============================================================================
@@ -523,20 +526,20 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
 
   // Handle generate now
   const handleGenerateNow = useCallback(async () => {
-    console.log('[CoachChatIntegrated] handleGenerateNow called');
-    console.log('[CoachChatIntegrated] refinedDescription:', refinedDescription);
-    console.log('[CoachChatIntegrated] isGenerationReady:', isGenerationReady);
-    console.log('[CoachChatIntegrated] isStreaming:', isStreaming);
+    log.info('handleGenerateNow called');
+    log.debug('refinedDescription:', refinedDescription);
+    log.debug('isGenerationReady:', isGenerationReady);
+    log.debug('isStreaming:', isStreaming);
     
     if (!refinedDescription || !isGenerationReady || isStreaming) {
-      console.log('[CoachChatIntegrated] handleGenerateNow - conditions not met, returning');
+      log.debug('handleGenerateNow - conditions not met, returning');
       return;
     }
 
     try {
       // Map the coach asset type to the backend generation asset type
       const backendAssetType = mapAssetTypeForGeneration(assetType);
-      console.log('[CoachChatIntegrated] Triggering generation with:', {
+      log.info('Triggering generation with:', {
         assetType: backendAssetType,
         customPrompt: refinedDescription,
         brandKitId,
@@ -548,9 +551,9 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         brandKitId,
       });
       
-      console.log('[CoachChatIntegrated] Generation triggered successfully');
+      log.info('Generation triggered successfully');
     } catch (err) {
-      console.error('[CoachChatIntegrated] Generation failed:', err);
+      log.error('Generation failed:', err);
       setLocalError(err instanceof Error ? err.message : 'Generation failed');
     }
   }, [refinedDescription, isGenerationReady, isStreaming, triggerGeneration, assetType, brandKitId]);

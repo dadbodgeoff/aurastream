@@ -14,6 +14,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useBrandKits } from '@aurastream/api-client';
+import { createDevLogger } from '@aurastream/shared';
 import { cn } from '@/lib/utils';
 import { 
   CoachChatIntegrated, 
@@ -24,6 +25,9 @@ import { useCoachChat } from '../../hooks/useCoachChat';
 import type { StartCoachRequest } from '../../hooks/useCoachContext';
 import type { Asset } from '../coach/generation';
 import { SparklesIcon } from './icons';
+
+// Dev logger for this component
+const log = createDevLogger({ prefix: '[CreateCoach]' });
 
 // ============================================================================
 // Types
@@ -294,9 +298,9 @@ export function CreateCoachIntegration({
   }, [onGenerateComplete]);
 
   // Use new UX if enabled
-  console.log('[CreateCoachIntegration] COACH_UX_2025_ENABLED:', COACH_UX_2025_ENABLED);
+  log.info('COACH_UX_2025_ENABLED:', COACH_UX_2025_ENABLED);
   if (COACH_UX_2025_ENABLED) {
-    console.log('[CreateCoachIntegration] Using CoachChatIntegrated (new UX)');
+    log.info('Using CoachChatIntegrated (new UX)');
     return (
       <CoachChatIntegrated
         assetType={assetType}
@@ -311,7 +315,7 @@ export function CreateCoachIntegration({
     );
   }
 
-  console.log('[CreateCoachIntegration] Using LegacyCoachIntegration (fallback)');
+  log.info('Using LegacyCoachIntegration (fallback)');
   // Fallback to legacy implementation
   return (
     <LegacyCoachIntegration

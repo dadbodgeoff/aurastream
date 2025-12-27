@@ -11,9 +11,12 @@
 
 import React, { memo, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useReducedMotion } from '@aurastream/shared';
+import { useReducedMotion, createDevLogger } from '@aurastream/shared';
 import { SuggestionChips } from './SuggestionChips';
 import type { Suggestion } from './useSuggestionContext';
+
+// Dev logger for this component
+const log = createDevLogger({ prefix: '[CoachInput]' });
 
 // ============================================================================
 // Type Definitions
@@ -187,7 +190,7 @@ const GenerateNowButton = memo(function GenerateNowButton({
   animate,
 }: GenerateNowButtonProps) {
   const handleClick = () => {
-    console.log('[GenerateNowButton] Button clicked!');
+    log.info('Generate Now button clicked');
     onClick();
   };
   

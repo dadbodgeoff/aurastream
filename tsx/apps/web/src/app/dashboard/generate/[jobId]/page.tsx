@@ -4,8 +4,11 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@aurastream/api-client';
-import { useAuth } from '@aurastream/shared';
+import { useAuth, createDevLogger } from '@aurastream/shared';
 import { useGenerationCelebration } from '@/hooks/useGenerationCelebration';
+
+// Dev logger for SSE debugging
+const log = createDevLogger({ prefix: '[SSE]' });
 
 interface GenerationProgress {
   type: 'progress' | 'completed' | 'failed' | 'heartbeat' | 'timeout' | 'error';
@@ -45,15 +48,15 @@ export default function GenerationProgressPage() {
 
   const connectToStream = useCallback(() => {
     const accessToken = getAccessToken();
-    console.log('[SSE] connectToStream called, jobId:', jobId, 'hasToken:', !!accessToken);
+    log.info('connectToStream called, jobId:', jobId, 'hasToken:', !!accessToken);
     if (!accessToken || !jobId) {
-      console.log('[SSE] Missing token or jobId, aborting');
+      log.debug('Missing token or jobId, aborting');
       return;
     }
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const url = `${apiBase}/api/v1/jobs/${jobId}/stream`;
-    console.log('[SSE] Connecting to:', url);
+    log.info('Connecting to:', url);
 
     // Use fetch with streaming for SSE with auth header
     const controller = new AbortController();
@@ -70,14 +73,14 @@ export default function GenerationProgressPage() {
       },
       signal: controller.signal,
     }).then(async (response) => {
-      console.log('[SSE] Response received, status:', response.status);
+      log.info('Response received, status:', response.status);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       
       const reader = response.body?.getReader();
       if (!reader) {
-        console.log('[SSE] No reader available');
+        log.debug('No reader available');
         return;
       }
       
@@ -87,7 +90,7 @@ export default function GenerationProgressPage() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
-          console.log('[SSE] Stream ended');
+          log.info('Stream ended');
           break;
         }
         
@@ -99,17 +102,17 @@ export default function GenerationProgressPage() {
           if (line.startsWith('data: ')) {
             try {
               const data: GenerationProgress = JSON.parse(line.slice(6));
-              console.log('[SSE] Event received:', data.type, data);
+              log.debug('Event received:', data.type, data);
               handleEvent(data);
             } catch (e) {
-              console.error('Failed to parse SSE data:', e);
+              log.error('Failed to parse SSE data:', e);
             }
           }
         }
       }
     }).catch((err) => {
       if (err.name !== 'AbortError') {
-        console.error('SSE connection error:', err);
+        log.error('SSE connection error:', err);
         setError('Connection lost. Please refresh the page.');
         setStatus('failed');
       }
@@ -150,10 +153,10 @@ export default function GenerationProgressPage() {
   };
 
   useEffect(() => {
-    console.log('[SSE] useEffect triggered, jobId:', jobId);
+    log.info('useEffect triggered, jobId:', jobId);
     const cleanup = connectToStream();
     return () => {
-      console.log('[SSE] Cleanup called');
+      log.debug('Cleanup called');
       cleanup?.();
     };
   }, [connectToStream]);
