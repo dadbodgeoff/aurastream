@@ -29,6 +29,9 @@ import { DashboardStatsSkeleton, AssetGridSkeleton } from '@/components/ui/skele
 // Usage Display
 import { UsageDisplay } from '@/components/usage';
 
+// Usage Stats Hook
+import { useUsageStats } from '@/hooks/useUsageStats';
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -65,6 +68,7 @@ export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { data: brandKitsData, isLoading: brandKitsLoading } = useBrandKits();
   const { data: assetsData, isLoading: assetsLoading } = useAssets({ limit: 10 });
+  const { data: usageData } = useUsageStats();
 
   const brandKits = brandKitsData?.brandKits ?? [];
   const recentAssets = assetsData?.assets ?? [];
@@ -72,9 +76,9 @@ export default function DashboardPage() {
   const hasNoBrandKits = brandKits.length === 0;
   const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
 
-  // Calculate usage
-  const assetsUsed = user?.assetsGeneratedThisMonth ?? 0;
-  const assetsLimit = isPremium ? -1 : 10; // -1 = unlimited
+  // Use fresh usage data from API, fallback to user object
+  const assetsUsed = usageData?.generationsUsed ?? user?.assetsGeneratedThisMonth ?? 0;
+  const assetsLimit = usageData?.generationsLimit ?? (isPremium ? -1 : 10);
 
   // Build activity feed from recent assets
   const activities = recentAssets.slice(0, 5).map((asset: any) => ({
