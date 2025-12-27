@@ -1,0 +1,88 @@
+# E2E Test Environment Docker Compose
+#
+# Usage:
+#   docker compose -f docker-compose.test.yml up --build
+#   docker compose -f docker-compose.test.yml run --rm e2e-runner
+#
+# This configuration extends the main docker-compose.yml and adds
+# an e2e-runner service for running end-to-end tests.
+
+services:
+  # API Service - FastAPI backend
+  api:
+    extends:
+      file: docker-compose.yml
+      service: api
+    environment:
+      - APP_ENV=development
+      - LOG_LEVEL=WARNING
+      - SUPABASE_URL=${SUPABASE_URL:-http://localhost:54321}
+      - SUPABASE_KEY=${SUPABASE_KEY:-test-key}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-test-service-key}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # Redis Service - Cache and job queue
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Web Service - Next.js frontend
+  web:
+    extends:
+      file: docker-compose.yml
+      service: web
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL:-http://localhost:54321}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_KEY:-test-key}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # E2E Test Runner
+  e2e-runner:
+    build:
+      context: .
+      dockerfile: e2e-orchestrator/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - E2E_API_URL=http://api:8000
+      - E2E_BASE_URL=http://web:3000
+      - E2E_REDIS_URL=redis://redis:6379
+      - E2E_USE_REAL_REDIS=true
+      - PYTHONPATH=/app
+    volumes:
+      - ./test-results:/app/test-results
+    command: python orchestrator.py --phase all --report json,console
+    networks:
+      - default
+
+networks:
+  default:
+    name: aurastream-test
+
+volumes:
+  redis_data:

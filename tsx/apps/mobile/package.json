@@ -1,0 +1,37 @@
+{
+  "name": "@aurastream/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "eslint src/",
+    "test": "jest --passWithNoTests"
+  },
+  "dependencies": {
+    "@aurastream/ui": "*",
+    "@aurastream/api-client": "*",
+    "@aurastream/shared": "*",
+    "expo": "~50.0.0",
+    "expo-router": "~3.4.0",
+    "expo-status-bar": "~1.11.0",
+    "react": "18.2.0",
+    "react-native": "0.73.0",
+    "react-native-safe-area-context": "4.8.2",
+    "react-native-screens": "~3.29.0",
+    "@tanstack/react-query": "^5.0.0",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@testing-library/react-native": "^11.5.0",
+    "@types/react": "~18.2.0",
+    "typescript": "^5.3.0",
+    "jest": "^29.0.0",
+    "jest-expo": "~50.0.0",
+    "react-test-renderer": "18.2.0"
+  }
+}

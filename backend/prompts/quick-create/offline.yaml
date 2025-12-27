@@ -1,0 +1,46 @@
+# Offline Screen - Twitch Channel (Offline 1920×1080)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: offline
+version: "1.0.0"
+category: twitch
+asset_type: twitch_offline
+dimensions:
+  width: 1920
+  height: 1080
+  aspect_ratio: "16:9"
+
+vibes:
+  pro:
+    name: "Technical Glitch"
+    prompt: |
+      A 16:9 'Technical Difficulties' aesthetic but professional. A dark screen with a subtle scan-line texture. A central frosted-glass UI box reads '{message}'. Below it, a clean schedule reads 'Next Stream: {schedule}'. Subtle RGB glitch effects on the borders, very high-end and informative.
+  
+  anime:
+    name: "Anime Away"
+    prompt: |
+      A 16:9 anime-style offline screen. A cute chibi version of a streamer character sleeping or waving goodbye. Soft dreamy background with stars. Text '{message}' in stylized anime font. 'Returning: {schedule}' in smaller text. Warm, friendly, anime aesthetic.
+  
+  playful:
+    name: "Cozy Desk"
+    prompt: |
+      A 16:9 wide-shot of an empty streamer's chair and a glowing desk at midnight. The monitors show a 'Goodbye' screen. A small sticky note on the monitor reads '{message}'. In the corner of the screen, the text 'Returning: {schedule}'. Soft moonlight coming through a window, peaceful, branded, and high-quality.
+
+placeholders:
+  - name: message
+    type: text
+    required: false
+    max_length: 40
+    default: "Currently Offline"
+  - name: schedule
+    type: text
+    required: false
+    max_length: 40
+    default: ""
+
+quality_modifiers:
+  - "offline aesthetic"
+  - "branded placeholder"
+  - "informative"
+  - "professional"
+  - "Twitch channel ready"

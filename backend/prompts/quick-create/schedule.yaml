@@ -1,0 +1,46 @@
+# Weekly Schedule - Streaming Calendar (Banner 1200×480)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: schedule
+version: "1.0.0"
+category: stream
+asset_type: banner
+dimensions:
+  width: 1200
+  height: 480
+  aspect_ratio: "2.5:1"
+
+vibes:
+  pro:
+    name: "Clean Minimalist"
+    prompt: |
+      A 2.5:1 horizontal flat-lay banner. A professional studio desk view with a matte-black desk mat. Five to seven clean white glass cards are arranged horizontally. Each card is etched with sharp sans-serif typography for '{days}' and '{times}'. A high-end camera lens and a controller are placed artistically in the margins. Soft global illumination, extremely organized and professional.
+  
+  anime:
+    name: "Retro Arcade"
+    prompt: |
+      A 2.5:1 horizontal neon arcade aesthetic. A series of glowing 80s-style CRT monitors arranged in a row. Each screen displays a day from '{days}' and a time from '{times}' in pixel-art fonts. Neon pink and electric blue 'Glow-wire' connects the monitors. The background is a dark grid-pattern 'Synthwave' landscape. High-contrast, nostalgic, and high-energy.
+  
+  playful:
+    name: "Colorful Calendar"
+    prompt: |
+      A 2.5:1 horizontal 3D render of a playful calendar board. Colorful 3D day blocks arranged in a row showing '{days}'. Each block has a cute clock icon displaying '{times}'. Soft pastel background with floating gaming icons. Clay-render aesthetic, cheerful and inviting, 8k textures.
+
+placeholders:
+  - name: days
+    type: text
+    required: true
+    max_length: 50
+    default: "Mon, Wed, Fri"
+  - name: times
+    type: text
+    required: false
+    max_length: 30
+    default: "Check schedule"
+
+quality_modifiers:
+  - "clean layout"
+  - "organized design"
+  - "readable typography"
+  - "professional"
+  - "calendar aesthetic"

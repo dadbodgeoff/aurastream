@@ -1,0 +1,99 @@
+# Custom Emote - Twitch Chat (Emote 112×112)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: emote
+version: "1.0.0"
+category: twitch
+asset_type: twitch_emote
+dimensions:
+  width: 112
+  height: 112
+  aspect_ratio: "1:1"
+
+vibes:
+  glossy:
+    name: "3D Glossy Sticker"
+    prompt: |
+      A 1:1 3D glossy vinyl emote. A cute chibi character representing a streamer expressing '{emotion}'. If '{text}' is provided, it is held on a small 3D sign. Thick white border, isolated on a flat green background. High-gloss finish, bold colors, readable at 28px.
+  
+  pixel:
+    name: "Pixel-Art Classic"
+    prompt: |
+      A 1:1 professional pixel-art emote. A 16-bit stylized character making a '{emotion}' face. Vibrant retro color palette, sharp 1-pixel outlines. If '{text}' is provided, it appears in pixel font. Simple, iconic, and extremely readable for Twitch chat. Isolated on a flat green background.
+  
+  modern-pixel:
+    name: "Modern 64-Bit"
+    prompt: |
+      A master-level modern pixel art Twitch emote. Subject: A focused icon or character expressing '{emotion}'. Style: High-fidelity 64-bit resolution with advanced sub-pixel shading and anti-aliasing. Palette: Vibrant, high-contrast arcade colors. Outline: A crisp, perfect 1-pixel black border to ensure a sharp silhouette in Twitch chat. Background: Isolated on a flat, solid neon-green background. Professional retro-future gaming aesthetic, pixel-perfect digital art.
+  
+  elite-glass:
+    name: "Elite Glass"
+    prompt: |
+      A sophisticated 'Glassmorphism' Twitch emote. Subject: A translucent icon representing '{emotion}' (e.g., a glowing heart or a lightning bolt). Material: Multi-layered frosted glass with realistic internal refraction and caustic light play. Accent: An internal glowing core that emits a soft light. Outline: A sharp, polished glass edge with ray-traced reflections. Background: Isolated on a flat, solid neon-green background. 8k resolution, looks like a premium spatial-computing UI asset.
+  
+  halftone-pop:
+    name: "Halftone Pop"
+    prompt: |
+      A vibrant 2D 'Pop Art' comic book style Twitch emote. Subject: A character or action-word '{text}' expressing extreme '{emotion}'. Style: Heavy ink brush strokes, dramatic halftone dot patterns for shading, and Ben-Day dots. Colors: High-saturation primary colors with a vintage yellow-paper texture. Detail: Dramatic speed lines and 'Kapow-style' action clouds. Background: Isolated on a flat, solid neon-green background. High-contrast, iconic, and professionally illustrated.
+  
+  marble-gold:
+    name: "Marble & Gold"
+    prompt: |
+      A hyper-realistic 3D luxury Twitch emote. Subject: A '{emotion}' themed object (e.g., a crown or a trophy). Material: Polished white Carrara marble with inlaid 24k liquid gold veins that glow slightly. Texture: Mirror-finish stone with realistic subsurface scattering. Lighting: Cinematic 'Museum-Grade' spotlights with sharp high-specular glints. Outline: A thick, polished gold beveled border. Background: Isolated on a flat, solid neon-green background. 8k resolution, peak designer-quality branding.
+  
+  cozy:
+    name: "Cozy Doodle"
+    prompt: |
+      A professional hand-drawn 'Doodle' style Twitch emote. Subject: A stylized character or object representing '{emotion}' (e.g., a steaming cup of coffee for 'comfy' or a sleepy cloud). Style: Soft pencil-sketch lines with watercolor-wash textures and a slightly messy, charming aesthetic. Lineart: Charcoal grey organic lines. Colors: Soft pastels with 'paper grain' texture visible. Isolated on a flat, solid neon-green background. Professional whimsical illustration, 8k resolution, clear and legible at small chat sizes.
+  
+  retro:
+    name: "Retro 90s Holographic"
+    prompt: |
+      A single 3D holographic sticker Twitch emote. Subject: A vibrant '{emotion}' icon (e.g., a lightning bolt for 'hype' or a crying moon for 'sad'). Style: 90s retro-future with a 'Prismatic Iridescent' foil finish that shifts colors in the light. Detail: Faux-embossed texture with a thick, jagged white 'Sticker-Peel' border. Lighting: Vibrant 'Flash-Photography' reflections. Isolated on a flat, solid neon-green background. High-contrast, nostalgic, and extremely eye-catching.
+  
+  anime:
+    name: "Cel-Shaded Anime"
+    prompt: |
+      A professional anime-style Twitch emote. Subject: A high-detail chibi head of a character expressing an exaggerated '{emotion}'. Style: 'Modern Cel-Shaded' with sharp, clean ink lines and distinct 3-tone shadow blocks. Eyes: Large, expressive 'Glistening' anime eyes. Outline: A thick, consistent black stroke for chat readability. Background: Isolated on a flat, solid neon-green background. Ufotable or Studio MAPPA aesthetic, vibrant colors, 8k digital art.
+  
+  vaporwave:
+    name: "Vaporwave Neon"
+    prompt: |
+      A minimalist 'Vaporwave' neon Twitch emote. Subject: A glowing wireframe or vector icon representing '{emotion}' (e.g., a 3D heart or a 'GG' badge). Style: Translucent neon glass tubing with an internal 'Electric Glow'. Colors: Cyber-pink and electric-blue gradients. Detail: Subtle digital 'Glitch' artifacts on the edges. Isolated on a flat, solid neon-green background. Sharp, clean vectors, high-end digital broadcast quality.
+  
+  tactical:
+    name: "Tactical Patch"
+    prompt: |
+      A hyper-realistic 3D embroidered tactical patch Twitch emote. Subject: A '{emotion}' themed design (e.g., a shield, medal, or character face). Texture: Highly detailed individual thread-weave patterns and 'Merrowed' stitched edges. Material: Tactical nylon fabric with slightly frayed high-quality embroidery. Lighting: Soft side-lighting to emphasize the 'Thread-Depth' and physical height of the embroidery. Isolated on a flat, solid neon-green background. 8k resolution macro photography, indistinguishable from a real physical patch.
+  
+  kawaii:
+    name: "Kawaii Blob"
+    prompt: |
+      A 1:1 ultra-cute 'Blob' style Twitch emote. A round, squishy character with minimal features expressing '{emotion}'. Soft gradient shading, tiny sparkle highlights. If '{text}' is provided, it floats above in a cute bubble. Pastel colors, maximum cuteness, isolated on flat green background. Kawaii aesthetic, readable at all sizes.
+
+placeholders:
+  - name: emotion
+    type: select
+    required: true
+    options:
+      - hype
+      - sad
+      - laugh
+      - love
+      - comfy
+      - rage
+      - pog
+      - gg
+    default: "hype"
+  - name: text
+    type: text
+    required: false
+    max_length: 10
+    default: ""
+
+quality_modifiers:
+  - "emote style"
+  - "expressive"
+  - "small-size optimized"
+  - "clear silhouette"
+  - "Twitch chat ready"

@@ -1,0 +1,143 @@
+# Logo Generation Templates - PFP & Social Avatars
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+# These templates are optimized for solid backgrounds with global illumination
+
+name: logo
+version: "1.0.0"
+category: branding
+asset_type: logo
+dimensions:
+  width: 512
+  height: 512
+  aspect_ratio: "1:1"
+
+vibes:
+  studio-minimalist:
+    name: "Studio Minimalist"
+    description: "Clean, professional icon perfect for Discord or Twitter avatars"
+    prompt: |
+      A professional 3D minimalist logo for '{name}'. The icon is a bold, geometric '{icon}' shape. Material: Matte-finish ceramic with polished beveled edges. The logo is centered and floating slightly in front of a flat, solid {background_color} studio wall. Lighting: Soft top-down studio lighting that casts a gentle, realistic drop-shadow onto the {background_color} surface. 8k resolution, clean-cut, high-end corporate gaming brand.
+
+  collectible:
+    name: "Collectible"
+    description: "Designer vinyl toy aesthetic for personality streamers"
+    prompt: |
+      A professional 3D mascot logo of a stylized {icon} character. Style: Designer vinyl toy with a high-gloss finish. The mascot is standing on a clean surface against a solid {background_color} background. Detail: The {background_color} reflects subtly in the character's glossy surface. Lighting: Vibrant 'Three-Point' studio lighting, creating a 'pop' effect. 8k resolution, playful, clean, and modern.
+
+  stealth-pro:
+    name: "Stealth Pro"
+    description: "High-contrast obsidian and neon for bold color choices"
+    prompt: |
+      A luxury 'After Dark' logo for '{name}'. Icon: A sharp, minimalist '{icon}' emblem. Material: Deep polished obsidian with glowing neon-light channels. The logo is set against a solid, vibrant {background_color} background. Lighting: The neon channels in the logo cast a soft colored glow onto the {background_color} wall. High-specular reflections, sharp cinematic edges, elite pro-esports quality.
+
+  liquid-flow:
+    name: "Liquid Flow"
+    description: "Organic chrome that reflects the background color beautifully"
+    prompt: |
+      A professional 'Liquid Chrome' logo for '{name}'. Icon: An organic, fluid '{icon}' shape. The logo is floating in front of a solid {background_color} backdrop. Material: Hyper-reflective mirror chrome. Crucial Detail: The chrome surface perfectly reflects the {background_color} environment, creating a beautiful color-shift effect. Lighting: Soft studio lights, 8k resolution, mesmerising and ultra-modern.
+
+  heavy-metal:
+    name: "Heavy Metal"
+    description: "Esports championship badge with dramatic lighting"
+    prompt: |
+      A 3D esports-style crest logo for '{name}'. Subject: A powerful {icon} emblem inside a brushed-metal shield. The logo is resting on a textured matte surface of a solid {background_color} color. Lighting: Strong 'Rembrandt' side-lighting that emphasizes the metallic grain and casts a deep, realistic shadow onto the {background_color} background. 8k resolution, authoritative and high-production.
+
+placeholders:
+  - name: name
+    type: text
+    required: true
+    max_length: 50
+    description: "Your brand or channel name"
+    default: ""
+  
+  - name: icon
+    type: select
+    required: true
+    description: "The main icon/symbol for your logo"
+    options:
+      - wolf
+      - dragon
+      - phoenix
+      - lion
+      - eagle
+      - skull
+      - crown
+      - lightning bolt
+      - flame
+      - sword
+      - shield
+      - star
+      - moon
+      - sun
+      - crystal
+      - diamond
+      - heart
+      - controller
+      - headset
+      - keyboard
+      - cat
+      - fox
+      - bear
+      - owl
+      - raven
+      - snake
+      - tiger
+      - panther
+      - robot
+      - alien
+      - ninja
+      - samurai
+      - knight
+      - wizard
+      - demon
+      - angel
+    default: "wolf"
+  
+  - name: background_color
+    type: color
+    required: true
+    description: "Solid background color for global illumination"
+    presets:
+      - name: "Deep Purple"
+        value: "#1a0a2e"
+      - name: "Midnight Blue"
+        value: "#0d1b2a"
+      - name: "Charcoal"
+        value: "#1c1c1c"
+      - name: "Hot Pink"
+        value: "#ff1493"
+      - name: "Electric Lime"
+        value: "#ccff00"
+      - name: "Cyber Teal"
+        value: "#00ffcc"
+      - name: "Blood Red"
+        value: "#8b0000"
+      - name: "Royal Gold"
+        value: "#ffd700"
+      - name: "Forest Green"
+        value: "#0b3d0b"
+      - name: "Ocean Blue"
+        value: "#006994"
+    default: "#1a0a2e"
+
+quality_modifiers:
+  - "professional studio photography"
+  - "global illumination"
+  - "realistic shadows"
+  - "color reflection"
+  - "8k resolution"
+  - "social media avatar optimized"
+
+output_variants:
+  - name: "primary"
+    size: 512
+    description: "Full resolution for profile pictures"
+  - name: "discord"
+    size: 128
+    description: "Optimized for Discord avatars"
+  - name: "twitter"
+    size: 400
+    description: "Optimized for Twitter/X profile"
+  - name: "favicon"
+    size: 32
+    description: "Small icon for browser tabs"

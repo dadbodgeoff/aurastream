@@ -1,0 +1,51 @@
+# Going Live - Stream Announcement (Story Graphic 1080×1920)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: going-live
+version: "1.0.0"
+category: stream
+asset_type: story_graphic
+dimensions:
+  width: 1080
+  height: 1920
+  aspect_ratio: "9:16"
+
+vibes:
+  pro:
+    name: "Pro Aesthetic"
+    prompt: |
+      A vertical 9:16 high-end photography shot of a professional streamer's setup at night. Foreground: A high-detail blurred view of a mechanical keyboard and a high-end microphone. Center: A floating frosted-glass UI panel with sharp white text reading '{title}'. Below it, the game '{game}' is displayed in a minimalist tag. Lighting: Soft teal and pink 'Gamer-Glow' from Nanoleafs in the background. Cinematic bokeh, ray-traced reflections, 8k resolution.
+  
+  anime:
+    name: "Anime Hype"
+    prompt: |
+      A vertical 9:16 cinematic anime-style illustration. A stylized character representing the streamer in a dynamic heroic pose, surrounded by glowing energy auras matching the world of {game}. Massive, stylized block typography at the top reads '{title}'. A digital clock-font at the bottom reads '{time}'. Vibrant cel-shaded colors, dramatic speed lines, high-octane energy, Ufotable studio art style.
+  
+  playful:
+    name: "3D Toy"
+    prompt: |
+      A vertical 9:16 3D render of a custom designer vinyl toy figurine of a streamer holding a {game} weapon. The figurine is in a high-gloss finish. The background is a vibrant, solid color studio. Floating 3D bubble letters in the air spell out '{title}'. A small 3D 'LIVE' tag shows '{time}'. Soft studio lighting, clay-render aesthetic, playful and colorful, 8k textures.
+
+placeholders:
+  - name: title
+    type: text
+    required: true
+    max_length: 50
+    default: "Going Live"
+  - name: game
+    type: text
+    required: false
+    max_length: 30
+    default: "gaming"
+  - name: time
+    type: text
+    required: false
+    max_length: 20
+    default: "LIVE NOW"
+
+quality_modifiers:
+  - "high contrast"
+  - "bold typography"
+  - "mobile-optimized"
+  - "professional streaming aesthetic"
+  - "vibrant colors"

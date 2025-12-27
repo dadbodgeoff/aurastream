@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+
+# Environment files (SENSITIVE - never commit!)
+.env
+.env.local
+.env.*.local
+backend/.env
+tsx/.env
+tsx/apps/web/.env.local
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.egg-info/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.coverage
+htmlcov/
+
+# Docker
+*.pid
+
+# Swift
+swift/.build/
+swift/.swiftpm/
+
+# Misc
+*.bak
+*.tmp
+.turbo/

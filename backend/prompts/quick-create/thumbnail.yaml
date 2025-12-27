@@ -1,0 +1,92 @@
+# YouTube Thumbnail (Thumbnail 1280×720)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: thumbnail
+version: "1.0.0"
+category: social
+asset_type: thumbnail
+dimensions:
+  width: 1280
+  height: 720
+  aspect_ratio: "16:9"
+
+vibes:
+  aesthetic-pro:
+    name: "Aesthetic Pro"
+    prompt: |
+      A 16:9 high-end YouTube thumbnail. Background: A blurred, cinematic wide-angle shot of a cozy streamer's room with purple Nanoleaf wall lights and warm fairy lights. Center-Right: A high-detail, heroic render of a character looking cool and approachable. Text: A floating frosted-glass UI panel on the left contains the title '{title}' in bold, sharp white typography. Below it, the subtitle '{subtitle}' in a soft glowing accent color. Lighting: Volumetric 'Gamer-Glow' and soft bokeh. 8k resolution, professionally designed, clean and sophisticated.
+  
+  viral-hype:
+    name: "Viral Hype"
+    prompt: |
+      A high-octane 16:9 YouTube thumbnail designed for maximum CTR. Foreground: A high-detail character striking an intense battle pose, facing the viewer. The character has a thick, vibrant white glowing 'Sticker-Outline' to pop off the background. Background: A high-contrast action scene with dramatic speed lines radiating from the center. Text: Massive, blocky 3D lettering at the top reads '{title}' in vibrant yellow with a heavy black drop-shadow. The subtitle '{subtitle}' is tilted for energy. Lighting: High-saturation, cinematic orange and teal color grading, 8k resolution.
+  
+  anime-cinematic:
+    name: "Anime Cinematic"
+    prompt: |
+      A 16:9 cinematic anime-style YouTube thumbnail. Background: A stylized, cel-shaded environmental render of a dramatic location during a sunset. Center: A stylized anime-version character with intense 'Battle-Glow' eyes and dynamic wind-swept hair. Text: Large, stylized block typography reads '{title}' with a 'Chroma-Aberration' glitch effect. The subtitle '{subtitle}' is written in sharp Japanese-style English font. Style: Ufotable or MAPPA studio aesthetic, vibrant colors, dramatic lighting, sharp digital illustration.
+  
+  playful-3d:
+    name: "Playful 3D"
+    prompt: |
+      A professional 3D-render YouTube thumbnail in a 'Designer Toy' aesthetic. Foreground: A cute, high-gloss 3D vinyl figurine version of a character, waving at the camera. Material: Glossy plastic and soft-touch clay. Text: Large, chunky 'Bubble-Text' floating in 3D space reads '{title}'. Subtitle '{subtitle}' is written on a 3D wooden sign or floating digital tag. Background: A colorful, soft-focus 'Toy-World' environment. Lighting: Bright, cheerful studio lighting with soft shadows. 8k resolution, playful and vibrant.
+  
+  after-dark:
+    name: "After Dark"
+    prompt: |
+      A 16:9 'Tactical-Noir' YouTube thumbnail. Background: A dark, moody night-ops scene with emerald green emergency lights and deep shadows. Center: A character wearing tactical gear, illuminated by a sharp side-light (rim lighting) in a vibrant cyan. Material: Matte carbon fiber and glowing glass. Text: Razor-sharp 'Ink-Trap' typography at the top reads '{title}' in a glowing white neon font. Below, the subtitle '{subtitle}' in a small, minimalist tech-tag. Detail: Cinematic rain particles and realistic lens flares. 8k resolution, elite pro-esports aesthetic.
+  
+  pro:
+    name: "The Shock Face"
+    prompt: |
+      A 16:9 YouTube thumbnail. Foreground: A high-detail, expressive 3D character making an 'insane' shocked face, looking directly at the camera with a thick white glowing outline. Background: A mysterious or rare location with a bright red arrow pointing at a 'Secret'. Massive blocky text reads '{title}' in the top-left. Subtitle '{subtitle}' in a smaller yellow font below. High contrast, high saturation.
+  
+  anime:
+    name: "The Duel"
+    prompt: |
+      A 16:9 cinematic 'Versus' composition. Two legendary character skins facing off, split down the middle by a bolt of lightning. Left side is blue, right side is red. Large metallic 3D text '{title}' spans the center. '{subtitle}' in dramatic subtitle font below. Vivid colors, dramatic lighting, sharp detail, designed to stand out on a crowded YouTube homepage.
+  
+  playful:
+    name: "Cartoon Pop"
+    prompt: |
+      A 16:9 colorful cartoon-style thumbnail. A cute exaggerated character with big eyes making an excited expression. Bold 3D bubble letters spell '{title}'. '{subtitle}' in a playful handwritten font. Vibrant purple and cyan gradient background with stars and sparkles. Fun, clickable, family-friendly aesthetic with gaming energy.
+  
+  color-pop:
+    name: "Color Pop"
+    prompt: |
+      A 16:9 high-impact YouTube thumbnail with a bold {background_scheme} background. Center: A dynamic character or subject with a thick white glowing outline to pop off the background. The background features {background_scheme} with subtle geometric patterns or gradients for depth. Text: Large, bold 3D typography reads '{title}' with a contrasting drop shadow. Subtitle '{subtitle}' in a clean sans-serif font below. Style: High contrast, vibrant saturation, professional color grading. The color scheme creates visual harmony while maximizing click-through appeal. 8k resolution, eye-catching, YouTube optimized.
+
+placeholders:
+  - name: title
+    type: text
+    required: true
+    max_length: 40
+    default: "INSANE!"
+  - name: subtitle
+    type: text
+    required: false
+    max_length: 30
+    default: ""
+  - name: background_scheme
+    type: select
+    required: false
+    max_length: 100
+    default: "vibrant purple and cyan gradient"
+    options:
+      - "vibrant purple and cyan gradient"
+      - "fiery orange and red gradient"
+      - "electric blue and neon green"
+      - "sunset pink and gold"
+      - "deep navy and silver"
+      - "lime green and black"
+      - "hot pink and electric purple"
+      - "teal and coral"
+      - "crimson red and dark gray"
+      - "golden yellow and royal blue"
+
+quality_modifiers:
+  - "high impact"
+  - "click-worthy"
+  - "YouTube optimized"
+  - "expressive"
+  - "thumbnail best practices"

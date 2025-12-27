@@ -1,0 +1,49 @@
+# Milestone - Achievement Celebration (Story Graphic 1080×1920)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: milestone
+version: "1.0.0"
+category: social
+asset_type: story_graphic
+dimensions:
+  width: 1080
+  height: 1920
+  aspect_ratio: "9:16"
+
+vibes:
+  pro:
+    name: "Golden Trophy"
+    prompt: |
+      A vertical 9:16 3D render of a massive, polished gold trophy shaped like the number '{count}'. The trophy is sitting on a high-gloss stage reflecting 'Gamer-Blue' stage lights. Floating 3D text above reads 'NEW {type} ACHIEVED'. Falling 3D metallic confetti and volumetric spotlights. Triumphant, luxury esports aesthetic.
+  
+  anime:
+    name: "Level Up"
+    prompt: |
+      A vertical 9:16 anime-style level-up celebration. Dramatic golden light rays bursting from center. The number '{count}' rendered in massive metallic 3D with energy aura. Floating icons representing {type} swirling around. Vibrant cel-shaded style, epic achievement moment, anime game aesthetic.
+  
+  playful:
+    name: "Pop-Art Celebration"
+    prompt: |
+      A vertical 9:16 vibrant pop-art illustration. A large, comic-book style speech bubble contains the number '{count}'. Surrounding the number are 3D icons of {type} (hearts for followers, stars for subs). Bright 'Halftone' patterns in the background, neon colors, 'Level Up' energy, very high energy.
+
+placeholders:
+  - name: type
+    type: select
+    required: true
+    options:
+      - followers
+      - subs
+      - viewers
+    default: "followers"
+  - name: count
+    type: text
+    required: true
+    max_length: 20
+    default: "1,000"
+
+quality_modifiers:
+  - "celebratory"
+  - "bold typography"
+  - "achievement aesthetic"
+  - "festive elements"
+  - "social media story"

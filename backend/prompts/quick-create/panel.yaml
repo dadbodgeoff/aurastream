@@ -1,0 +1,45 @@
+# Channel Panel - Twitch Profile (Panel 320×160)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: panel
+version: "1.0.0"
+category: twitch
+asset_type: twitch_panel
+dimensions:
+  width: 320
+  height: 160
+  aspect_ratio: "2:1"
+
+vibes:
+  pro:
+    name: "Matte Hardware"
+    prompt: |
+      A 2:1 horizontal Twitch panel. A 3D render of a matte-white gaming controller or headset on the left. The text '{type}' in a clean, bold black sans-serif font on the right. Background is a soft grey gradient with a subtle hexagonal texture. Professional, minimalist, and high-end.
+  
+  anime:
+    name: "Neon Sign"
+    prompt: |
+      A 2:1 horizontal neon sign aesthetic. A glowing glass tube shaped like a gaming icon next to the word '{type}' in a vibrant neon font. The background is a dark brick wall with soft color spill. Warm, inviting, 'Night-stream' aesthetic.
+  
+  playful:
+    name: "Cute Icon"
+    prompt: |
+      A 2:1 horizontal panel with cute 3D icon style. A playful cartoon icon representing '{type}' on the left. Bold colorful text '{type}' on the right. Soft pastel gradient background. Friendly, approachable, kawaii-inspired aesthetic.
+
+placeholders:
+  - name: type
+    type: select
+    required: true
+    options:
+      - about
+      - schedule
+      - rules
+      - donate
+    default: "about"
+
+quality_modifiers:
+  - "clean design"
+  - "professional"
+  - "Twitch panel style"
+  - "consistent branding"
+  - "profile aesthetic"

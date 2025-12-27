@@ -1,0 +1,189 @@
+{
+  "config": {
+    "configFile": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/playwright.config.ts",
+    "rootDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 1,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/results.json"
+        }
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "test-results/html",
+          "open": "on-failure"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/test-results/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 0
+      },
+      {
+        "outputDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/test-results/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 0
+      },
+      {
+        "outputDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/test-results/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-chrome",
+        "name": "mobile-chrome",
+        "testDir": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 0
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "smoke/dashboard.spec.ts",
+      "file": "smoke/dashboard.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Dashboard Redirects",
+          "file": "smoke/dashboard.spec.ts",
+          "line": 72,
+          "column": 6,
+          "specs": [
+            {
+              "title": "old /generate should redirect (eventually to /create or /login)",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 0,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 17836064,
+                      "error": {
+                        "message": "Error: page.goto: Target page, context or browser has been closed",
+                        "stack": "Error: page.goto: Target page, context or browser has been closed\n    at /Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/smoke/dashboard.spec.ts:81:16",
+                        "location": {
+                          "file": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/smoke/dashboard.spec.ts",
+                          "column": 16,
+                          "line": 81
+                        },
+                        "snippet": "  79 |\n  80 |   test(\"old /generate should redirect (eventually to /create or /login)\", async ({ page }) => {\n> 81 |     await page.goto(\"/dashboard/generate\");\n     |                ^\n  82 |     // Wait for client-side redirect to complete\n  83 |     await page.waitForTimeout(2000);\n  84 |     const url = page.url();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/smoke/dashboard.spec.ts",
+                            "column": 16,
+                            "line": 81
+                          },
+                          "message": "Error: page.goto: Target page, context or browser has been closed\n\n  79 |\n  80 |   test(\"old /generate should redirect (eventually to /create or /login)\", async ({ page }) => {\n> 81 |     await page.goto(\"/dashboard/generate\");\n     |                ^\n  82 |     // Wait for client-side redirect to complete\n  83 |     await page.waitForTimeout(2000);\n  84 |     const url = page.url();\n    at /Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/smoke/dashboard.spec.ts:81:16"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2025-12-26T21:55:04.673Z",
+                      "annotations": [],
+                      "attachments": [],
+                      "errorLocation": {
+                        "file": "/Users/geoffreyfernald/streamer suite/tsx/apps/web/e2e/smoke/dashboard.spec.ts",
+                        "column": 16,
+                        "line": 81
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "a9421f2616aaa838a179-51bd894a76c32a44f13e",
+              "file": "smoke/dashboard.spec.ts",
+              "line": 80,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "message": "\u001b[31mTesting stopped early after 1 maximum allowed failures.\u001b[39m"
+    }
+  ],
+  "stats": {
+    "startTime": "2025-12-26T21:55:04.371Z",
+    "duration": 17838813.053,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  }
+}

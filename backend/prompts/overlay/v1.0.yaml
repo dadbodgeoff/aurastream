@@ -1,0 +1,26 @@
+name: overlay
+version: "1.0"
+base_prompt: |
+  Create a stream overlay graphic with {tone} style.
+  Use colors: {primary_colors}.
+  Accent colors: {accent_colors}.
+  Typography style: {headline_font} for headlines, {body_font} for body text.
+  Style reference: {style_reference}
+  {custom_prompt}
+quality_modifiers:
+  - "high quality"
+  - "professional streaming overlay"
+  - "clean design"
+  - "transparent background compatible"
+  - "1080p resolution"
+  - "modern aesthetic"
+  - "readable text"
+  - "stream-ready"
+placeholders:
+  - tone
+  - primary_colors
+  - accent_colors
+  - headline_font
+  - body_font
+  - style_reference
+  - custom_prompt

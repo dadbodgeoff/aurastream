@@ -1,0 +1,124 @@
+# Aurastream - Full Stack Docker Compose
+# Brings up: Backend API, Redis, Worker, Web Frontend
+
+services:
+  # =============================================================================
+  # Backend Services
+  # =============================================================================
+  
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - aurastream
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - aurastream
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: rq worker --url redis://redis:6379 generation
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      replicas: 4
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # =============================================================================
+  # Frontend Services
+  # =============================================================================
+  
+  web:
+    build:
+      context: ./tsx
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+      - WATCHPACK_POLLING=true
+    volumes:
+      # Mount source files for hot reload, but preserve container's node_modules
+      - ./tsx/apps/web/src:/app/apps/web/src
+      - ./tsx/apps/web/public:/app/apps/web/public
+      - ./tsx/packages/ui/src:/app/packages/ui/src
+      - ./tsx/packages/shared/src:/app/packages/shared/src
+      - ./tsx/packages/api-client/src:/app/packages/api-client/src
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - aurastream
+    restart: unless-stopped
+
+networks:
+  aurastream:
+    driver: bridge
+
+volumes:
+  redis_data:
+
+# =============================================================================
+# E2E Validation (Optional - run with: docker compose run e2e-validate)
+# =============================================================================
+# 
+# To validate the stack after startup:
+#   docker compose run --rm e2e-validate
+#
+# Or use the local script:
+#   ./scripts/validate-startup.sh
+#

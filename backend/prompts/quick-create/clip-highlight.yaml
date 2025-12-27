@@ -1,0 +1,46 @@
+# Clip Highlight - Social Share (Clip Cover 1080×1080)
+# PROPRIETARY - DO NOT EXPOSE TO FRONTEND
+
+name: clip-highlight
+version: "1.0.0"
+category: social
+asset_type: clip_cover
+dimensions:
+  width: 1080
+  height: 1080
+  aspect_ratio: "1:1"
+
+vibes:
+  pro:
+    name: "Action Freeze-Frame"
+    prompt: |
+      A square 1:1 high-impact action shot. A character from {game} captured mid-air during an explosion. High-motion blur on the environment, but the character is razor-sharp. Large bold yellow text with a heavy black stroke reads '{title}'. High-saturation color grading, 'Victory Royale' aesthetic, designed for maximum scroll-stopping impact on social media.
+  
+  anime:
+    name: "Manga Speed-Line"
+    prompt: |
+      A square 1:1 black and white manga-style illustration with vibrant color accents. A character making a shocked 'Hype' expression. Dramatic black ink speed lines radiating from the center. Bold 'Katakana-style' English text reads '{title}'. High contrast, sharp edges, extremely stylized and professional.
+  
+  playful:
+    name: "Pop Victory"
+    prompt: |
+      A square 1:1 3D pop-art style render. A cute chibi character celebrating with confetti. Bold 3D bubble text reads '{title}'. Bright saturated colors, comic-style halftone patterns in background. Playful victory aesthetic, social media optimized, 8k textures.
+
+placeholders:
+  - name: title
+    type: text
+    required: true
+    max_length: 40
+    default: "Epic Moment"
+  - name: game
+    type: text
+    required: false
+    max_length: 30
+    default: "gaming"
+
+quality_modifiers:
+  - "action-packed"
+  - "dramatic lighting"
+  - "high impact"
+  - "social media optimized"
+  - "gaming highlight aesthetic"
