@@ -1,0 +1,131 @@
+# =============================================================================
+# AuraStream - Production Docker Compose
+# =============================================================================
+# For DigitalOcean deployment at aurastream.shop
+# 
+# PORT ALLOCATION (to avoid conflicts with other apps on same droplet):
+# - API:   8001 (external) -> 8000 (internal)
+# - Web:   3001 (external) -> 3000 (internal)
+# - Redis: 6381 (external) -> 6379 (internal)
+#
+# NOTE: This does NOT include nginx - add AuraStream routes to your existing
+# nginx config that handles SSL for the droplet.
+# =============================================================================
+
+services:
+  # =============================================================================
+  # Backend API - Port 8001
+  # =============================================================================
+  
+  aurastream-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aurastream-api
+    ports:
+      - "8001:8000"
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - REDIS_URL=redis://aurastream-redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      aurastream-redis:
+        condition: service_healthy
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000 --workers 4
+    networks:
+      - aurastream-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # =============================================================================
+  # Redis (Job Queue & Cache) - Port 6381
+  # =============================================================================
+  
+  aurastream-redis:
+    image: redis:7-alpine
+    container_name: aurastream-redis
+    ports:
+      - "6381:6379"
+    volumes:
+      - aurastream_redis_data:/data
+    networks:
+      - aurastream-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # =============================================================================
+  # Background Workers (no external port needed)
+  # =============================================================================
+  
+  aurastream-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://aurastream-redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      aurastream-redis:
+        condition: service_healthy
+    command: rq worker --url redis://aurastream-redis:6379 generation
+    networks:
+      - aurastream-net
+    restart: unless-stopped
+    deploy:
+      replicas: 4
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # =============================================================================
+  # Next.js Frontend - Port 3001
+  # =============================================================================
+  
+  aurastream-web:
+    build:
+      context: ./tsx
+      dockerfile: apps/web/Dockerfile
+      target: prod
+      args:
+        - NEXT_PUBLIC_API_URL=https://aurastream.shop/api
+        - NEXT_PUBLIC_APP_URL=https://aurastream.shop
+        - NEXT_PUBLIC_SUPABASE_URL=https://qgyvdadgdomnubngfpun.supabase.co
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFneXZkYWRnZG9tbnVibmdmcHVuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NDEzMzIsImV4cCI6MjA4MjExNzMzMn0.prP5BzHMW9DaM3MY7CjfWiMOgVjCnYADmjcSacqrA00
+    container_name: aurastream-web
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      aurastream-api:
+        condition: service_healthy
+    networks:
+      - aurastream-net
+    restart: unless-stopped
+
+networks:
+  aurastream-net:
+    driver: bridge
+    name: aurastream-net
+
+volumes:
+  aurastream_redis_data:
+    name: aurastream_redis_data
