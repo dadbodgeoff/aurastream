@@ -37,6 +37,18 @@ class CommunityFeedService:
             logger.error(f"Error fetching user summary for {user_id}: {e}")
         return None
 
+    async def _batch_get_user_summaries(self, user_ids: List[str]) -> dict[str, UserSummary]:
+        """Batch fetch user summaries for multiple users in a single query."""
+        if not user_ids:
+            return {}
+        try:
+            result = self.db.table("users").select("id, display_name, avatar_url").in_("id", list(set(user_ids))).execute()
+            return {r["id"]: UserSummary(id=r["id"], display_name=r["display_name"], avatar_url=r.get("avatar_url")) 
+                    for r in (result.data or [])}
+        except Exception as e:
+            logger.error(f"Error batch fetching user summaries: {e}")
+            return {}
+
     async def _check_viewer_liked(self, post_id: str, viewer_id: Optional[str]) -> bool:
         """Check if viewer has liked a post."""
         if not viewer_id:
@@ -47,14 +59,34 @@ class CommunityFeedService:
         except Exception:
             return False
 
+    async def _batch_check_viewer_likes(self, post_ids: List[str], viewer_id: Optional[str]) -> set[str]:
+        """Batch check which posts the viewer has liked."""
+        if not viewer_id or not post_ids:
+            return set()
+        try:
+            result = self.db.table("community_likes").select("post_id").in_("post_id", post_ids).eq("user_id", viewer_id).execute()
+            return {r["post_id"] for r in (result.data or [])}
+        except Exception:
+            return set()
+
     async def _enrich_posts(self, posts: List[dict], viewer_id: Optional[str]) -> List[CommunityPostWithAuthorResponse]:
-        """Add author info and like status to posts."""
+        """Add author info and like status to posts using batch queries."""
+        if not posts:
+            return []
+        
+        # Batch fetch all user summaries and like statuses
+        user_ids = [post["user_id"] for post in posts]
+        post_ids = [post["id"] for post in posts]
+        
+        user_map = await self._batch_get_user_summaries(user_ids)
+        liked_posts = await self._batch_check_viewer_likes(post_ids, viewer_id)
+        
         enriched = []
         for post in posts:
-            author = await self._get_user_summary(post["user_id"])
+            author = user_map.get(post["user_id"])
             if not author:
                 continue
-            is_liked = await self._check_viewer_liked(post["id"], viewer_id)
+            is_liked = post["id"] in liked_posts
             enriched.append(CommunityPostWithAuthorResponse(
                 id=post["id"], user_id=post["user_id"], asset_id=post["asset_id"],
                 title=post["title"], description=post.get("description"),

@@ -59,13 +59,14 @@ export function usePinnedMessage() {
   });
 }
 
-export function useLeaderboard() {
+export function useLeaderboard(enabled = true) {
   return useQuery({
     queryKey: promoKeys.leaderboard(),
     queryFn: async (): Promise<LeaderboardResponse> => {
       const result = await apiClient.promo.getLeaderboard();
       return result as LeaderboardResponse;
     },
+    enabled,
   });
 }
 

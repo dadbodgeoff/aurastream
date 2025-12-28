@@ -108,6 +108,7 @@ export function useCommunityPosts(filters?: PostFilters) {
       if (!res.ok) throw new Error('Failed to fetch community posts');
       return transformPaginatedPosts(await res.json());
     },
+    enabled: filters !== undefined,
   });
 }
 
@@ -123,7 +124,7 @@ export function useCommunityPost(postId: string | undefined) {
   });
 }
 
-export function useFeaturedPosts(limit?: number) {
+export function useFeaturedPosts(limit?: number, enabled = true) {
   return useQuery({
     queryKey: communityKeys.featured(),
     queryFn: async (): Promise<CommunityPostWithAuthor[]> => {
@@ -132,10 +133,11 @@ export function useFeaturedPosts(limit?: number) {
       const data = await res.json();
       return (data.items || data).map(transformPost);
     },
+    enabled,
   });
 }
 
-export function useTrendingPosts(assetType?: string, limit?: number) {
+export function useTrendingPosts(assetType?: string, limit?: number, enabled = true) {
   return useQuery({
     queryKey: communityKeys.trending(assetType),
     queryFn: async (): Promise<CommunityPostWithAuthor[]> => {
@@ -147,6 +149,7 @@ export function useTrendingPosts(assetType?: string, limit?: number) {
       const data = await res.json();
       return (data.items || data).map(transformPost);
     },
+    enabled,
   });
 }
 
@@ -186,7 +189,7 @@ export function useLikedPosts(page?: number) {
   });
 }
 
-export function useFollowingFeed(page?: number) {
+export function useFollowingFeed(page?: number, enabled = true) {
   return useQuery({
     queryKey: communityKeys.followingFeed(),
     queryFn: async (): Promise<PaginatedPosts> => {
@@ -194,6 +197,7 @@ export function useFollowingFeed(page?: number) {
       if (!res.ok) throw new Error('Failed to fetch following feed');
       return transformPaginatedPosts(await res.json());
     },
+    enabled,
   });
 }
 

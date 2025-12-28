@@ -232,7 +232,13 @@ class PromoService:
             if len(result.data) > limit:
                 next_cursor = result.data[limit - 1]["id"]
                 result.data = result.data[:limit]
-            messages = [await self._map_message(r) for r in result.data]
+            
+            # Batch fetch user info and badges for all messages
+            user_ids = list(set(r["user_id"] for r in result.data))
+            user_info_map = await self._batch_get_user_info(user_ids)
+            badges_map = await self._batch_get_user_badges(user_ids)
+            
+            messages = [self._map_message_with_cache(r, user_info_map, badges_map) for r in result.data]
         return messages, next_cursor
 
     async def get_pinned_message(self) -> Optional[PromoMessage]:
@@ -252,9 +258,14 @@ class PromoService:
     async def get_leaderboard(self, user_id: Optional[str] = None) -> LeaderboardResponse:
         top = self.db.table("promo_leaderboard_cache").select(
             "user_id, total_donations_cents, message_count, rank, is_king").order("rank").limit(10).execute()
+        
+        # Batch fetch user info for all top 10
+        user_ids = [r["user_id"] for r in (top.data or [])]
+        user_info_map = await self._batch_get_user_info(user_ids)
+        
         top_10 = []
         for r in top.data or []:
-            u = await self._get_user_info(r["user_id"])
+            u = user_info_map.get(r["user_id"], {"display_name": "Unknown", "avatar_url": None})
             top_10.append(LeaderboardEntry(r["user_id"], u.get("display_name", "Unknown"), u.get("avatar_url"),
                 r["total_donations_cents"], r["message_count"], r["rank"], r["is_king"]))
         user_entry = None
@@ -262,7 +273,8 @@ class PromoService:
             ur = self.db.table("promo_leaderboard_cache").select(
                 "user_id, total_donations_cents, message_count, rank, is_king").eq("user_id", user_id).execute()
             if ur.data and ur.data[0]["rank"] > 10:
-                r, u = ur.data[0], await self._get_user_info(user_id)
+                r = ur.data[0]
+                u = user_info_map.get(user_id) or await self._get_user_info(user_id)
                 user_entry = LeaderboardEntry(r["user_id"], u.get("display_name", "Unknown"), u.get("avatar_url"),
                     r["total_donations_cents"], r["message_count"], r["rank"], r["is_king"])
         return LeaderboardResponse(top_10=top_10, user_entry=user_entry)
@@ -325,6 +337,45 @@ class PromoService:
     async def _get_user_info(self, user_id: str) -> Dict[str, Any]:
         result = self.db.table("users").select("display_name, avatar_url").eq("id", user_id).execute()
         return result.data[0] if result.data else {"display_name": "Unknown", "avatar_url": None}
+
+    async def _batch_get_user_info(self, user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Batch fetch user info for multiple users in a single query."""
+        if not user_ids:
+            return {}
+        result = self.db.table("users").select("id, display_name, avatar_url").in_("id", user_ids).execute()
+        return {r["id"]: {"display_name": r.get("display_name", "Unknown"), "avatar_url": r.get("avatar_url")} 
+                for r in (result.data or [])}
+
+    async def _batch_get_user_badges(self, user_ids: List[str]) -> Dict[str, UserBadges]:
+        """Batch fetch badges for multiple users in a single query."""
+        if not user_ids:
+            return {}
+        result = self.db.table("promo_leaderboard_cache").select(
+            "user_id, rank, is_king, total_donations_cents").in_("user_id", user_ids).execute()
+        badges_map = {}
+        for r in (result.data or []):
+            badges_map[r["user_id"]] = UserBadges(
+                r["is_king"], r["rank"] <= 10 if r["rank"] else False, r["rank"], r["total_donations_cents"])
+        # Fill in defaults for users not in leaderboard
+        for uid in user_ids:
+            if uid not in badges_map:
+                badges_map[uid] = UserBadges()
+        return badges_map
+
+    def _map_message_with_cache(self, row: Dict[str, Any], user_info_map: Dict[str, Dict[str, Any]], 
+                                 badges_map: Dict[str, UserBadges]) -> PromoMessage:
+        """Map message row using pre-fetched user info and badges."""
+        user_info = user_info_map.get(row["user_id"], {"display_name": "Unknown", "avatar_url": None})
+        badges = badges_map.get(row["user_id"], UserBadges())
+        lp = row.get("link_preview")
+        link_preview = LinkPreview(lp.get("url", ""), lp.get("title"), lp.get("description"),
+                                   lp.get("image_url"), lp.get("site_name")) if lp else None
+        created_at = row["created_at"]
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        return PromoMessage(row["id"], row["user_id"], row["content"], row.get("link_url"), link_preview,
+            row.get("is_pinned", False), row.get("reactions", {"fire": 0, "crown": 0, "heart": 0, "game": 0}),
+            created_at, user_info.get("display_name", "Unknown"), user_info.get("avatar_url"), badges)
 
     async def _map_message(self, row: Dict[str, Any]) -> PromoMessage:
         user_info, badges = await self._get_user_info(row["user_id"]), await self._get_user_badges(row["user_id"])

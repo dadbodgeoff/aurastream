@@ -76,15 +76,21 @@ export default function CommunityPage() {
     }
   }, [activeTab]);
 
-  // Fetch data based on active tab
-  const { data: allPostsData, isLoading: allLoading } = useCommunityPosts({
-    sort,
-    assetType,
-    search: searchQuery || undefined,
-  });
-  const { data: featuredPosts, isLoading: featuredLoading } = useFeaturedPosts(20);
-  const { data: trendingPosts, isLoading: trendingLoading } = useTrendingPosts(assetType, 20);
-  const { data: followingData, isLoading: followingLoading } = useFollowingFeed();
+  // Conditional fetching - only fetch data for active tab
+  const shouldFetchAll = activeTab === 'all' || activeTab === 'new';
+  const shouldFetchFeatured = activeTab === 'featured';
+  const shouldFetchTrending = activeTab === 'trending';
+  const shouldFetchFollowing = activeTab === 'following';
+
+  // Fetch data based on active tab (conditional)
+  const { data: allPostsData, isLoading: allLoading } = useCommunityPosts(
+    shouldFetchAll ? { sort, assetType, search: searchQuery || undefined } : undefined
+  );
+  const { data: featuredPosts, isLoading: featuredLoading } = useFeaturedPosts(20, shouldFetchFeatured);
+  const { data: trendingPosts, isLoading: trendingLoading } = useTrendingPosts(assetType, 20, shouldFetchTrending);
+  const { data: followingData, isLoading: followingLoading } = useFollowingFeed(undefined, shouldFetchFollowing);
+  
+  // Spotlight creators always load (shown on all tabs)
   const { data: spotlightCreators, isLoading: creatorsLoading } = useSpotlightCreators(10);
 
   // Mutations

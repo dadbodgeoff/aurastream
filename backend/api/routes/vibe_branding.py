@@ -84,9 +84,14 @@ async def analyze_uploaded_image(
     **Supported formats:** JPEG, PNG, WebP (max 15MB)
     """
     from backend.services.free_tier_service import get_free_tier_service
+    from backend.database.supabase_client import get_supabase_client
     
     service = get_vibe_branding_service()
-    tier = current_user.tier or "free"
+    
+    # Fetch current tier from database (JWT may be stale after upgrade)
+    db = get_supabase_client()
+    user_result = db.table("users").select("subscription_tier").eq("id", current_user.sub).execute()
+    tier = user_result.data[0]["subscription_tier"] if user_result.data else (current_user.tier or "free")
     
     # Check quota - use free tier system for free users
     if tier == "free":
@@ -200,9 +205,14 @@ async def analyze_image_url(
     - Studio: Unlimited
     """
     from backend.services.free_tier_service import get_free_tier_service
+    from backend.database.supabase_client import get_supabase_client
     
     service = get_vibe_branding_service()
-    tier = current_user.tier or "free"
+    
+    # Fetch current tier from database (JWT may be stale after upgrade)
+    db = get_supabase_client()
+    user_result = db.table("users").select("subscription_tier").eq("id", current_user.sub).execute()
+    tier = user_result.data[0]["subscription_tier"] if user_result.data else (current_user.tier or "free")
     
     # Check quota - use free tier system for free users
     if tier == "free":
@@ -321,8 +331,12 @@ async def get_usage(
     - Studio: Unlimited
     """
     from backend.services.free_tier_service import get_free_tier_service
+    from backend.database.supabase_client import get_supabase_client
     
-    tier = current_user.tier or "free"
+    # Fetch current tier from database (JWT may be stale after upgrade)
+    db = get_supabase_client()
+    user_result = db.table("users").select("subscription_tier").eq("id", current_user.sub).execute()
+    tier = user_result.data[0]["subscription_tier"] if user_result.data else (current_user.tier or "free")
     
     # For free tier, use the 28-day cooldown system
     if tier == "free":
