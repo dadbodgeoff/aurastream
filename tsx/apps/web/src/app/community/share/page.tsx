@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAssets, useCreatePost } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
@@ -24,11 +24,11 @@ const sanitizeTag = (tag: string): string => {
   return tag
     .toLowerCase()
     .trim()
-    .replace(/[\s_]+/g, '-')      // Replace spaces and underscores with hyphens
-    .replace(/[^a-z0-9-]/g, '')   // Remove any non-alphanumeric except hyphens
-    .replace(/-+/g, '-')          // Collapse multiple hyphens
-    .replace(/^-|-$/g, '')        // Remove leading/trailing hyphens
-    .slice(0, 30);                // Max 30 chars per tag
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 30);
 };
 
 // Parse comma-separated tags input into sanitized array
@@ -40,7 +40,7 @@ const parseTags = (input: string): string[] => {
     .slice(0, 5);
 };
 
-export default function ShareAssetPage() {
+function ShareAssetContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedAssetId = searchParams.get('assetId');
@@ -55,17 +55,14 @@ export default function ShareAssetPage() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [errors, setErrors] = useState<{ title?: string; submit?: string }>({});
 
-
   // Auto-select asset from URL parameter
   useEffect(() => {
     if (preselectedAssetId && assetsData?.assets) {
       const asset = assetsData.assets.find((a: any) => a.id === preselectedAssetId);
       if (asset && !selectedAsset) {
         setSelectedAsset(asset);
-        // Pre-fill title with formatted asset type
         const formattedType = asset.assetType?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || '';
         setTitle(formattedType);
-        // Pre-fill tags with sanitized asset type
         setTagsInput(sanitizeTag(asset.assetType || ''));
       }
     }
@@ -143,7 +140,6 @@ export default function ShareAssetPage() {
           )}
         </div>
 
-
         {/* Form */}
         {selectedAsset && (
           <form onSubmit={handleSubmit} className="space-y-5 bg-background-surface rounded-xl border border-border-subtle p-6">
@@ -219,5 +215,27 @@ export default function ShareAssetPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Loading fallback for Suspense
+function ShareAssetLoading() {
+  return (
+    <div className="min-h-screen bg-background-base">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-48">
+          <Spinner />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main export wrapped in Suspense for useSearchParams
+export default function ShareAssetPage() {
+  return (
+    <Suspense fallback={<ShareAssetLoading />}>
+      <ShareAssetContent />
+    </Suspense>
   );
 }
