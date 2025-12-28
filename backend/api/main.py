@@ -325,6 +325,7 @@ def create_app() -> FastAPI:
     from api.routes.webhooks import router as webhooks_router
     from api.routes.usage import router as usage_router
     from api.routes.site_analytics import router as site_analytics_router
+    from api.routes.avatars import router as avatars_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -341,6 +342,7 @@ def create_app() -> FastAPI:
     app.include_router(subscriptions_router, prefix="/api/v1/subscriptions", tags=["Subscriptions"])
     app.include_router(webhooks_router, prefix="/api/v1/webhooks", tags=["Webhooks"])
     app.include_router(usage_router, prefix="/api/v1/usage", tags=["Usage"])
+    app.include_router(avatars_router, prefix="/api/v1/avatars", tags=["Avatars"])
     
     return app
 

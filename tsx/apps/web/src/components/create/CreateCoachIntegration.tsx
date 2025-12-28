@@ -85,7 +85,7 @@ function LegacyCoachIntegration({
   onGenerateNow,
   className,
 }: LegacyCoachIntegrationProps) {
-  const { data: brandKitsData } = useBrandKits();
+  const { data: brandKitsData, isLoading: isLoadingBrandKits } = useBrandKits();
   const brandKits = brandKitsData?.brandKits ?? [];
   const selectedBrandKit = brandKits.find(k => k.id === brandKitId);
 
@@ -111,7 +111,13 @@ function LegacyCoachIntegration({
   }, [messages]);
 
   // Auto-start session when component mounts with valid context
+  // Wait for brand kits to load if brandKitId is provided
   useEffect(() => {
+    // If brandKitId is provided but brand kits are still loading, wait
+    if (brandKitId && isLoadingBrandKits) {
+      return;
+    }
+    
     if (!hasStarted && assetType) {
       setHasStarted(true);
       
@@ -142,7 +148,7 @@ function LegacyCoachIntegration({
 
       startSession(request);
     }
-  }, [hasStarted, selectedBrandKit, assetType, brandKitId, startSession]);
+  }, [hasStarted, selectedBrandKit, assetType, brandKitId, startSession, isLoadingBrandKits]);
 
   const handleSend = useCallback(async () => {
     const trimmedValue = inputValue.trim();
@@ -261,12 +267,33 @@ export function CreateCoachIntegration({
   onEndSession,
   className,
 }: CreateCoachIntegrationProps) {
-  const { data: brandKitsData } = useBrandKits();
+  const { data: brandKitsData, isLoading: isLoadingBrandKits } = useBrandKits();
   const brandKits = brandKitsData?.brandKits ?? [];
   const selectedBrandKit = brandKits.find(k => k.id === brandKitId);
 
   // Build initial request for the new UX
-  const initialRequest = useMemo((): StartCoachRequest => {
+  // Only build when brand kits are loaded (or no brandKitId was provided)
+  const initialRequest = useMemo((): StartCoachRequest | null => {
+    // If brandKitId is provided but brand kits are still loading, wait
+    if (brandKitId && isLoadingBrandKits) {
+      log.debug('Waiting for brand kits to load before building initialRequest');
+      return null;
+    }
+    
+    // If brandKitId is provided but not found in loaded kits, log warning
+    if (brandKitId && !selectedBrandKit && !isLoadingBrandKits) {
+      log.warn('Brand kit not found:', brandKitId);
+    }
+    
+    log.info('Building initialRequest with brand context:', {
+      brandKitId,
+      selectedBrandKit: selectedBrandKit?.name,
+      colors: selectedBrandKit ? [
+        ...(selectedBrandKit.primary_colors || []),
+        ...(selectedBrandKit.accent_colors || []),
+      ].length : 0,
+    });
+    
     return {
       brand_context: selectedBrandKit ? {
         brand_kit_id: brandKitId || '',
@@ -290,7 +317,7 @@ export function CreateCoachIntegration({
       custom_mood: 'Help me figure out the perfect mood',
       description: `I want to create a ${assetType.replace(/_/g, ' ')}. Help me describe exactly what I'm looking for.`,
     };
-  }, [selectedBrandKit, assetType, brandKitId]);
+  }, [selectedBrandKit, assetType, brandKitId, isLoadingBrandKits]);
 
   // Handle generate complete - also call onGenerateNow for backwards compatibility
   const handleGenerateComplete = useCallback((asset: Asset) => {
@@ -301,6 +328,7 @@ export function CreateCoachIntegration({
   log.info('COACH_UX_2025_ENABLED:', COACH_UX_2025_ENABLED);
   if (COACH_UX_2025_ENABLED) {
     log.info('Using CoachChatIntegrated (new UX)');
+    log.debug('initialRequest:', initialRequest);
     return (
       <CoachChatIntegrated
         assetType={assetType}
@@ -308,7 +336,7 @@ export function CreateCoachIntegration({
         brandKitName={selectedBrandKit?.name}
         onGenerateComplete={handleGenerateComplete}
         onEndSession={onEndSession}
-        initialRequest={initialRequest}
+        initialRequest={initialRequest ?? undefined}
         className={className}
         testId="create-coach-integration"
       />

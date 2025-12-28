@@ -150,6 +150,26 @@ class UserNotFoundError(StreamerStudioError):
         )
 
 
+class NotFoundError(StreamerStudioError):
+    """
+    Generic not found error for any resource type.
+    
+    Used when a resource (avatar, asset, etc.) is not found.
+    Provides a consistent error structure with resource type and ID.
+    """
+    
+    def __init__(self, resource_type: str, resource_id: Optional[str] = None):
+        super().__init__(
+            message=f"{resource_type} not found",
+            code="RESOURCE_NOT_FOUND",
+            status_code=404,
+            details={
+                "resource_type": resource_type.lower(),
+                "resource_id": resource_id
+            } if resource_id else {"resource_type": resource_type.lower()}
+        )
+
+
 class WeakPasswordError(StreamerStudioError):
     """
     Raised when password doesn't meet strength requirements.
@@ -599,6 +619,7 @@ __all__ = [
     "InvalidCredentialsError",
     "EmailExistsError",
     "UserNotFoundError",
+    "NotFoundError",
     "WeakPasswordError",
     "ValidationError",
     "RateLimitExceededError",
