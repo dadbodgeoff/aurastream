@@ -106,7 +106,30 @@ function ProfileTab({ user }: { user: any }) {
 // =============================================================================
 
 function BillingTab({ user }: { user: any }) {
+  const [isLoading, setIsLoading] = useState(false);
   const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+
+  const handleUpgrade = async (planId: string) => {
+    setIsLoading(true);
+    try {
+      const { apiClient } = await import('@aurastream/api-client');
+      const response = await apiClient.subscriptions.createCheckout({
+        plan: planId as 'pro' | 'studio',
+        successUrl: `${window.location.origin}/dashboard/settings?tab=billing&success=true`,
+        cancelUrl: `${window.location.origin}/dashboard/settings?tab=billing&canceled=true`,
+      });
+      
+      // Redirect to Stripe Checkout
+      if (response.checkoutUrl) {
+        window.location.href = response.checkoutUrl;
+      }
+    } catch (error) {
+      console.error('Failed to create checkout session:', error);
+      alert('Failed to start checkout. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const plans = [
     {
@@ -114,16 +137,16 @@ function BillingTab({ user }: { user: any }) {
       name: 'Free',
       price: '$0',
       period: 'forever',
-      features: ['10 assets per month', '1 brand kit', 'Basic templates', 'Community support'],
-      current: !isPremium,
+      features: ['3 assets total', '1 brand kit', 'Basic templates', 'Community support'],
+      current: user?.subscriptionTier === 'free',
     },
     {
-      id: 'studio',
-      name: 'Studio',
-      price: '$19',
+      id: 'pro',
+      name: 'Pro',
+      price: '$24.99',
       period: 'per month',
-      features: ['Unlimited assets', '10 brand kits', 'AI Prompt Coach', 'Priority support', 'Advanced templates', 'Custom branding'],
-      current: isPremium,
+      features: ['50 assets per month', '5 brand kits', 'AI Prompt Coach', 'Priority support', 'Advanced templates'],
+      current: user?.subscriptionTier === 'pro',
       recommended: true,
     },
   ];
@@ -170,9 +193,17 @@ function BillingTab({ user }: { user: any }) {
               <span className="block w-full text-center py-2 text-sm font-medium text-interactive-600">
                 Current Plan
               </span>
+            ) : plan.id === 'free' ? (
+              <span className="block w-full text-center py-2 text-sm font-medium text-text-muted">
+                —
+              </span>
             ) : (
-              <button className="w-full py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors">
-                Upgrade
+              <button 
+                onClick={() => handleUpgrade(plan.id)}
+                disabled={isLoading}
+                className="w-full py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isLoading ? 'Loading...' : 'Upgrade'}
               </button>
             )}
           </div>
