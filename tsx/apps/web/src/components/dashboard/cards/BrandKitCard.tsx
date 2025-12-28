@@ -32,7 +32,7 @@ export function BrandKitCard({
   compact = false,
   className,
 }: BrandKitCardProps) {
-  const allColors = [...primaryColors, ...accentColors].slice(0, 5);
+  const allColors = [...(primaryColors || []), ...(accentColors || [])].slice(0, 5);
 
   if (compact) {
     return (
