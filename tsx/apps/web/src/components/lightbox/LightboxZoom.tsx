@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
-import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
+import React, { useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { usePinchZoom, useReducedMotion } from '@aurastream/shared';
 import { cn } from '@/lib/utils';
 import type { LightboxImage } from '@aurastream/shared';
 
@@ -12,18 +12,30 @@ export interface LightboxZoomProps {
   className?: string;
   /** Test ID for testing */
   testId?: string;
+  /** Callback when zoom state changes (for disabling swipe when zoomed) */
+  onZoomChange?: (isZoomed: boolean) => void;
+  /** External reset trigger (increments to trigger reset) */
+  resetTrigger?: number;
+}
+
+export interface LightboxZoomRef {
+  /** Reset zoom to initial state */
+  reset: () => void;
+  /** Get current zoom state */
+  isZoomed: () => boolean;
 }
 
 /**
- * LightboxZoom - Zoomable image component using react-zoom-pan-pinch
+ * LightboxZoom - Zoomable image component using custom usePinchZoom hook
  *
  * Features:
  * - Pinch-to-zoom on mobile
  * - Wheel zoom on desktop
- * - Double-click/tap to reset zoom
- * - Smooth animations
+ * - Double-tap to zoom/reset
+ * - Smooth animations with reduced motion support
  * - Pan when zoomed in
- * - Constrained to image bounds
+ * - Mouse drag panning on desktop
+ * - Constrained zoom levels (1x - 4x)
  *
  * @example
  * ```tsx
@@ -34,88 +46,124 @@ export interface LightboxZoomProps {
  *     width: 1920,
  *     height: 1080,
  *   }}
+ *   onZoomChange={(isZoomed) => setSwipeDisabled(isZoomed)}
  * />
  * ```
  */
-export function LightboxZoom({
-  image,
-  className,
-  testId = 'lightbox-zoom',
-}: LightboxZoomProps) {
-  const transformRef = useRef<ReactZoomPanPinchRef>(null);
+export const LightboxZoom = forwardRef<LightboxZoomRef, LightboxZoomProps>(
+  function LightboxZoom(
+    {
+      image,
+      className,
+      testId = 'lightbox-zoom',
+      onZoomChange,
+      resetTrigger,
+    },
+    ref
+  ) {
+    const prefersReducedMotion = useReducedMotion();
 
-  /**
-   * Reset zoom to initial state on double-click
-   */
-  const handleDoubleClick = useCallback(() => {
-    if (transformRef.current) {
-      transformRef.current.resetTransform();
-    }
-  }, []);
+    const {
+      handlers: zoomHandlers,
+      state: zoomState,
+      reset: resetZoom,
+    } = usePinchZoom({
+      minScale: 1,
+      maxScale: 4,
+      doubleTapZoom: true,
+      doubleTapScale: 2,
+      wheelZoom: true,
+      wheelSensitivity: 0.1,
+      onZoomChange: (state) => {
+        onZoomChange?.(state.isZoomed);
+      },
+    });
 
-  return (
-    <div
-      data-testid={testId}
-      className={cn(
-        'relative flex items-center justify-center',
-        'w-full h-full max-w-[90vw] max-h-[85vh]',
-        className
-      )}
-    >
-      <TransformWrapper
-        ref={transformRef}
-        initialScale={1}
-        minScale={0.5}
-        maxScale={4}
-        centerOnInit
-        wheel={{
-          step: 0.1,
-          smoothStep: 0.005,
-        }}
-        pinch={{
-          step: 5,
-        }}
-        doubleClick={{
-          mode: 'reset',
-        }}
-        panning={{
-          velocityDisabled: false,
-        }}
-        alignmentAnimation={{
-          sizeX: 100,
-          sizeY: 100,
-          velocityAlignmentTime: 200,
-        }}
-        velocityAnimation={{
-          sensitivity: 1,
-          animationTime: 200,
-        }}
+    // Expose reset method via ref
+    useImperativeHandle(ref, () => ({
+      reset: resetZoom,
+      isZoomed: () => zoomState.isZoomed,
+    }), [resetZoom, zoomState.isZoomed]);
+
+    // Reset zoom when resetTrigger changes (e.g., when navigating to different image)
+    useEffect(() => {
+      if (resetTrigger !== undefined) {
+        resetZoom();
+      }
+    }, [resetTrigger, resetZoom]);
+
+    // Notify parent of zoom state changes
+    useEffect(() => {
+      onZoomChange?.(zoomState.isZoomed);
+    }, [zoomState.isZoomed, onZoomChange]);
+
+    /**
+     * Handle double-click to reset zoom (desktop)
+     */
+    const handleDoubleClick = useCallback(() => {
+      resetZoom();
+    }, [resetZoom]);
+
+    // Calculate transform style
+    const transformStyle = {
+      transform: `scale(${zoomState.scale}) translate(${zoomState.offset.x}px, ${zoomState.offset.y}px)`,
+      transition: prefersReducedMotion ? 'none' : 'transform 0.2s ease-out',
+      transformOrigin: 'center center',
+    };
+
+    return (
+      <div
+        data-testid={testId}
+        className={cn(
+          'relative flex items-center justify-center',
+          'w-full h-full max-w-[90vw] max-h-[85vh]',
+          // Cursor changes based on zoom state
+          zoomState.isZoomed ? 'cursor-grab' : 'cursor-zoom-in',
+          zoomState.isPanning && 'cursor-grabbing',
+          className
+        )}
+        {...zoomHandlers}
       >
-        <TransformComponent
-            wrapperClass="!w-full !h-full"
-            contentClass="!w-full !h-full flex items-center justify-center"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={image.src}
+          alt={image.alt}
+          width={image.width}
+          height={image.height}
+          onDoubleClick={handleDoubleClick}
+          style={transformStyle}
+          className={cn(
+            'max-w-full max-h-[85vh] w-auto h-auto',
+            'object-contain select-none',
+            'rounded-lg shadow-2xl',
+            // Disable pointer events on image to let container handle gestures
+            'pointer-events-none'
+          )}
+          draggable={false}
+        />
+
+        {/* Zoom indicator (shows when zoomed) */}
+        {zoomState.isZoomed && (
+          <div
+            className={cn(
+              'absolute bottom-4 right-4',
+              'px-2 py-1 rounded-md',
+              'bg-background-elevated/80 backdrop-blur-sm',
+              'border border-border-subtle',
+              'text-xs text-text-secondary',
+              'pointer-events-none',
+              'transition-opacity duration-200',
+              prefersReducedMotion && 'transition-none'
+            )}
+            aria-hidden="true"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={image.src}
-              alt={image.alt}
-              width={image.width}
-              height={image.height}
-              onDoubleClick={handleDoubleClick}
-              className={cn(
-                'max-w-full max-h-[85vh] w-auto h-auto',
-                'object-contain select-none',
-                'rounded-lg shadow-2xl',
-                // Smooth transitions
-                'transition-transform duration-200 ease-out motion-reduce:transition-none'
-              )}
-              draggable={false}
-            />
-          </TransformComponent>
-      </TransformWrapper>
-    </div>
-  );
-}
+            {Math.round(zoomState.scale * 100)}%
+          </div>
+        )}
+      </div>
+    );
+  }
+);
 
 /**
  * Zoom control buttons component (optional, for toolbar integration)

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ArrowRightIcon } from './icons';
-import { useSiteAnalytics } from '@aurastream/shared';
+import { useEnterpriseAnalytics } from '@aurastream/shared';
 
 // =============================================================================
 // CTA Section
@@ -24,7 +24,7 @@ const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
 export function CTASection() {
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
-  const { trackFunnel } = useSiteAnalytics();
+  const { trackFunnel } = useEnterpriseAnalytics();
 
   const handleCtaClick = () => {
     trackFunnel('cta_click', { location: 'cta_section' });

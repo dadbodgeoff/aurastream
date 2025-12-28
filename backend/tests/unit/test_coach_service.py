@@ -449,6 +449,57 @@ class TestCoachOutput:
         assert output.refined_intent.description == "Victory celebration"
         assert output.suggested_asset_type == "twitch_emote"
         assert len(output.keywords) == 2
+    
+    def test_coach_output_final_prompt_property(self):
+        """Test that final_prompt property returns the generation input."""
+        intent = CreativeIntent(
+            description="A vibrant gaming thumbnail",
+            emotion="hype",
+            confidence_score=0.9,
+        )
+        output = CoachOutput(
+            refined_intent=intent,
+            metadata={},
+            suggested_asset_type="youtube_thumbnail",
+            keywords=["gaming", "thumbnail"],
+        )
+        
+        assert output.final_prompt == intent.to_generation_input()
+        assert "hype mood" in output.final_prompt
+    
+    def test_coach_output_confidence_score_property(self):
+        """Test that confidence_score property returns the intent's score."""
+        intent = CreativeIntent(
+            description="Test description",
+            confidence_score=0.92,
+        )
+        output = CoachOutput(
+            refined_intent=intent,
+            metadata={},
+            suggested_asset_type="twitch_emote",
+            keywords=[],
+        )
+        
+        assert output.confidence_score == 0.92
+    
+    def test_coach_output_final_prompt_excludes_custom_mood(self):
+        """
+        REGRESSION TEST: Ensure final_prompt doesn't include 'custom mood'.
+        """
+        intent = CreativeIntent(
+            description="A Fortnite thumbnail with neon effects",
+            emotion="custom",  # This should NOT appear in final_prompt
+            confidence_score=0.85,
+        )
+        output = CoachOutput(
+            refined_intent=intent,
+            metadata={},
+            suggested_asset_type="youtube_thumbnail",
+            keywords=["fortnite", "neon"],
+        )
+        
+        assert "custom mood" not in output.final_prompt.lower()
+        assert "Fortnite thumbnail" in output.final_prompt
 
 
 class TestCreativeDirectorServiceEdgeCases:
@@ -488,7 +539,7 @@ class TestCreativeDirectorServiceEdgeCases:
             game_context="",
         )
         
-        assert "No colors specified" in prompt
+        assert "none specified" in prompt
     
     def test_build_system_prompt_no_fonts(self, service):
         """Test system prompt with missing fonts."""

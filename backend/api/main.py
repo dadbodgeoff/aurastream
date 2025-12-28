@@ -326,6 +326,13 @@ def create_app() -> FastAPI:
     from api.routes.usage import router as usage_router
     from api.routes.site_analytics import router as site_analytics_router
     from api.routes.avatars import router as avatars_router
+    from api.routes.enterprise_analytics import router as enterprise_analytics_router
+    from api.routes.community import router as community_router
+    from api.routes.community_engagement import router as community_engagement_router
+    from api.routes.community_admin import router as community_admin_router
+    from api.routes.vibe_branding import router as vibe_branding_router
+    from api.routes.aura_lab import router as aura_lab_router
+    from api.routes.promo import router as promo_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -339,10 +346,17 @@ def create_app() -> FastAPI:
     app.include_router(twitch_router, prefix="/api/v1", tags=["Twitch"])
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
     app.include_router(site_analytics_router, prefix="/api/v1/site-analytics", tags=["Site Analytics"])
+    app.include_router(enterprise_analytics_router, prefix="/api/v1/enterprise-analytics", tags=["Enterprise Analytics"])
     app.include_router(subscriptions_router, prefix="/api/v1/subscriptions", tags=["Subscriptions"])
     app.include_router(webhooks_router, prefix="/api/v1/webhooks", tags=["Webhooks"])
     app.include_router(usage_router, prefix="/api/v1/usage", tags=["Usage"])
     app.include_router(avatars_router, prefix="/api/v1/avatars", tags=["Avatars"])
+    app.include_router(community_router, prefix="/api/v1", tags=["Community"])
+    app.include_router(community_engagement_router, prefix="/api/v1", tags=["Community Engagement"])
+    app.include_router(community_admin_router, prefix="/api/v1", tags=["Community Admin"])
+    app.include_router(vibe_branding_router, tags=["Vibe Branding"])
+    app.include_router(aura_lab_router, tags=["Aura Lab"])
+    app.include_router(promo_router, prefix="/api/v1/promo", tags=["Promo Chatroom"])
     
     return app
 

@@ -31,14 +31,22 @@ RUN addgroup --system --gid 1001 appgroup && \
 COPY --from=builder /app/wheels /wheels
 RUN pip install --no-cache /wheels/*
 
-# Create backend directory structure
-RUN mkdir -p /app/backend
+# Create backend directory structure and cache directories
+RUN mkdir -p /app/backend /app/.cache/numba /app/.cache/rembg
 
 # Copy application code
 COPY . /app/backend/
 
 # Set PYTHONPATH so imports work correctly
+# Set Numba cache directory to writable location (fixes pymatting/rembg caching issue)
 ENV PYTHONPATH=/app
+ENV NUMBA_CACHE_DIR=/app/.cache/numba
+ENV U2NET_HOME=/app/.cache/rembg
+
+# Pre-download the U2Net model for background removal (176MB)
+# This avoids slow first-request downloads at runtime
+RUN python -c "from rembg import new_session; new_session('u2net')" && \
+    echo "✅ U2Net model downloaded"
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app

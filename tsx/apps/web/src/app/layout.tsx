@@ -5,6 +5,16 @@ import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
+// Site configuration
+const siteConfig = {
+  name: 'AuraStream',
+  title: 'AuraStream — Your stream. Your brand. Every platform.',
+  description: 'AI-powered thumbnails, overlays, banners, emotes, and more — all matching your style, ready in seconds. No templates. No Photoshop. Just you.',
+  url: 'https://aurastream.shop',
+  ogImage: 'https://aurastream.shop/og-image.png',
+  twitterHandle: '@aurastream',
+};
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -18,17 +28,78 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Aurastream — Your stream. Your brand. Every platform.',
-  description: 'Thumbnails, overlays, banners, and more — all matching your style, ready in seconds. No templates. No Photoshop. Just you.',
-  openGraph: {
-    title: 'Aurastream',
-    description: 'Your stream. Your brand. Every platform.',
-    type: 'website',
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.title,
+    template: `%s | ${siteConfig.name}`,
   },
+  description: siteConfig.description,
+  keywords: [
+    'stream assets',
+    'twitch emotes',
+    'youtube thumbnails',
+    'stream overlays',
+    'AI graphics',
+    'content creator tools',
+    'streamer branding',
+    'twitch banners',
+    'gaming graphics',
+  ],
+  authors: [{ name: siteConfig.name }],
+  creator: siteConfig.name,
+  
+  // Open Graph (Facebook, LinkedIn, Discord, etc.)
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: siteConfig.url,
+    siteName: siteConfig.name,
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: [
+      {
+        url: siteConfig.ogImage,
+        width: 1200,
+        height: 630,
+        alt: `${siteConfig.name} - AI-powered stream assets`,
+      },
+    ],
+  },
+  
+  // Twitter Card
   twitter: {
     card: 'summary_large_image',
-    title: 'Aurastream',
-    description: 'Your stream. Your brand. Every platform.',
+    title: siteConfig.title,
+    description: siteConfig.description,
+    images: [siteConfig.ogImage],
+    creator: siteConfig.twitterHandle,
+    site: siteConfig.twitterHandle,
+  },
+  
+  // Icons - place these files in /public folder
+  icons: {
+    icon: [
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  
+  // Manifest for PWA
+  manifest: '/site.webmanifest',
+  
+  // Robots
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
   },
 };
 

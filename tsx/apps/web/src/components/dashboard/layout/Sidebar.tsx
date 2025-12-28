@@ -16,6 +16,10 @@ import {
   AnalyticsIcon,
   LogoutIcon,
   QuickCreateIcon,
+  CommunityIcon,
+  VibeIcon,
+  AuraLabIcon,
+  PromoIcon,
 } from '../icons';
 
 export interface NavItem {
@@ -45,10 +49,14 @@ const mainNavItems: NavItem[] = [
   { name: 'Create', href: '/dashboard/create', icon: CreateIcon },
   { name: 'Brand Studio', href: '/dashboard/brand-kits', icon: BrandIcon, dataTour: 'brand-kits' },
   { name: 'Asset Library', href: '/dashboard/assets', icon: LibraryIcon, dataTour: 'assets' },
+  { name: 'Community', href: '/community', icon: CommunityIcon, badge: 'New', dataTour: 'community' },
+  { name: 'Promo Board', href: '/promo', icon: PromoIcon, badge: '$1', dataTour: 'promo' },
 ];
 
 const toolsNavItems: NavItem[] = [
   { name: 'Prompt Coach', href: '/dashboard/coach', icon: CoachIcon, badge: 'Pro', dataTour: 'coach' },
+  { name: 'Vibe Branding', href: '/dashboard/brand-kits?vibe=true', icon: VibeIcon, badge: 'New', dataTour: 'vibe-branding' },
+  { name: 'Aura Lab', href: '/dashboard/aura-lab', icon: AuraLabIcon, badge: 'New', dataTour: 'aura-lab' },
 ];
 
 const settingsNavItems: NavItem[] = [

@@ -49,6 +49,9 @@ import type { Asset } from './generation';
 // Lightbox (Task 1)
 import { useLightbox } from '../lightbox';
 
+// Download utility
+import { downloadAsset, getAssetFilename } from '@/utils/download';
+
 // ============================================================================
 // Feature Flag
 // ============================================================================
@@ -692,11 +695,10 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
                       <GenerationResult
                         asset={generationAsset}
                         onDownload={() => {
-                          // Download the asset
-                          const link = document.createElement('a');
-                          link.href = generationAsset.url;
-                          link.download = `${generationAsset.assetType}-${generationAsset.id}.png`;
-                          link.click();
+                          downloadAsset({
+                            url: generationAsset.url,
+                            filename: getAssetFilename(generationAsset.assetType, generationAsset.id),
+                          });
                         }}
                         onShare={() => {
                           // Share the asset URL

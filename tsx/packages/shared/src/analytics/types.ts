@@ -3,17 +3,15 @@
  * Zero-impact, queue-based analytics for Streamer Studio
  */
 
-// Core event categories
+// Core event categories - must match backend VALID_CATEGORIES
 export type EventCategory =
-  | 'page_view'
+  | 'page'
   | 'modal'
   | 'wizard'
   | 'user_action'
   | 'feature'
   | 'error'
-  | 'performance'
-  | 'engagement'
-  | 'conversion';
+  | 'performance';
 
 // Modal-specific events
 export type ModalEvent =

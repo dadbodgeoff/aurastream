@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useLongPress } from '@aurastream/shared';
+import { ContextMenu } from '@/components/ui/ContextMenu';
 import { DownloadIcon, TrashIcon, EyeIcon, EyeOffIcon, CheckIcon } from '../icons';
 
 export interface AssetCardProps {
@@ -54,11 +56,51 @@ export function AssetCard({
 }: AssetCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+
+  // Long press hook for mobile context menu
+  const { handlers: longPressHandlers, reset: resetLongPress } = useLongPress({
+    onLongPress: (position) => {
+      setMenuPosition(position);
+      setContextMenuOpen(true);
+    },
+    duration: 500,
+    disabled: selectable, // Disable when in selection mode
+  });
 
   const handleSelect = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect?.(id);
   };
+
+  const handleContextMenuClose = () => {
+    setContextMenuOpen(false);
+    resetLongPress();
+  };
+
+  // Build context menu items based on available handlers
+  const contextMenuItems = [
+    ...(onDownload ? [{
+      id: 'download',
+      label: 'Download',
+      icon: <DownloadIcon size="sm" />,
+      onClick: () => { onDownload(); handleContextMenuClose(); },
+    }] : []),
+    ...(onToggleVisibility ? [{
+      id: 'visibility',
+      label: isPublic ? 'Make Private' : 'Make Public',
+      icon: isPublic ? <EyeOffIcon size="sm" /> : <EyeIcon size="sm" />,
+      onClick: () => { onToggleVisibility(); handleContextMenuClose(); },
+    }] : []),
+    ...(onDelete ? [{
+      id: 'delete',
+      label: 'Delete',
+      icon: <TrashIcon size="sm" />,
+      onClick: () => { onDelete(); handleContextMenuClose(); },
+      variant: 'danger' as const,
+    }] : []),
+  ];
 
   return (
     <div
@@ -72,6 +114,7 @@ export function AssetCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
+      {...longPressHandlers}
     >
 
       {/* Selection Checkbox */}
@@ -163,6 +206,16 @@ export function AssetCard({
           )}
         </div>
       </div>
+
+      {/* Context Menu for long-press actions */}
+      {contextMenuItems.length > 0 && (
+        <ContextMenu
+          items={contextMenuItems}
+          isOpen={contextMenuOpen}
+          onClose={handleContextMenuClose}
+          position={menuPosition}
+        />
+      )}
     </div>
   );
 }

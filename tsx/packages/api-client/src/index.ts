@@ -376,3 +376,136 @@ export type {
   SubscriptionTier as UsageTier,
   TIER_DISPLAY,
 } from './types/usage';
+
+// Community Gallery type exports
+export type {
+  ReportReason,
+  ReportStatus,
+  PostSortOption,
+  UserSummary,
+  CommunityPost,
+  CommunityPostWithAuthor,
+  CommunityComment,
+  CommentWithAuthor,
+  CommunityUserStats,
+  CreatorProfile,
+  PaginatedResponse,
+  PaginatedPosts,
+  PaginatedComments,
+  PaginatedUsers,
+  CreatePostRequest,
+  UpdatePostRequest,
+  CreateCommentRequest,
+  UpdateCommentRequest,
+  ReportPostRequest,
+  PostFilters,
+  CommentFilters,
+  Report,
+  ReviewReportRequest,
+  PaginatedReports,
+} from './types/community';
+
+// Community Gallery hooks exports
+export {
+  communityKeys,
+  transformUserSummary,
+  transformPost,
+  transformComment,
+  transformProfile,
+  useCommunityPosts,
+  useCommunityPost,
+  useFeaturedPosts,
+  useTrendingPosts,
+  useSearchPosts,
+  useMyPosts,
+  useLikedPosts,
+  useFollowingFeed,
+  useComments,
+  useCreatorProfile,
+  useCreatePost,
+  useUpdatePost,
+  useDeletePost,
+  useLikePost,
+  useUnlikePost,
+  useCreateComment,
+  useUpdateComment,
+  useDeleteComment,
+  useFollowUser,
+  useUnfollowUser,
+  useReportPost,
+  useSpotlightCreators,
+} from './hooks/useCommunity';
+
+export type { SpotlightCreator } from './hooks/useCommunity';
+
+// Promo Board type exports
+export type {
+  PromoPaymentStatus,
+  PromoCheckoutRequest,
+  PromoCheckoutResponse,
+  UserBadges,
+  PromoMessageAuthor,
+  LinkPreview,
+  PromoMessage,
+  PromoMessagesListResponse,
+  LeaderboardEntry,
+  LeaderboardResponse,
+} from './types/promo';
+
+// Promo Board hooks exports
+export {
+  promoKeys,
+  usePromoMessages,
+  usePinnedMessage,
+  useLeaderboard,
+  usePromoCheckout,
+  useDeletePromoMessage,
+} from './hooks/usePromo';
+
+// Aura Lab type exports
+export type {
+  RarityType,
+  RarityScores,
+  SetSubjectResponse,
+  FuseRequest,
+  FuseResponse,
+  FusionItem,
+  InventoryResponse,
+  InventoryFilters,
+  UsageResponse as AuraLabUsageResponse,
+  Element as AuraLabElement,
+  ElementsResponse,
+  SuccessResponse as AuraLabSuccessResponse,
+} from './types/auraLab';
+
+// Aura Lab hooks exports
+export {
+  auraLabKeys,
+  useSetSubject,
+  useFuse,
+  useKeepFusion,
+  useTrashFusion,
+  useAuraLabInventory,
+  useAuraLabUsage,
+  useAuraLabElements,
+} from './hooks/useAuraLab';
+
+// Vibe Branding type exports
+export type {
+  LightingMood,
+  BrandTone,
+  Fonts as VibeBrandingFonts,
+  VibeAnalysis,
+  AnalyzeResponse as VibeBrandingAnalyzeResponse,
+  AnalyzeUrlRequest,
+  AnalyzeUploadOptions,
+  UsageResponse as VibeBrandingUsageResponse,
+} from './types/vibeBranding';
+
+// Vibe Branding hooks exports
+export {
+  vibeBrandingKeys,
+  useAnalyzeImage,
+  useAnalyzeUrl,
+  useVibeBrandingUsage,
+} from './hooks/useVibeBranding';

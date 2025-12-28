@@ -47,6 +47,26 @@ import type {
   SubscriptionStatusResponse,
   CancelResponse,
 } from './types/subscription';
+import type {
+  SetSubjectResponse,
+  FuseRequest,
+  FuseResponse,
+  InventoryResponse,
+  InventoryFilters,
+  UsageResponse,
+  ElementsResponse,
+  SuccessResponse,
+} from './types/auraLab';
+import type {
+  AnalyzeResponse,
+  AnalyzeUrlRequest,
+  AnalyzeUploadOptions,
+  UsageResponse as VibeBrandingUsageResponse,
+} from './types/vibeBranding';
+import type {
+  CommunityPostWithAuthor,
+  PaginatedPosts,
+} from './types/community';
 
 // ============================================================================
 // Types
@@ -541,8 +561,380 @@ export class APIClient {
   };
 
   // ==========================================================================
+  // Aura Lab Namespace
+  // ==========================================================================
+
+  auraLab = {
+    /**
+     * Upload and lock in a test subject for fusion experiments
+     */
+    setSubject: async (file: File): Promise<SetSubjectResponse> => {
+      // For file uploads, we need to use FormData and a custom fetch
+      // We'll handle auth manually but use the same token management
+      return this.requestWithFormData<SetSubjectResponse>(
+        '/api/v1/aura-lab/set-subject',
+        file
+      );
+    },
+
+    /**
+     * Perform a fusion between test subject and element
+     */
+    fuse: async (data: FuseRequest): Promise<FuseResponse> => {
+      return this.request<FuseResponse>('POST', '/api/v1/aura-lab/fuse', {
+        body: {
+          subject_id: data.subjectId,
+          element_id: data.elementId,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Keep a fusion result and add it to inventory
+     */
+    keep: async (fusionId: string): Promise<SuccessResponse> => {
+      return this.request<SuccessResponse>('POST', '/api/v1/aura-lab/keep', {
+        body: {
+          fusion_id: fusionId,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Trash a fusion result (discard without saving)
+     */
+    trash: async (fusionId: string): Promise<SuccessResponse> => {
+      return this.request<SuccessResponse>('POST', '/api/v1/aura-lab/trash', {
+        body: {
+          fusion_id: fusionId,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get user's saved fusion inventory
+     */
+    getInventory: async (filters?: InventoryFilters): Promise<InventoryResponse> => {
+      const params = new URLSearchParams();
+      if (filters?.limit) params.append('limit', String(filters.limit));
+      if (filters?.offset) params.append('offset', String(filters.offset));
+      if (filters?.rarity) params.append('rarity', filters.rarity);
+
+      const query = params.toString();
+      const path = query ? `/api/v1/aura-lab/inventory?${query}` : '/api/v1/aura-lab/inventory';
+
+      return this.request<InventoryResponse>('GET', path, {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get user's daily fusion usage
+     */
+    getUsage: async (): Promise<UsageResponse> => {
+      return this.request<UsageResponse>('GET', '/api/v1/aura-lab/usage', {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get available elements for fusion
+     */
+    getElements: async (): Promise<ElementsResponse> => {
+      return this.request<ElementsResponse>('GET', '/api/v1/aura-lab/elements', {
+        requiresAuth: true,
+      });
+    },
+  };
+
+  // ==========================================================================
+  // Promo Namespace
+  // ==========================================================================
+
+  promo = {
+    /**
+     * Create a Stripe checkout session for promo message
+     */
+    createCheckout: async (data: {
+      content: string;
+      linkUrl?: string;
+      successUrl?: string;
+      cancelUrl?: string;
+    }): Promise<{ checkoutUrl: string; sessionId: string; pendingMessageId: string }> => {
+      return this.request('POST', '/api/v1/promo/checkout', {
+        body: {
+          content: data.content,
+          link_url: data.linkUrl,
+          success_url: data.successUrl,
+          cancel_url: data.cancelUrl,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get paginated promo messages
+     */
+    getMessages: async (cursor?: string | null, limit = 20): Promise<{
+      messages: unknown[];
+      pinnedMessage: unknown | null;
+      totalCount: number;
+      hasMore: boolean;
+      nextCursor: string | null;
+    }> => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (cursor) params.set('cursor', cursor);
+      return this.request('GET', `/api/v1/promo/messages?${params}`, {
+        requiresAuth: false,
+      });
+    },
+
+    /**
+     * Get the currently pinned message
+     */
+    getPinnedMessage: async (): Promise<unknown | null> => {
+      return this.request('GET', '/api/v1/promo/messages/pinned', {
+        requiresAuth: false,
+      });
+    },
+
+    /**
+     * Delete own promo message
+     */
+    deleteMessage: async (messageId: string): Promise<void> => {
+      return this.request('DELETE', `/api/v1/promo/messages/${messageId}`, {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get donation leaderboard
+     */
+    getLeaderboard: async (): Promise<{
+      entries: unknown[];
+      currentUserRank: number | null;
+      currentUserTotal: number | null;
+      updatedAt: string;
+    }> => {
+      return this.request('GET', '/api/v1/promo/leaderboard', {
+        requiresAuth: false,
+      });
+    },
+  };
+
+  // ==========================================================================
+  // Vibe Branding Namespace
+  // ==========================================================================
+
+  vibeBranding = {
+    /**
+     * Analyze an uploaded image and extract brand identity
+     */
+    analyzeUpload: async (
+      file: File,
+      options?: AnalyzeUploadOptions
+    ): Promise<AnalyzeResponse> => {
+      const params = new URLSearchParams();
+      if (options?.autoCreateKit !== undefined) {
+        params.append('auto_create_kit', String(options.autoCreateKit));
+      }
+      if (options?.kitName) {
+        params.append('kit_name', options.kitName);
+      }
+
+      const queryString = params.toString();
+      const path = `/api/v1/vibe-branding/analyze/upload${queryString ? '?' + queryString : ''}`;
+
+      return this.requestWithFormData<AnalyzeResponse>(path, file);
+    },
+
+    /**
+     * Analyze an image from URL and extract brand identity
+     */
+    analyzeUrl: async (data: AnalyzeUrlRequest): Promise<AnalyzeResponse> => {
+      return this.request<AnalyzeResponse>('POST', '/api/v1/vibe-branding/analyze/url', {
+        body: {
+          image_url: data.imageUrl,
+          auto_create_kit: data.autoCreateKit ?? true,
+          kit_name: data.kitName,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get user's vibe branding usage for current month
+     */
+    getUsage: async (): Promise<VibeBrandingUsageResponse> => {
+      return this.request<VibeBrandingUsageResponse>('GET', '/api/v1/vibe-branding/usage', {
+        requiresAuth: true,
+      });
+    },
+  };
+
+  // ==========================================================================
+  // Community Namespace
+  // ==========================================================================
+
+  community = {
+    /**
+     * Create a new community post (share an asset)
+     */
+    createPost: async (data: {
+      assetId: string;
+      title: string;
+      description?: string;
+      tags?: string[];
+      showPrompt?: boolean;
+      inspiredByPostId?: string;
+    }): Promise<CommunityPostWithAuthor> => {
+      return this.request<CommunityPostWithAuthor>('POST', '/api/v1/community/posts', {
+        body: {
+          asset_id: data.assetId,
+          title: data.title,
+          description: data.description,
+          tags: data.tags || [],
+          show_prompt: data.showPrompt ?? false,
+          inspired_by_post_id: data.inspiredByPostId,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get community posts with pagination
+     */
+    listPosts: async (params?: {
+      page?: number;
+      limit?: number;
+      sort?: string;
+      assetType?: string;
+      tags?: string[];
+    }): Promise<PaginatedPosts> => {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.append('page', String(params.page));
+      if (params?.limit) searchParams.append('limit', String(params.limit));
+      if (params?.sort) searchParams.append('sort', params.sort);
+      if (params?.assetType) searchParams.append('asset_type', params.assetType);
+      if (params?.tags?.length) searchParams.append('tags', params.tags.join(','));
+
+      const query = searchParams.toString();
+      const path = query ? `/api/v1/community/posts?${query}` : '/api/v1/community/posts';
+
+      return this.request<PaginatedPosts>('GET', path, {
+        requiresAuth: false,
+      });
+    },
+
+    /**
+     * Get a single community post by ID
+     */
+    getPost: async (postId: string): Promise<CommunityPostWithAuthor> => {
+      return this.request<CommunityPostWithAuthor>('GET', `/api/v1/community/posts/${postId}`, {
+        requiresAuth: false,
+      });
+    },
+
+    /**
+     * Update a community post
+     */
+    updatePost: async (
+      postId: string,
+      data: {
+        title?: string;
+        description?: string;
+        tags?: string[];
+        showPrompt?: boolean;
+      }
+    ): Promise<CommunityPostWithAuthor> => {
+      return this.request<CommunityPostWithAuthor>('PUT', `/api/v1/community/posts/${postId}`, {
+        body: {
+          title: data.title,
+          description: data.description,
+          tags: data.tags,
+          show_prompt: data.showPrompt,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Delete a community post
+     */
+    deletePost: async (postId: string): Promise<void> => {
+      return this.request('DELETE', `/api/v1/community/posts/${postId}`, {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Like a community post
+     */
+    likePost: async (postId: string): Promise<void> => {
+      return this.request('POST', `/api/v1/community/posts/${postId}/like`, {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Unlike a community post
+     */
+    unlikePost: async (postId: string): Promise<void> => {
+      return this.request('DELETE', `/api/v1/community/posts/${postId}/like`, {
+        requiresAuth: true,
+      });
+    },
+  };
+
+  // ==========================================================================
   // Private Methods
   // ==========================================================================
+
+  /**
+   * Make an HTTP request with FormData (for file uploads)
+   */
+  private async requestWithFormData<T>(
+    path: string,
+    file: File,
+    fieldName: string = 'file'
+  ): Promise<T> {
+    const formData = new FormData();
+    formData.append(fieldName, file);
+
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+
+    const url = `${this.baseUrl}${path}`;
+
+    let response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      credentials: 'include',
+    });
+
+    // Handle 401 Unauthorized - attempt token refresh
+    if (response.status === 401) {
+      const refreshed = await this.handleUnauthorized();
+      if (refreshed) {
+        // Retry with new token
+        headers['Authorization'] = `Bearer ${this.accessToken}`;
+        response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData,
+          credentials: 'include',
+        });
+      }
+    }
+
+    return this.parseResponse<T>(response);
+  }
 
   /**
    * Make an HTTP request to the API

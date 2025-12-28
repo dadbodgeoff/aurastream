@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth, useSiteAnalytics } from '@aurastream/shared';
+import { useAuth, useEnterpriseAnalytics } from '@aurastream/shared';
 
 // OAuth provider icons
 const GoogleIcon = () => (
@@ -109,7 +109,7 @@ function calculatePasswordStrength(password: string): PasswordStrength {
 export default function SignupPage() {
   const router = useRouter();
   const { signup, isLoading, error, clearError } = useAuth();
-  const { trackFunnel } = useSiteAnalytics();
+  const { trackFunnel } = useEnterpriseAnalytics();
   const emailInputRef = useRef<HTMLInputElement>(null);
   
   const [email, setEmail] = useState('');

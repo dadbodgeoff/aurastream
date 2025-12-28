@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useBrandKits,
   useCreateBrandKit,
@@ -23,6 +23,8 @@ import {
 import { BrandKitsEmptyState } from '@/components/empty-states';
 import { BrandKitCardSkeleton } from '@/components/ui/skeletons';
 import { toast } from '@/components/ui/Toast';
+import { VibeBrandingModal } from '@/components/vibe-branding';
+import { Sparkles } from 'lucide-react';
 import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
 
@@ -198,6 +200,7 @@ function BrandKitForm({ isOpen, onClose, brandKit, onSave }: BrandKitFormProps) 
 
 export default function BrandKitsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { data, isLoading, error, refetch } = useBrandKits();
   const createBrandKit = useCreateBrandKit();
@@ -218,6 +221,16 @@ export default function BrandKitsPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingBrandKit, setEditingBrandKit] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showVibeBranding, setShowVibeBranding] = useState(false);
+
+  // Handle ?vibe=true query param to auto-open modal
+  useEffect(() => {
+    if (searchParams.get('vibe') === 'true') {
+      setShowVibeBranding(true);
+      // Clean up URL
+      router.replace('/dashboard/brand-kits');
+    }
+  }, [searchParams, router]);
 
   const brandKits = data?.brandKits ?? [];
   const filteredBrandKits = search
@@ -288,17 +301,26 @@ export default function BrandKitsPage() {
       title="Brand Studio"
       description="Manage your brand identities for consistent asset generation"
       actions={
-        canCreateMore ? (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowCreateForm(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors"
+            onClick={() => setShowVibeBranding(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            <PlusIcon className="w-4 h-4" />
-            New Brand Kit
+            <Sparkles className="w-4 h-4" />
+            Import from Image
           </button>
-        ) : (
-          <span className="text-sm text-text-muted">Maximum 10 brand kits reached</span>
-        )
+          {canCreateMore ? (
+            <button
+              onClick={() => setShowCreateForm(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <PlusIcon className="w-4 h-4" />
+              New Brand Kit
+            </button>
+          ) : (
+            <span className="text-sm text-text-muted">Maximum 10 brand kits reached</span>
+          )}
+        </div>
       }
     >
       {/* Search */}
@@ -366,6 +388,16 @@ export default function BrandKitsPage() {
         message="Are you sure you want to delete this brand kit? This action cannot be undone."
         confirmLabel="Delete"
         variant="danger"
+      />
+
+      {/* Vibe Branding Modal */}
+      <VibeBrandingModal
+        isOpen={showVibeBranding}
+        onClose={() => setShowVibeBranding(false)}
+        onKitCreated={() => {
+          refetch();
+          toast.success('Brand kit created from image!');
+        }}
       />
     </PageContainer>
   );

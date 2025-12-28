@@ -1,0 +1,10 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://aurastream.shop/sitemap.xml
+
+# Disallow admin/private areas
+Disallow: /api/
+Disallow: /dashboard/settings/

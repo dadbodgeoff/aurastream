@@ -303,12 +303,68 @@ export function useCoachChat(): UseCoachChatReturn {
   // Refs for abort controller
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Token batching refs to reduce re-renders during streaming
+  // Instead of updating on every token, we batch updates every 100ms
+  const tokenBufferRef = useRef<string>('');
+  const flushIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentMessageIdRef = useRef<string | null>(null);
+  const accumulatedContentRef = useRef<string>('');
+
   // Get access token from apiClient (following existing pattern)
   const getAccessToken = useCallback((): string | null => {
     if (typeof window === 'undefined') return null;
     // The apiClient stores tokens in memory after login
     return apiClient.getAccessToken();
   }, []);
+
+  /**
+   * Flush the token buffer and update the message with accumulated content.
+   * This batches multiple token updates into a single state update.
+   */
+  const flushTokenBuffer = useCallback(() => {
+    if (tokenBufferRef.current && currentMessageIdRef.current) {
+      // Append buffered tokens to accumulated content
+      accumulatedContentRef.current += tokenBufferRef.current;
+      const newContent = accumulatedContentRef.current;
+      const messageId = currentMessageIdRef.current;
+      
+      // Clear the buffer
+      tokenBufferRef.current = '';
+      
+      // Update the message with the new accumulated content
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, content: newContent, isStreaming: true }
+            : msg
+        )
+      );
+    }
+  }, []);
+
+  /**
+   * Start the flush interval for batching token updates.
+   * The interval flushes accumulated tokens every 100ms.
+   */
+  const startFlushInterval = useCallback(() => {
+    if (!flushIntervalRef.current) {
+      flushIntervalRef.current = setInterval(() => {
+        flushTokenBuffer();
+      }, 100);
+    }
+  }, [flushTokenBuffer]);
+
+  /**
+   * Stop the flush interval and flush any remaining tokens.
+   */
+  const stopFlushInterval = useCallback(() => {
+    if (flushIntervalRef.current) {
+      clearInterval(flushIntervalRef.current);
+      flushIntervalRef.current = null;
+    }
+    // Flush any remaining tokens in the buffer
+    flushTokenBuffer();
+  }, [flushTokenBuffer]);
 
   /**
    * Process SSE stream and update messages.
@@ -324,6 +380,11 @@ export function useCoachChat(): UseCoachChatReturn {
       
       // Reset first token tracking for this stream
       hasReceivedFirstTokenRef.current = false;
+      
+      // Initialize batching refs for this stream
+      tokenBufferRef.current = '';
+      accumulatedContentRef.current = '';
+      currentMessageIdRef.current = assistantMessageId;
 
       try {
         for await (const chunk of stream) {
@@ -333,19 +394,20 @@ export function useCoachChat(): UseCoachChatReturn {
               if (!hasReceivedFirstTokenRef.current) {
                 hasReceivedFirstTokenRef.current = true;
                 setStreamingStage('streaming');
+                // Start the flush interval for batching
+                startFlushInterval();
               }
               
+              // Add token to buffer instead of updating state directly
+              // This batches updates to reduce re-renders
+              tokenBufferRef.current += chunk.content;
               accumulatedContent += chunk.content;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, isStreaming: true }
-                    : msg
-                )
-              );
               break;
 
             case 'intent_ready':
+              // Flush buffer before handling intent_ready to ensure content is up to date
+              stopFlushInterval();
+              
               if (chunk.metadata) {
                 intentStatus = {
                   isReady: chunk.metadata.is_ready ?? false,
@@ -364,6 +426,9 @@ export function useCoachChat(): UseCoachChatReturn {
               break;
 
             case 'grounding':
+              // Flush buffer before handling grounding state change
+              stopFlushInterval();
+              
               setIsGrounding(true);
               setGroundingQuery(chunk.metadata?.searching || null);
               groundingUsed = true;
@@ -372,9 +437,16 @@ export function useCoachChat(): UseCoachChatReturn {
             case 'grounding_complete':
               setIsGrounding(false);
               setGroundingQuery(null);
+              // Restart flush interval if we're still streaming
+              if (hasReceivedFirstTokenRef.current) {
+                startFlushInterval();
+              }
               break;
 
             case 'done':
+              // Flush any remaining tokens before finalizing
+              stopFlushInterval();
+              
               if (chunk.metadata?.session_id) {
                 setSessionId(chunk.metadata.session_id);
               }
@@ -383,6 +455,9 @@ export function useCoachChat(): UseCoachChatReturn {
               break;
 
             case 'error':
+              // Flush any remaining tokens before handling error
+              stopFlushInterval();
+              
               setError(chunk.content || 'An error occurred');
               setStreamingStage('error');
               break;
@@ -392,21 +467,21 @@ export function useCoachChat(): UseCoachChatReturn {
               if (!hasReceivedFirstTokenRef.current) {
                 hasReceivedFirstTokenRef.current = true;
                 setStreamingStage('streaming');
+                // Start the flush interval for batching
+                startFlushInterval();
               }
               
+              // Add redirect content to buffer (same batching as tokens)
+              tokenBufferRef.current += chunk.content;
               accumulatedContent += chunk.content;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, content: accumulatedContent, isStreaming: true }
-                    : msg
-                )
-              );
               break;
           }
         }
 
-        // Finalize the message
+        // Ensure flush interval is stopped and buffer is flushed
+        stopFlushInterval();
+
+        // Finalize the message with the complete accumulated content
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
@@ -426,6 +501,9 @@ export function useCoachChat(): UseCoachChatReturn {
           setStreamingStage('complete');
         }
       } catch (err) {
+        // Stop flush interval on error
+        stopFlushInterval();
+        
         const errorMessage = err instanceof Error ? err.message : 'Stream error occurred';
         setError(errorMessage);
         setStreamingStage('error');
@@ -440,9 +518,11 @@ export function useCoachChat(): UseCoachChatReturn {
         setIsStreaming(false);
         setIsGrounding(false);
         setGroundingQuery(null);
+        // Clean up refs
+        currentMessageIdRef.current = null;
       }
     },
-    [streamingStage]
+    [streamingStage, startFlushInterval, stopFlushInterval]
   );
 
   /**
@@ -613,6 +693,12 @@ export function useCoachChat(): UseCoachChatReturn {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    
+    // Clean up flush interval
+    if (flushIntervalRef.current) {
+      clearInterval(flushIntervalRef.current);
+      flushIntervalRef.current = null;
+    }
 
     setMessages([]);
     setIsStreaming(false);
@@ -625,6 +711,9 @@ export function useCoachChat(): UseCoachChatReturn {
     setIsGrounding(false);
     setGroundingQuery(null);
     hasReceivedFirstTokenRef.current = false;
+    tokenBufferRef.current = '';
+    accumulatedContentRef.current = '';
+    currentMessageIdRef.current = null;
   }, []);
 
   // Cleanup on unmount
@@ -632,6 +721,11 @@ export function useCoachChat(): UseCoachChatReturn {
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      // Clean up flush interval on unmount
+      if (flushIntervalRef.current) {
+        clearInterval(flushIntervalRef.current);
+        flushIntervalRef.current = null;
       }
     };
   }, []);

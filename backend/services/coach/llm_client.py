@@ -15,10 +15,30 @@ Environment Variables:
 - COACH_LLM_MODEL: Model to use (default: gemini-1.5-flash)
 """
 
+import asyncio
 import os
-from typing import AsyncGenerator, List, Dict, Any, Optional
+from dataclasses import dataclass
+from typing import AsyncGenerator, List, Dict, Optional, Tuple
 
 import google.generativeai as genai
+
+
+@dataclass
+class TokenUsage:
+    """Token usage statistics from a Gemini API call."""
+    tokens_in: int = 0
+    tokens_out: int = 0
+
+
+@dataclass
+class StreamResult:
+    """
+    Result from streaming chat completion.
+    
+    Contains both the full response text and token usage statistics.
+    """
+    text: str
+    usage: TokenUsage
 
 
 class CoachLLMClient:
@@ -131,6 +151,132 @@ class CoachLLMClient:
         for chunk in response:
             if chunk.text:
                 yield chunk.text
+                await asyncio.sleep(0)  # Yield control back to event loop
+    
+    async def stream_chat_with_usage(
+        self,
+        messages: List[Dict[str, str]],
+    ) -> Tuple[AsyncGenerator[str, None], "UsageAccessor"]:
+        """
+        Stream chat completion tokens and provide access to usage metadata.
+        
+        This method returns a tuple of (generator, usage_accessor). The generator
+        yields tokens as they arrive. After iteration completes, call
+        usage_accessor.get_usage() to retrieve token counts.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content' keys.
+                     Roles: 'system', 'user', 'assistant'
+        
+        Returns:
+            Tuple of (token generator, usage accessor)
+            
+        Example:
+            generator, usage_accessor = await client.stream_chat_with_usage(messages)
+            full_text = ""
+            async for token in generator:
+                full_text += token
+            usage = usage_accessor.get_usage()
+            print(f"Tokens in: {usage.tokens_in}, out: {usage.tokens_out}")
+        """
+        # Convert messages to Gemini format
+        system_prompt = None
+        chat_history = []
+        
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            
+            if role == "system":
+                system_prompt = content
+            elif role == "assistant":
+                chat_history.append({"role": "model", "parts": [content]})
+            else:  # user
+                chat_history.append({"role": "user", "parts": [content]})
+        
+        # Create chat with system instruction if provided
+        generation_config = genai.GenerationConfig(
+            temperature=0.7,
+            max_output_tokens=2048,
+        )
+        
+        if system_prompt:
+            model = genai.GenerativeModel(
+                self.model_name,
+                system_instruction=system_prompt,
+                generation_config=generation_config,
+            )
+        else:
+            model = genai.GenerativeModel(
+                self.model_name,
+                generation_config=generation_config,
+            )
+        
+        # Start chat with history (excluding the last user message)
+        chat = model.start_chat(history=chat_history[:-1] if len(chat_history) > 1 else [])
+        
+        # Get the last user message
+        last_message = chat_history[-1]["parts"][0] if chat_history else ""
+        
+        # Stream the response
+        response = chat.send_message(last_message, stream=True)
+        
+        # Create usage accessor that holds reference to response
+        usage_accessor = UsageAccessor(response)
+        
+        async def token_generator() -> AsyncGenerator[str, None]:
+            """Inner generator that yields tokens and marks completion."""
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+                    await asyncio.sleep(0)  # Yield control back to event loop
+            # Mark iteration as complete so usage can be accessed
+            usage_accessor._iteration_complete = True
+        
+        return token_generator(), usage_accessor
+
+
+class UsageAccessor:
+    """
+    Accessor for token usage metadata after streaming completes.
+    
+    The Gemini SDK only provides usage_metadata after the response
+    has been fully iterated. This class holds a reference to the
+    response and provides access to usage after iteration.
+    """
+    
+    def __init__(self, response):
+        """
+        Initialize with a Gemini response object.
+        
+        Args:
+            response: The streaming response from Gemini
+        """
+        self._response = response
+        self._iteration_complete = False
+    
+    def get_usage(self) -> TokenUsage:
+        """
+        Get token usage from the response.
+        
+        Should be called after the streaming generator has been
+        fully consumed. Returns zeros if usage is not available.
+        
+        Returns:
+            TokenUsage with tokens_in and tokens_out
+        """
+        try:
+            usage_metadata = getattr(self._response, 'usage_metadata', None)
+            if usage_metadata is None:
+                return TokenUsage(tokens_in=0, tokens_out=0)
+            
+            tokens_in = getattr(usage_metadata, 'prompt_token_count', 0) or 0
+            tokens_out = getattr(usage_metadata, 'candidates_token_count', 0) or 0
+            
+            return TokenUsage(tokens_in=tokens_in, tokens_out=tokens_out)
+        except Exception:
+            # If anything goes wrong, return zeros
+            return TokenUsage(tokens_in=0, tokens_out=0)
 
 
 # Singleton instance
@@ -156,4 +302,4 @@ def get_llm_client() -> Optional[CoachLLMClient]:
         return None
 
 
-__all__ = ["CoachLLMClient", "get_llm_client"]
+__all__ = ["CoachLLMClient", "get_llm_client", "TokenUsage", "StreamResult", "UsageAccessor"]

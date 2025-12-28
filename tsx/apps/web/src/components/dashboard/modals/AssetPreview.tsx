@@ -1,8 +1,15 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Modal } from './Modal';
 import { DownloadIcon, TrashIcon, EyeIcon, EyeOffIcon } from '../icons';
 import { cn } from '@/lib/utils';
+
+const ShareIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+  </svg>
+);
 
 export interface AssetPreviewProps {
   isOpen: boolean;
@@ -51,7 +58,14 @@ export function AssetPreview({
   onDelete,
   onToggleVisibility,
 }: AssetPreviewProps) {
+  const router = useRouter();
+
   if (!asset) return null;
+
+  const handleShareToCommunity = () => {
+    onClose();
+    router.push(`/community/share?assetId=${asset.id}`);
+  };
 
   return (
     <Modal
@@ -62,6 +76,13 @@ export function AssetPreview({
       footer={
         <div className="flex items-center gap-2 w-full">
           <div className="flex-1 flex items-center gap-2">
+            <button
+              onClick={handleShareToCommunity}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-interactive-600 hover:bg-interactive-600/10 rounded-lg transition-colors"
+            >
+              <ShareIcon className="w-4 h-4" />
+              Share to Community
+            </button>
             {onToggleVisibility && (
               <button
                 onClick={onToggleVisibility}

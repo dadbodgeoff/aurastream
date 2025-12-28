@@ -18,6 +18,7 @@ Environment Variables:
 
 import asyncio
 import base64
+import logging
 import os
 import time
 import uuid
@@ -33,6 +34,8 @@ from backend.services.exceptions import (
     RateLimitError,
 )
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class GenerationRequest:
@@ -42,6 +45,8 @@ class GenerationRequest:
     height: int
     model: str = "gemini-3-pro-image-preview"
     seed: Optional[int] = None
+    input_image: Optional[bytes] = None  # Optional input image for image-to-image
+    input_mime_type: str = "image/png"   # MIME type of input image
 
 
 @dataclass
@@ -192,7 +197,9 @@ class NanoBananaClient:
             model_name=model_name,
             seed=request.seed,
             width=request.width,
-            height=request.height
+            height=request.height,
+            input_image=request.input_image,
+            input_mime_type=request.input_mime_type
         )
     
     async def _request_with_retry(
@@ -201,7 +208,9 @@ class NanoBananaClient:
         model_name: str,
         seed: Optional[int],
         width: int,
-        height: int
+        height: int,
+        input_image: Optional[bytes] = None,
+        input_mime_type: str = "image/png"
     ) -> GenerationResponse:
         """
         Execute generation request with exponential backoff retry.
@@ -215,7 +224,9 @@ class NanoBananaClient:
                     model_name=model_name,
                     seed=seed,
                     width=width,
-                    height=height
+                    height=height,
+                    input_image=input_image,
+                    input_mime_type=input_mime_type
                 )
             
             except ContentPolicyError:
@@ -261,7 +272,9 @@ class NanoBananaClient:
         model_name: str,
         seed: Optional[int],
         width: int,
-        height: int
+        height: int,
+        input_image: Optional[bytes] = None,
+        input_mime_type: str = "image/png"
     ) -> GenerationResponse:
         """
         Execute a single generation request using Gemini REST API.
@@ -273,12 +286,24 @@ class NanoBananaClient:
         # Prepend strict content constraint to prevent hallucination
         constrained_prompt = f"{self.STRICT_CONTENT_CONSTRAINT}{prompt}"
         
+        # Build the parts array - text prompt first
+        parts = [{
+            "text": f"{constrained_prompt}\n\nGenerate this as a {width}x{height} pixel image."
+        }]
+        
+        # Add input image if provided (for image-to-image transformation)
+        if input_image is not None:
+            parts.append({
+                "inlineData": {
+                    "mimeType": input_mime_type,
+                    "data": base64.b64encode(input_image).decode()
+                }
+            })
+        
         # Build the request body for image generation
         request_body = {
             "contents": [{
-                "parts": [{
-                    "text": f"{constrained_prompt}\n\nGenerate this as a {width}x{height} pixel image."
-                }]
+                "parts": parts
             }],
             "generationConfig": {
                 "responseModalities": ["IMAGE", "TEXT"],
@@ -417,3 +442,12 @@ def get_nano_banana_client() -> NanoBananaClient:
     if _nano_banana_client is None:
         _nano_banana_client = create_nano_banana_client()
     return _nano_banana_client
+
+
+__all__ = [
+    "GenerationRequest",
+    "GenerationResponse",
+    "NanoBananaClient",
+    "create_nano_banana_client",
+    "get_nano_banana_client",
+]

@@ -26,6 +26,7 @@ import {
 import { AssetsEmptyState } from '@/components/empty-states';
 import { AssetGridSkeleton } from '@/components/ui/skeletons';
 import { toast } from '@/components/ui/Toast';
+import { downloadAsset, getAssetFilename } from '@/utils/download';
 import type { ViewMode } from '@/components/dashboard';
 import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
@@ -130,10 +131,13 @@ export default function AssetsPage() {
 
   // Handle download
   const handleDownload = useCallback((asset: any) => {
-    const link = document.createElement('a');
-    link.href = asset.url;
-    link.download = `${asset.asset_type}-${asset.id}.png`;
-    link.click();
+    const filename = getAssetFilename(asset.asset_type, asset.id, asset.format || 'png');
+    downloadAsset({
+      url: asset.url,
+      filename,
+      onSuccess: () => toast.success('Download started'),
+      onError: (error) => toast.error(`Download failed: ${error.message}`),
+    });
   }, []);
 
   // Handle delete

@@ -345,7 +345,7 @@ const track = (
  */
 const page = (name: string, properties: CustomProperties = {}): void => {
   enqueue(
-    createEvent('page_view', { pageName: name, ...properties }, 'page_view'),
+    createEvent('page_view', { pageName: name, ...properties }, 'page'),
     'normal'
   );
 };

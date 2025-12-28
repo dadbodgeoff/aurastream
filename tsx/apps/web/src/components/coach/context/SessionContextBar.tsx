@@ -4,13 +4,14 @@
  * SessionContextBar Component
  * 
  * Sticky context bar displayed at the top of the coach chat interface.
- * Shows session information including asset type, brand kit, and turns remaining.
+ * Shows session information including asset type, brand kit, turns remaining,
+ * and session timeout countdown.
  * Supports expanded and collapsed states for mobile responsiveness.
  * 
  * @module coach/context/SessionContextBar
  */
 
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { SessionBadge } from './SessionBadge';
 import { TurnsIndicator } from './TurnsIndicator';
@@ -32,6 +33,10 @@ export interface SessionContextBarProps {
   turnsRemaining: number;
   /** Total turns allowed */
   totalTurns?: number;
+  /** Session start time for timeout calculation (optional) */
+  sessionStartTime?: Date;
+  /** Session timeout in minutes (default: 30) */
+  sessionTimeoutMinutes?: number;
   /** Callback when End Session is clicked */
   onEndSession?: () => void;
   /** Callback when View History is clicked */
@@ -44,6 +49,57 @@ export interface SessionContextBarProps {
   className?: string;
   /** Test ID for testing */
   testId?: string;
+}
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+/**
+ * Hook to calculate and track session timeout
+ * 
+ * @param sessionStartTime - When the session started
+ * @param timeoutMinutes - Total timeout duration in minutes
+ * @returns Minutes remaining until session expires, or null if not applicable
+ */
+function useSessionTimeout(
+  sessionStartTime?: Date,
+  timeoutMinutes: number = 30
+): number | null {
+  const [minutesRemaining, setMinutesRemaining] = useState<number | null>(null);
+
+  useEffect(() => {
+    // If no session start time provided, don't track timeout
+    if (!sessionStartTime) {
+      setMinutesRemaining(null);
+      return;
+    }
+
+    // Calculate time remaining
+    const calculateTimeRemaining = () => {
+      const now = new Date();
+      const startTime = new Date(sessionStartTime);
+      const expiresAt = new Date(startTime.getTime() + timeoutMinutes * 60 * 1000);
+      const msRemaining = expiresAt.getTime() - now.getTime();
+      
+      // Convert to minutes, minimum 0
+      const minutes = Math.max(0, Math.ceil(msRemaining / (60 * 1000)));
+      setMinutesRemaining(minutes);
+    };
+
+    // Calculate immediately
+    calculateTimeRemaining();
+
+    // Update every minute
+    const intervalId = setInterval(calculateTimeRemaining, 60 * 1000);
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [sessionStartTime, timeoutMinutes]);
+
+  return minutesRemaining;
 }
 
 // ============================================================================
@@ -72,6 +128,13 @@ const HistoryIcon = ({ className }: { className?: string }) => (
 const StopIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <rect x="6" y="6" width="12" height="12" rx="2" />
+  </svg>
+);
+
+const ClockIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
   </svg>
 );
 
@@ -123,6 +186,53 @@ const ActionButton = memo(function ActionButton({
 
 ActionButton.displayName = 'ActionButton';
 
+interface SessionTimeoutDisplayProps {
+  minutesRemaining: number;
+  testId?: string;
+}
+
+/**
+ * Displays the session timeout countdown with appropriate warning colors
+ */
+const SessionTimeoutDisplay = memo(function SessionTimeoutDisplay({
+  minutesRemaining,
+  testId,
+}: SessionTimeoutDisplayProps) {
+  // Determine warning state
+  const isCritical = minutesRemaining <= 2;
+  const isWarning = minutesRemaining <= 5 && !isCritical;
+
+  // Determine display text
+  const displayText = minutesRemaining === 0
+    ? 'Session expired'
+    : `Session expires in ${minutesRemaining} min`;
+
+  // Determine aria-live for screen readers
+  const ariaLive = isCritical ? 'assertive' : isWarning ? 'polite' : 'off';
+
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1.5 text-sm',
+        isCritical
+          ? 'text-red-400'
+          : isWarning
+            ? 'text-yellow-400'
+            : 'text-text-tertiary'
+      )}
+      role="timer"
+      aria-live={ariaLive}
+      aria-label={displayText}
+      data-testid={testId}
+    >
+      <ClockIcon className="w-3.5 h-3.5" />
+      <span>{displayText}</span>
+    </div>
+  );
+});
+
+SessionTimeoutDisplay.displayName = 'SessionTimeoutDisplay';
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -134,6 +244,7 @@ ActionButton.displayName = 'ActionButton';
  * - Sticky positioning at top of chat
  * - Shows asset type badge and brand kit name
  * - Displays turns remaining with warning states
+ * - Shows session timeout countdown with warning states
  * - End Session and View History actions
  * - Collapse/expand for mobile responsiveness
  * - Glassmorphism styling
@@ -142,7 +253,8 @@ ActionButton.displayName = 'ActionButton';
  * ```
  * ┌─────────────────────────────────────────────────────┐
  * │ Creating: [Twitch Emote] with [My Brand Kit]        │
- * │ Turns: 3/10 remaining          [End] [History] [−]  │
+ * │ Turns: 3/10 remaining • Session expires in 25 min   │
+ * │                                 [End] [History] [−] │
  * └─────────────────────────────────────────────────────┘
  * ```
  * 
@@ -161,18 +273,22 @@ ActionButton.displayName = 'ActionButton';
  *   brandKitName="My Brand Kit"
  *   turnsUsed={7}
  *   turnsRemaining={3}
+ *   sessionStartTime={new Date()}
+ *   sessionTimeoutMinutes={30}
  *   onEndSession={() => handleEndSession()}
  *   onViewHistory={() => handleViewHistory()}
  * />
  * ```
  */
 export const SessionContextBar = memo(function SessionContextBar({
-  sessionId,
+  sessionId: _sessionId,
   assetType,
   brandKitName,
   turnsUsed,
   turnsRemaining,
   totalTurns = 10,
+  sessionStartTime,
+  sessionTimeoutMinutes = 30,
   onEndSession,
   onViewHistory,
   isCollapsed = false,
@@ -180,7 +296,10 @@ export const SessionContextBar = memo(function SessionContextBar({
   className,
   testId = 'session-context-bar',
 }: SessionContextBarProps) {
-  // Determine warning state
+  // Calculate session timeout
+  const minutesRemaining = useSessionTimeout(sessionStartTime, sessionTimeoutMinutes);
+
+  // Determine warning state for turns
   const isLowTurns = turnsRemaining < 3 && turnsRemaining > 0;
   const isCritical = turnsRemaining <= 1 && turnsRemaining > 0;
 
@@ -277,15 +396,29 @@ export const SessionContextBar = memo(function SessionContextBar({
         </div>
       </div>
 
-      {/* Bottom row: Turns and actions */}
+      {/* Bottom row: Turns, timeout, and actions */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-text-secondary">Turns:</span>
-          <TurnsIndicator
-            used={turnsUsed}
-            total={totalTurns}
-            testId={`${testId}-turns`}
-          />
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Turns indicator */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-text-secondary">Turns:</span>
+            <TurnsIndicator
+              used={turnsUsed}
+              total={totalTurns}
+              testId={`${testId}-turns`}
+            />
+          </div>
+
+          {/* Session timeout display - only shown if sessionStartTime is provided */}
+          {minutesRemaining !== null && (
+            <>
+              <span className="text-text-tertiary hidden sm:inline">•</span>
+              <SessionTimeoutDisplay
+                minutesRemaining={minutesRemaining}
+                testId={`${testId}-timeout`}
+              />
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-1">

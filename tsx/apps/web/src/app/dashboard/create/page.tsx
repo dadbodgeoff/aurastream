@@ -28,6 +28,7 @@ import {
 } from '../../../components/create';
 import { UsageDisplay } from '../../../components/usage';
 import { useUsageStats } from '../../../hooks/useUsageStats';
+import { Sparkles } from 'lucide-react';
 import type { Platform, CreatePhase, BrandKitOption } from '../../../components/create';
 
 // =============================================================================
@@ -73,6 +74,21 @@ export default function CreatePage() {
       setPlatform(platformParam as Platform);
     }
   }, [searchParams]);
+
+  // Handle vibe_kit param - auto-select brand kit from Vibe Branding
+  useEffect(() => {
+    const vibeKitId = searchParams.get('vibe_kit');
+    if (vibeKitId && brandKits.length > 0) {
+      const kit = brandKits.find(k => k.id === vibeKitId);
+      if (kit) {
+        setSelectedBrandKitId(vibeKitId);
+      }
+    }
+  }, [searchParams, brandKits]);
+
+  // Check if using a vibe kit
+  const vibeKitId = searchParams.get('vibe_kit');
+  const isVibeKit = vibeKitId && selectedBrandKitId === vibeKitId;
 
   // Filter asset types by platform and auto-select first valid one
   const filteredAssetTypes = useMemo(() => {
@@ -320,6 +336,18 @@ export default function CreatePage() {
           showUpgrade={false}
         />
       </div>
+
+      {/* Vibe Kit Banner */}
+      {isVibeKit && (
+        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-purple-400" />
+            <p className="text-sm text-purple-300">
+              Generating with your extracted vibe from Vibe Branding
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Limit Warning */}
       {isAtLimit && (

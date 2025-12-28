@@ -104,3 +104,23 @@ export {
 export { siteTracker, type FunnelStep, type SiteTrackerConfig } from './siteTracker';
 export { SiteAnalyticsProvider } from './SiteAnalyticsProvider';
 export { useSiteAnalytics } from './useSiteAnalytics';
+
+// =============================================================================
+// Enterprise Analytics (Comprehensive Tracking with Heatmaps, Journeys, etc.)
+// =============================================================================
+
+export { 
+  enterpriseTracker,
+  type EnterpriseTrackerConfig,
+  type FunnelStep as EnterpriseFunnelStep,
+  type AbandonmentType,
+} from './enterpriseTracker';
+
+export {
+  EnterpriseAnalyticsProvider,
+  useEnterpriseAnalytics,
+  useFormAbandonmentTracking,
+  useWizardAbandonmentTracking,
+  useSignupTracking,
+  useGenerationTracking,
+} from './EnterpriseAnalyticsProvider';

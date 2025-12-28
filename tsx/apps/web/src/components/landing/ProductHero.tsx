@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { HeroShowcase } from './HeroShowcase';
 import { PlayIcon, ArrowRightIcon, TwitchIcon, YouTubeIcon, TikTokIcon, KickIcon } from './icons';
 import { useIsMobile, useTouchDevice } from '@/hooks';
-import { useReducedMotion, useSiteAnalytics } from '@aurastream/shared';
+import { useReducedMotion, useEnterpriseAnalytics } from '@aurastream/shared';
 
 // =============================================================================
 // Product Hero Section
@@ -30,7 +30,7 @@ export function ProductHero() {
   const isMobile = useIsMobile();
   const isTouch = useTouchDevice();
   const prefersReducedMotion = useReducedMotion();
-  const { trackFunnel } = useSiteAnalytics();
+  const { trackFunnel } = useEnterpriseAnalytics();
 
   // Track CTA click
   const handleCtaClick = () => {

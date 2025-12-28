@@ -18,22 +18,16 @@ import time
 from typing import Optional, Dict, Any, AsyncGenerator, List
 from dataclasses import dataclass
 
-from backend.services.coach.models import CoachSession, CoachMessage, PromptSuggestion
+from backend.services.coach.models import CoachSession, CoachMessage
 from backend.services.coach.session_manager import (
     SessionManager,
     SessionNotFoundError,
     get_session_manager,
 )
-from backend.services.coach.validator import OutputValidator, ValidationResult, get_validator
+from backend.services.coach.validator import OutputValidator, get_validator
 from backend.services.coach.grounding import (
     GroundingStrategy,
-    GroundingOrchestrator,
     get_grounding_strategy,
-)
-from backend.services.twitch.dimensions import (
-    get_dimension_info_for_prompt,
-    get_composition_directive,
-    get_asset_directive,
 )
 
 
@@ -74,7 +68,8 @@ class CreativeIntent:
             parts.append(self.subject)
         if self.action:
             parts.append(self.action)
-        if self.emotion:
+        # Don't include "custom" as an emotion - it's just a placeholder
+        if self.emotion and self.emotion.lower() != "custom":
             parts.append(f"{self.emotion} mood")
         if self.elements:
             parts.append(", ".join(self.elements))
@@ -90,6 +85,16 @@ class CoachOutput:
     metadata: Dict[str, Any]
     suggested_asset_type: Optional[str]
     keywords: List[str]
+    
+    @property
+    def final_prompt(self) -> str:
+        """Get the final prompt from the refined intent."""
+        return self.refined_intent.to_generation_input()
+    
+    @property
+    def confidence_score(self) -> float:
+        """Get the confidence score from the refined intent."""
+        return self.refined_intent.confidence_score
 
 
 class CreativeDirectorService:
@@ -107,52 +112,18 @@ class CreativeDirectorService:
     5. Refined "intent" is passed to generation (where we add our magic)
     """
     
-    # System prompt - focused creative assistant that gathers info in ~3 messages
-    SYSTEM_PROMPT_BASE = '''You are a focused creative assistant helping streamers create their {asset_type}.
+    # System prompt - concise creative assistant
+    SYSTEM_PROMPT_BASE = '''You help streamers create {asset_type} assets.
 
-## Your Goal
-Get ALL the info needed to create their asset in 2-3 messages MAX. Be efficient, not chatty.
+RULE #1: Do what the user asks. If they request changes, make them. If they ask questions, answer them.
 
-## Pre-Loaded Context
-{brand_context}
-{game_context}
-{mood_context}
+Context: {brand_context} | {game_context} | {mood_context}
+Brand colors: {color_list}
 
-## REQUIRED INFO TO GATHER (ask for what's missing):
-1. **Main Subject**: What/who is the focus? (character, object, scene)
-2. **Text Elements**: 
-   - Title/headline (if any)
-   - Subtitle (if any)  
-   - Call-to-action text (if any)
-3. **Style/Mood**: Vibe they want (energetic, chill, dramatic, etc.)
-4. **Colors**: Use their brand colors ({color_list}) OR let them pick from these proven palettes:
-   - Sunset Warmth: #FF6B35, #F7C59F, #2E294E
-   - Ocean Depth: #1A535C, #4ECDC4, #F7FFF7
-   - Neon Night: #7B2CBF, #E0AAFF, #10002B
-   - Forest Fresh: #2D6A4F, #95D5B2, #D8F3DC
-   - Fire & Ice: #EF476F, #FFD166, #06D6A0
+Gather (only what's missing): subject, style/mood, any text to include.
 
-## CONVERSATION FLOW
-**Message 1**: Acknowledge their idea, ask for missing required info (title, subtitle, any text?)
-**Message 2**: Confirm details, suggest colors if not specified, ask if ready
-**Message 3**: Summarize everything and mark ready
-
-## RESPONSE RULES
-- Keep responses SHORT (2-4 sentences max)
-- NEVER write prompts or technical terms
-- NEVER say "8k", "detailed", "professional", etc.
-- DO ask about text they want included
-- DO confirm ALL text exactly as they want it spelled
-
-## TEXT INCLUSION - CRITICAL
-When user provides text (title, subtitle, CTA), ALWAYS repeat it back exactly to confirm spelling.
-Example: "Got it - the title will say 'EPIC WINS' and subtitle 'Season 5 Highlights'. Correct?"
-
-## Ready Check
-When you have: subject + any text elements + style/colors, respond with:
-"✨ Ready! Creating: [brief summary with exact text]. [INTENT_READY]"
-
-Include [INTENT_READY] marker when all info is gathered.
+Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
+"✨ Ready! [summary] [INTENT_READY]"
 '''
     
     MAX_TURNS = 10
@@ -238,6 +209,7 @@ Include [INTENT_READY] marker when all info is gathered.
         
         # Check if game needs current context (web search)
         game_context = ""
+        search_context = ""
         if game_id and game_name:
             grounding_decision = await self.grounding.should_ground(
                 message=f"{game_name} {description}",
@@ -250,11 +222,22 @@ Include [INTENT_READY] marker when all info is gathered.
                     content="",
                     metadata={"searching": game_name, "query": grounding_decision.query},
                 )
-                game_context = f"Game: {game_name} (current season context requested)"
+                
+                # Actually perform the web search
+                search_results = await self._perform_search(grounding_decision.query)
+                if search_results:
+                    search_context = search_results
+                    game_context = f"Game: {game_name}\n\n{search_context}"
+                else:
+                    game_context = f"Game: {game_name} (current season context requested)"
+                
                 yield StreamChunk(
                     type="grounding_complete",
                     content="",
-                    metadata={"game": game_name},
+                    metadata={
+                        "game": game_name,
+                        "search_performed": bool(search_results),
+                    },
                 )
         
         # Build system prompt for creative director mode
@@ -291,12 +274,26 @@ Include [INTENT_READY] marker when all info is gathered.
         ]
         
         full_response = ""
+        tokens_in = 0
+        tokens_out = 0
         
         if self.llm is not None:
             try:
-                async for token in self.llm.stream_chat(messages):
-                    full_response += token
-                    yield StreamChunk(type="token", content=token)
+                # Use the new stream_chat_with_usage method if available
+                if hasattr(self.llm, 'stream_chat_with_usage'):
+                    generator, usage_accessor = await self.llm.stream_chat_with_usage(messages)
+                    async for token in generator:
+                        full_response += token
+                        yield StreamChunk(type="token", content=token)
+                    # Get token usage after streaming completes
+                    usage = usage_accessor.get_usage()
+                    tokens_in = usage.tokens_in
+                    tokens_out = usage.tokens_out
+                else:
+                    # Fallback to original stream_chat for backwards compatibility
+                    async for token in self.llm.stream_chat(messages):
+                        full_response += token
+                        yield StreamChunk(type="token", content=token)
             except Exception as e:
                 yield StreamChunk(type="error", content=f"LLM error: {str(e)}")
                 return
@@ -336,14 +333,14 @@ Include [INTENT_READY] marker when all info is gathered.
             },
         )
         
-        # Save messages
+        # Save messages with token counts
         await self.sessions.add_message(
             session.session_id,
-            CoachMessage(role="user", content=first_message, timestamp=time.time()),
+            CoachMessage(role="user", content=first_message, timestamp=time.time(), tokens_in=tokens_in),
         )
         await self.sessions.add_message(
             session.session_id,
-            CoachMessage(role="assistant", content=full_response, timestamp=time.time()),
+            CoachMessage(role="assistant", content=full_response, timestamp=time.time(), tokens_out=tokens_out),
         )
         
         yield StreamChunk(
@@ -353,6 +350,8 @@ Include [INTENT_READY] marker when all info is gathered.
                 "session_id": session.session_id,
                 "turns_used": 1,
                 "turns_remaining": self.MAX_TURNS - 1,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
             },
         )
     
@@ -400,12 +399,26 @@ Include [INTENT_READY] marker when all info is gathered.
         
         # Stream response
         full_response = ""
+        tokens_in = 0
+        tokens_out = 0
         
         if self.llm is not None:
             try:
-                async for token in self.llm.stream_chat(messages):
-                    full_response += token
-                    yield StreamChunk(type="token", content=token)
+                # Use the new stream_chat_with_usage method if available
+                if hasattr(self.llm, 'stream_chat_with_usage'):
+                    generator, usage_accessor = await self.llm.stream_chat_with_usage(messages)
+                    async for token in generator:
+                        full_response += token
+                        yield StreamChunk(type="token", content=token)
+                    # Get token usage after streaming completes
+                    usage = usage_accessor.get_usage()
+                    tokens_in = usage.tokens_in
+                    tokens_out = usage.tokens_out
+                else:
+                    # Fallback to original stream_chat for backwards compatibility
+                    async for token in self.llm.stream_chat(messages):
+                        full_response += token
+                        yield StreamChunk(type="token", content=token)
             except Exception as e:
                 yield StreamChunk(type="error", content=f"LLM error: {str(e)}")
                 return
@@ -450,14 +463,14 @@ Include [INTENT_READY] marker when all info is gathered.
             },
         )
         
-        # Save messages
+        # Save messages with token counts
         await self.sessions.add_message(
             session_id,
-            CoachMessage(role="user", content=message, timestamp=time.time()),
+            CoachMessage(role="user", content=message, timestamp=time.time(), tokens_in=tokens_in),
         )
         await self.sessions.add_message(
             session_id,
-            CoachMessage(role="assistant", content=full_response, timestamp=time.time()),
+            CoachMessage(role="assistant", content=full_response, timestamp=time.time(), tokens_out=tokens_out),
         )
         
         yield StreamChunk(
@@ -466,6 +479,8 @@ Include [INTENT_READY] marker when all info is gathered.
             metadata={
                 "turns_used": session.turns_used + 1,
                 "turns_remaining": self.MAX_TURNS - session.turns_used - 1,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
             },
         )
     
@@ -513,6 +528,42 @@ Include [INTENT_READY] marker when all info is gathered.
             keywords=keywords,
         )
     
+    async def _perform_search(self, query: str) -> Optional[str]:
+        """
+        Perform a web search and format results for context injection.
+        
+        Args:
+            query: Search query string
+            
+        Returns:
+            Formatted search results string, or None if search fails/unavailable
+        """
+        try:
+            from backend.services.coach.search_service import get_search_service
+            
+            search_service = get_search_service()
+            if search_service is None:
+                return None
+            
+            results = await search_service.search(query, max_results=3)
+            if not results:
+                return None
+            
+            # Format results for context injection
+            formatted = ["Current information from web search:"]
+            for r in results:
+                title = r.title[:100] if r.title else ""
+                snippet = r.snippet[:200] if r.snippet else ""
+                source = r.source or ""
+                formatted.append(f"- {title} ({source}): {snippet}")
+            
+            return "\n".join(formatted)
+            
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Search failed: {e}")
+            return None
+    
     def _build_system_prompt(
         self,
         brand_context: Dict[str, Any],
@@ -526,22 +577,18 @@ Include [INTENT_READY] marker when all info is gathered.
         color_list = ", ".join([
             f"{c.get('name', 'Color')} ({c.get('hex', '#000000')})"
             for c in colors[:3]
-        ]) if colors else "No colors specified"
+        ]) if colors else "none specified"
         
         tone = brand_context.get("tone", "professional")
+        brand_section = f"Tone: {tone}" if tone else "No brand"
         
-        brand_section = f"""
-Brand: {brand_context.get('brand_kit_id', 'Custom')}
-Colors: {color_list}
-Tone: {tone}
-"""
-        
-        mood_section = f"Mood: {custom_mood or mood}"
+        mood_section = custom_mood or mood or "flexible"
+        game_section = game_context if game_context else "none"
         
         return self.SYSTEM_PROMPT_BASE.format(
             asset_type=asset_type,
             brand_context=brand_section,
-            game_context=game_context or "No specific game",
+            game_context=game_section,
             mood_context=mood_section,
             color_list=color_list,
         )
@@ -550,13 +597,10 @@ Tone: {tone}
         """Rebuild system prompt from session data."""
         brand_context = session.brand_context or {}
         
-        # Include conversation summary for context
+        # Add current understanding if we have one
         history_section = ""
-        if session.prompt_history:
-            history_section = "\n## Conversation So Far\n"
-            history_section += "User has been refining their vision. Current understanding:\n"
-            if session.current_prompt_draft:
-                history_section += f"- {session.current_prompt_draft}\n"
+        if session.current_prompt_draft:
+            history_section = f"\nCurrent vision: {session.current_prompt_draft}"
         
         base_prompt = self._build_system_prompt(
             brand_context=brand_context,
@@ -605,19 +649,36 @@ Tone: {tone}
         """Extract creative intent from coach response."""
         import re
         
-        # Look for summary patterns
+        # Look for summary patterns - order matters, most specific first
         summary_patterns = [
-            r"Here's what I've got:\s*(.+?)(?:\.|Ready|$)",
-            r"So we're going for\s*(.+?)(?:\.|Ready|$)",
-            r"we'll create\s*(.+?)(?:\.|Ready|$)",
+            # "✨ Ready! A vibrant thumbnail..." or "Ready! A cool emote..."
+            r"(?:✨\s*)?Ready[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
+            # "Here's what I've got: a cool thumbnail"
+            r"Here's what I've got:\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
+            # "So we're going for a neon-style emote"
+            r"So we're going for\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
+            # "we'll create a dynamic banner"
+            r"we'll create\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
+            # "Perfect! A high-energy thumbnail"
+            r"(?:✨\s*)?Perfect[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
         ]
         
-        description = original_description
+        description = None
         for pattern in summary_patterns:
             match = re.search(pattern, response, re.IGNORECASE | re.DOTALL)
             if match:
-                description = match.group(1).strip()
-                break
+                extracted = match.group(1).strip()
+                # Clean up the extracted text
+                extracted = re.sub(r'\[INTENT_READY\]', '', extracted).strip()
+                # Remove trailing punctuation if it's just a period
+                extracted = extracted.rstrip('.')
+                if extracted and len(extracted) > 10:  # Ensure we got something meaningful
+                    description = extracted
+                    break
+        
+        # Fallback to original only if we couldn't extract anything
+        if not description:
+            description = original_description
         
         # Calculate confidence based on response quality
         confidence = 0.5
@@ -644,18 +705,30 @@ Tone: {tone}
         # Start with previous intent
         base_description = session.current_prompt_draft or ""
         
-        # Look for updated summary in response
+        # Look for updated summary in response - order matters, most specific first
         summary_patterns = [
-            r"Here's what I've got:\s*(.+?)(?:\.|Ready|$)",
-            r"So we're going for\s*(.+?)(?:\.|Ready|$)",
-            r"Updated:\s*(.+?)(?:\.|$)",
+            # "✨ Ready! A vibrant thumbnail..." or "Ready! A cool emote..."
+            r"(?:✨\s*)?Ready[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
+            # "Here's what I've got: a cool thumbnail"
+            r"Here's what I've got:\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
+            # "So we're going for a neon-style emote"
+            r"So we're going for\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
+            # "Updated: a dynamic banner with neon effects"
+            r"Updated:\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
+            # "Perfect! A high-energy thumbnail"
+            r"(?:✨\s*)?Perfect[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
         ]
         
         for pattern in summary_patterns:
             match = re.search(pattern, response, re.IGNORECASE | re.DOTALL)
             if match:
-                base_description = match.group(1).strip()
-                break
+                extracted = match.group(1).strip()
+                # Clean up the extracted text
+                extracted = re.sub(r'\[INTENT_READY\]', '', extracted).strip()
+                extracted = extracted.rstrip('.')
+                if extracted and len(extracted) > 10:  # Ensure we got something meaningful
+                    base_description = extracted
+                    break
         
         # If no summary found, combine previous with user additions
         if not base_description and session.current_prompt_draft:

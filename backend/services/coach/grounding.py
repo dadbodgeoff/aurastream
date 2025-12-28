@@ -378,9 +378,22 @@ def get_grounding_orchestrator(
     strategy: Optional[GroundingStrategy] = None,
     search_service=None
 ) -> GroundingOrchestrator:
-    """Get or create the grounding orchestrator singleton."""
+    """
+    Get or create the grounding orchestrator singleton.
+    
+    If no search_service is provided, automatically initializes one
+    using the search_service factory.
+    """
     global _grounding_orchestrator
     if _grounding_orchestrator is None:
+        # Auto-initialize search service if not provided
+        if search_service is None:
+            try:
+                from backend.services.coach.search_service import get_search_service
+                search_service = get_search_service()
+            except ImportError:
+                pass
+        
         _grounding_orchestrator = GroundingOrchestrator(
             strategy=strategy or get_grounding_strategy(),
             search_service=search_service,

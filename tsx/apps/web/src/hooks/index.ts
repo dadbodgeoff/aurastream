@@ -22,3 +22,14 @@ export { useMicroInteraction } from './useMicroInteraction';
 export type { MicroInteractionType } from './useMicroInteraction';
 export { useCoachAccess } from './useCoachAccess';
 export type { UseCoachAccessReturn } from './useCoachAccess';
+
+// Aura Lab hooks - re-exported from api-client for convenience
+export {
+  useSetSubject,
+  useFuse,
+  useKeepFusion,
+  useTrashFusion,
+  useAuraLabInventory,
+  useAuraLabUsage,
+  useAuraLabElements,
+} from '@aurastream/api-client';

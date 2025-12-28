@@ -122,3 +122,33 @@ export type {
   UseOptimisticAssetDeletionOptions,
   UseOptimisticBulkAssetDeletionOptions,
 } from './useOptimisticAssetDeletion';
+
+// Community Gallery hooks
+export {
+  communityKeys,
+  transformUserSummary,
+  transformPost,
+  transformComment,
+  transformProfile,
+  useCommunityPosts,
+  useCommunityPost,
+  useFeaturedPosts,
+  useTrendingPosts,
+  useSearchPosts,
+  useMyPosts,
+  useLikedPosts,
+  useFollowingFeed,
+  useComments,
+  useCreatorProfile,
+  useCreatePost,
+  useUpdatePost,
+  useDeletePost,
+  useLikePost,
+  useUnlikePost,
+  useCreateComment,
+  useUpdateComment,
+  useDeleteComment,
+  useFollowUser,
+  useUnfollowUser,
+  useReportPost,
+} from './useCommunity';

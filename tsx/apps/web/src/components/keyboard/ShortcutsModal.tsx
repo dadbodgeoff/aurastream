@@ -7,8 +7,7 @@
  * Triggered by pressing "?" key.
  * 
  * Features:
- * - Focus trap for accessibility
- * - Escape to close
+ * - Uses ResponsiveModal for mobile bottom sheet / desktop dialog
  * - Grouped shortcuts by category
  * - Platform-aware shortcut display
  * - Reduced motion support
@@ -16,10 +15,9 @@
  * @module components/keyboard/ShortcutsModal
  */
 
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { useScrollLock, useFocusTrap } from '@/hooks';
-import { useReducedMotion } from '@aurastream/shared';
+import { ResponsiveModal } from '@/components/ui/ResponsiveModal';
 import type { ShortcutsModalProps, Shortcut, ShortcutCategory } from '@aurastream/shared';
 import { ShortcutHint } from './ShortcutHint';
 
@@ -70,13 +68,6 @@ function groupShortcutsByCategory(shortcuts: Shortcut[]): Map<ShortcutCategory, 
  * ShortcutsModal - Display all keyboard shortcuts
  */
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion();
-  
-  // Use hooks for scroll lock and focus trap
-  useScrollLock(isOpen);
-  useFocusTrap(modalRef, isOpen);
-
   // Get shortcuts from context or use defaults
   // For now, we'll define them here since we can't use context inside the modal
   // (it would create a circular dependency)
@@ -132,157 +123,72 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
     [shortcuts]
   );
 
-  // Handle escape key
-  const handleEscape = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-      }
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
-    }
-  }, [isOpen, handleEscape]);
-
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className={cn(
-          'absolute inset-0 bg-black/50 backdrop-blur-sm',
-          !prefersReducedMotion && 'transition-opacity duration-300',
-          prefersReducedMotion && 'transition-none'
-        )}
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <ResponsiveModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Keyboard Shortcuts"
+      description="Navigate faster with these shortcuts"
+    >
+      {/* Shortcuts Content */}
+      <div className="space-y-6">
+        {CATEGORY_ORDER.map((category) => {
+          const categoryShortcuts = groupedShortcuts.get(category) || [];
+          if (categoryShortcuts.length === 0) return null;
 
-      {/* Modal */}
-      <div
-        ref={modalRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="shortcuts-modal-title"
-        className={cn(
-          'relative w-full max-w-lg',
-          'bg-background-surface border border-border-subtle rounded-2xl shadow-xl',
-          !prefersReducedMotion && 'transform transition-all duration-300',
-          prefersReducedMotion && 'transition-none'
-        )}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-border-subtle">
-          <div>
-            <h2
-              id="shortcuts-modal-title"
-              className="text-lg font-semibold text-text-primary"
-            >
-              Keyboard Shortcuts
-            </h2>
-            <p className="text-sm text-text-muted mt-1">
-              Navigate faster with these shortcuts
-            </p>
-          </div>
-          {/* Close button */}
-          <button
-            onClick={onClose}
-            className={cn(
-              'flex items-center justify-center w-11 h-11 -mr-2 -mt-2',
-              'text-text-muted hover:text-text-secondary rounded-lg',
-              'hover:bg-background-elevated active:bg-background-elevated active:scale-95',
-              !prefersReducedMotion && 'transition-all duration-75',
-              prefersReducedMotion && 'transition-none',
-              'focus:outline-none focus:ring-2 focus:ring-interactive-600'
-            )}
-            aria-label="Close shortcuts modal"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 sm:p-6 max-h-[60vh] overflow-y-auto">
-          <div className="space-y-6">
-            {CATEGORY_ORDER.map((category) => {
-              const categoryShortcuts = groupedShortcuts.get(category) || [];
-              if (categoryShortcuts.length === 0) return null;
-
-              return (
-                <div key={category}>
-                  <h3 className="text-sm font-medium text-text-secondary mb-3">
-                    {CATEGORY_LABELS[category]}
-                  </h3>
-                  <div className="space-y-2">
-                    {categoryShortcuts.map((shortcut) => (
-                      <div
-                        key={shortcut.action}
-                        className={cn(
-                          'flex items-center justify-between',
-                          'p-3 rounded-lg',
-                          'bg-background-elevated/50',
-                          'border border-border-subtle/50'
-                        )}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-text-primary">
-                            {shortcut.label}
-                          </p>
-                          {shortcut.description && (
-                            <p className="text-xs text-text-muted mt-0.5 truncate">
-                              {shortcut.description}
-                            </p>
-                          )}
-                        </div>
-                        <div className="ml-4 flex-shrink-0">
-                          <ShortcutHint
-                            shortcut={{
-                              key: shortcut.key,
-                              meta: shortcut.meta,
-                              ctrl: shortcut.ctrl,
-                              shift: shortcut.shift,
-                              alt: shortcut.alt,
-                            }}
-                            size="md"
-                          />
-                        </div>
-                      </div>
-                    ))}
+          return (
+            <div key={category}>
+              <h3 className="text-sm font-medium text-text-secondary mb-3">
+                {CATEGORY_LABELS[category]}
+              </h3>
+              <div className="space-y-2">
+                {categoryShortcuts.map((shortcut) => (
+                  <div
+                    key={shortcut.action}
+                    className={cn(
+                      'flex items-center justify-between',
+                      'p-3 rounded-lg',
+                      'bg-background-elevated/50',
+                      'border border-border-subtle/50'
+                    )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text-primary">
+                        {shortcut.label}
+                      </p>
+                      {shortcut.description && (
+                        <p className="text-xs text-text-muted mt-0.5 truncate">
+                          {shortcut.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="ml-4 flex-shrink-0">
+                      <ShortcutHint
+                        shortcut={{
+                          key: shortcut.key,
+                          meta: shortcut.meta,
+                          ctrl: shortcut.ctrl,
+                          shift: shortcut.shift,
+                          alt: shortcut.alt,
+                        }}
+                        size="md"
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 sm:p-6 border-t border-border-subtle">
-          <p className="text-xs text-text-muted text-center">
-            Press <ShortcutHint shortcut={{ key: '?' }} size="sm" className="mx-1" /> anytime to show this help
-          </p>
-        </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="mt-6 pt-4 border-t border-border-subtle">
+        <p className="text-xs text-text-muted text-center">
+          Press <ShortcutHint shortcut={{ key: '?' }} size="sm" className="mx-1" /> anytime to show this help
+        </p>
+      </div>
+    </ResponsiveModal>
   );
 }
 

@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import { cn } from '@/lib/utils';
-import { useReducedMotion, type RarityTier, RARITY_CONFIG } from '@aurastream/shared';
+import { useReducedMotion, useSwipeGesture, type RarityTier, RARITY_CONFIG } from '@aurastream/shared';
 
 // ============================================================================
 // Types
@@ -345,7 +345,9 @@ export const toast = {
  * - Optional rarity-based styling for special notifications
  * - Auto-dismiss with configurable duration
  * - Click to dismiss
+ * - Swipe-to-dismiss on touch devices (horizontal swipe)
  * - Slide-in/out animations
+ * - Spring-back animation when released below threshold
  * - Respects reduced motion preference
  * - Accessible with role="alert" and aria-live
  */
@@ -359,6 +361,21 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
 
   // Get rarity configuration if provided
   const rarityConfig = rarity ? RARITY_CONFIG[rarity] : null;
+
+  // Handle click to dismiss (defined before useSwipeGesture to use in callback)
+  const handleDismiss = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    onDismiss(id);
+  }, [id, onDismiss]);
+
+  // Swipe-to-dismiss gesture handling
+  const { handlers, state: swipeState, style: swipeStyle } = useSwipeGesture({
+    onSwipe: () => handleDismiss(),
+    threshold: 100,
+    disabled: prefersReducedMotion,
+  });
 
   // Handle auto-dismiss
   useEffect(() => {
@@ -375,14 +392,6 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
     };
   }, [id, duration, onDismiss]);
 
-  // Handle click to dismiss
-  const handleDismiss = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-    onDismiss(id);
-  }, [id, onDismiss]);
-
   // Handle action click
   const handleActionClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -397,16 +406,17 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
     }
   }, [handleDismiss]);
 
-  // Build animation classes
+  // Build animation classes (only apply when not actively swiping)
   const animationClasses = prefersReducedMotion
     ? ''
-    : cn(
-        'transition-all duration-300 ease-out',
-        'toast-animated',
-        isExiting
-          ? 'opacity-0 translate-x-full'
-          : 'opacity-100 translate-x-0 animate-slide-in-right'
-      );
+    : swipeState.offset !== 0
+      ? '' // No animation classes during active swipe
+      : cn(
+          'toast-animated',
+          isExiting
+            ? 'opacity-0 translate-x-full'
+            : 'opacity-100 translate-x-0 animate-slide-in-right'
+        );
 
   // Build border/glow styles based on rarity or variant
   const borderStyles = rarityConfig
@@ -421,6 +431,27 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
     ? { borderLeftColor: rarityConfig.colors.solid }
     : undefined;
 
+  // Merge swipe styles with existing styles
+  // When actively swiping (offset !== 0), use swipe transform and opacity
+  // When not swiping (offset === 0), use default styles with spring-back transition
+  const mergedStyles: React.CSSProperties = {
+    ...glowStyles,
+    ...borderColorStyle,
+    minWidth: '320px',
+    maxWidth: '420px',
+    // Apply swipe transform when actively swiping
+    ...(swipeState.offset !== 0 && !prefersReducedMotion
+      ? {
+          transform: swipeStyle.transform,
+          opacity: swipeStyle.opacity,
+        }
+      : {}),
+    // Spring-back transition when released below threshold
+    transition: swipeState.offset === 0 && !prefersReducedMotion
+      ? 'transform 0.2s ease-out, opacity 0.2s ease-out'
+      : 'none',
+  };
+
   return (
     <div
       role="alert"
@@ -429,6 +460,7 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
       tabIndex={0}
       onClick={handleDismiss}
       onKeyDown={handleKeyDown}
+      {...handlers}
       className={cn(
         // Base styles
         'relative flex items-start gap-3 p-4 rounded-lg cursor-pointer',
@@ -441,13 +473,10 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
         'focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:ring-offset-2',
         // Hover state
         'hover:bg-background-surface',
+        // Touch action for swipe gesture
+        'touch-pan-y',
       )}
-      style={{
-        ...glowStyles,
-        ...borderColorStyle,
-        minWidth: '320px',
-        maxWidth: '420px',
-      }}
+      style={mergedStyles}
     >
       {/* Icon */}
       <div

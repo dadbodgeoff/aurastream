@@ -18,6 +18,7 @@ from fastapi import APIRouter, Request, HTTPException, status, Header
 
 from backend.services.stripe_service import get_stripe_service, StripeWebhookError
 from backend.services.subscription_service import get_subscription_service
+from backend.services.promo_service import get_promo_service
 from backend.services.webhook_queue import (
     get_webhook_queue,
     WebhookEventTooOldError,
@@ -71,6 +72,7 @@ async def handle_stripe_webhook(
     # Get services
     stripe_service = get_stripe_service()
     subscription_service = get_subscription_service()
+    promo_service = get_promo_service()
     webhook_queue = get_webhook_queue()
     
     # 1. Verify webhook signature
@@ -114,7 +116,12 @@ async def handle_stripe_webhook(
     try:
         # 4. Route event to appropriate handler
         if event_type == "checkout.session.completed":
-            await _handle_checkout_completed(event, stripe_service, subscription_service)
+            session = event.data.object
+            # Check if this is a promo payment or subscription
+            if session.metadata.get("type") == "promo_message":
+                await _handle_promo_checkout_completed(event, promo_service)
+            else:
+                await _handle_checkout_completed(event, stripe_service, subscription_service)
         
         elif event_type == "customer.subscription.created":
             await _handle_subscription_created(event)
@@ -282,3 +289,26 @@ async def _handle_invoice_payment_failed(event, subscription_service):
         )
         
         logger.info(f"Subscription {invoice.subscription} marked as past_due")
+
+
+async def _handle_promo_checkout_completed(event, promo_service):
+    """Handle checkout.session.completed event for promo messages."""
+    session = event.data.object
+    checkout_session_id = session.id
+    payment_intent_id = session.payment_intent
+    user_id = session.metadata.get("user_id")
+    
+    logger.info(
+        f"Processing promo checkout completion for user {user_id}, "
+        f"session {checkout_session_id}"
+    )
+    
+    try:
+        await promo_service.confirm_payment(
+            checkout_session_id=checkout_session_id,
+            payment_intent_id=payment_intent_id,
+        )
+        logger.info(f"Promo message created for user {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to confirm promo payment: {e}")
+        raise

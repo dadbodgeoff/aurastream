@@ -610,6 +610,189 @@ class AssetNotFoundError(StorageError):
         self.path = path
 
 
+# ============================================================================
+# Community Gallery Exceptions
+# ============================================================================
+
+
+class CommunityError(StreamerStudioError):
+    """
+    Base class for community gallery errors.
+    
+    All community-specific exceptions inherit from this class.
+    """
+    
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: dict = None,
+        status_code: int = 400
+    ):
+        super().__init__(
+            message=message,
+            code=code,
+            status_code=status_code,
+            details=details
+        )
+
+
+class CommunityPostNotFoundError(CommunityError):
+    """Raised when a community post is not found."""
+    
+    def __init__(self, post_id: str):
+        super().__init__(
+            code="COMMUNITY_POST_NOT_FOUND",
+            message="Community post not found",
+            details={"post_id": post_id},
+            status_code=404
+        )
+
+
+class CommunityCommentNotFoundError(CommunityError):
+    """Raised when a comment is not found."""
+    
+    def __init__(self, comment_id: str):
+        super().__init__(
+            code="COMMUNITY_COMMENT_NOT_FOUND",
+            message="Comment not found",
+            details={"comment_id": comment_id},
+            status_code=404
+        )
+
+
+class CommunityAssetNotOwnedError(CommunityError):
+    """Raised when user tries to share an asset they don't own."""
+    
+    def __init__(self, asset_id: str):
+        super().__init__(
+            code="COMMUNITY_ASSET_NOT_OWNED",
+            message="You don't own this asset",
+            details={"asset_id": asset_id},
+            status_code=403
+        )
+
+
+class CommunityPostNotOwnedError(CommunityError):
+    """Raised when user tries to modify a post they don't own."""
+    
+    def __init__(self, post_id: str):
+        super().__init__(
+            code="COMMUNITY_POST_NOT_OWNED",
+            message="You don't own this post",
+            details={"post_id": post_id},
+            status_code=403
+        )
+
+
+class CommunityCommentNotOwnedError(CommunityError):
+    """Raised when user tries to modify a comment they don't own."""
+    
+    def __init__(self, comment_id: str):
+        super().__init__(
+            code="COMMUNITY_COMMENT_NOT_OWNED",
+            message="You don't own this comment",
+            details={"comment_id": comment_id},
+            status_code=403
+        )
+
+
+class CommunityEditWindowExpiredError(CommunityError):
+    """Raised when comment edit window (15 minutes) has expired."""
+    
+    def __init__(self, comment_id: str, window_minutes: int = 15):
+        super().__init__(
+            code="COMMUNITY_EDIT_WINDOW_EXPIRED",
+            message=f"Comment edit window ({window_minutes} minutes) has expired",
+            details={"comment_id": comment_id, "window_minutes": window_minutes},
+            status_code=403
+        )
+
+
+class CommunityAlreadySharedError(CommunityError):
+    """Raised when asset has already been shared to community."""
+    
+    def __init__(self, asset_id: str):
+        super().__init__(
+            code="COMMUNITY_ALREADY_SHARED",
+            message="This asset has already been shared to the community",
+            details={"asset_id": asset_id},
+            status_code=409
+        )
+
+
+class CommunityUserBannedError(CommunityError):
+    """Raised when user is banned from community features."""
+    
+    def __init__(self, user_id: str):
+        super().__init__(
+            code="COMMUNITY_USER_BANNED",
+            message="You are banned from community features",
+            details={"user_id": user_id},
+            status_code=403
+        )
+
+
+class CommunitySelfFollowError(CommunityError):
+    """Raised when user tries to follow themselves."""
+    
+    def __init__(self):
+        super().__init__(
+            code="COMMUNITY_SELF_FOLLOW",
+            message="You cannot follow yourself",
+            details={},
+            status_code=422
+        )
+
+
+class CommunityAlreadyReportedError(CommunityError):
+    """Raised when user has already reported a post."""
+    
+    def __init__(self, post_id: str):
+        super().__init__(
+            code="COMMUNITY_ALREADY_REPORTED",
+            message="You have already reported this post",
+            details={"post_id": post_id},
+            status_code=409
+        )
+
+
+class CommunityInvalidTagError(CommunityError):
+    """Raised when tag format is invalid."""
+    
+    def __init__(self, tag: str):
+        super().__init__(
+            code="COMMUNITY_INVALID_TAG",
+            message=f"Invalid tag format: {tag}",
+            details={"tag": tag, "expected_format": "lowercase alphanumeric with hyphens"},
+            status_code=422
+        )
+
+
+class CommunityTooManyTagsError(CommunityError):
+    """Raised when too many tags are provided."""
+    
+    def __init__(self, count: int, max_count: int = 5):
+        super().__init__(
+            code="COMMUNITY_TOO_MANY_TAGS",
+            message=f"Maximum {max_count} tags allowed",
+            details={"count": count, "max_count": max_count},
+            status_code=422
+        )
+
+
+class CommunityRateLimitedError(CommunityError):
+    """Raised when community rate limit is exceeded."""
+    
+    def __init__(self, action: str, retry_after: int = 60):
+        super().__init__(
+            code="COMMUNITY_RATE_LIMITED",
+            message=f"Rate limit exceeded for {action}. Please try again later.",
+            details={"action": action, "retry_after_seconds": retry_after},
+            status_code=429
+        )
+
+
 # Export all exceptions for easy importing
 __all__ = [
     "StreamerStudioError",
@@ -646,4 +829,19 @@ __all__ = [
     "StorageUploadError",
     "StorageDeleteError",
     "AssetNotFoundError",
+    # Community Gallery Exceptions
+    "CommunityError",
+    "CommunityPostNotFoundError",
+    "CommunityCommentNotFoundError",
+    "CommunityAssetNotOwnedError",
+    "CommunityPostNotOwnedError",
+    "CommunityCommentNotOwnedError",
+    "CommunityEditWindowExpiredError",
+    "CommunityAlreadySharedError",
+    "CommunityUserBannedError",
+    "CommunitySelfFollowError",
+    "CommunityAlreadyReportedError",
+    "CommunityInvalidTagError",
+    "CommunityTooManyTagsError",
+    "CommunityRateLimitedError",
 ]
