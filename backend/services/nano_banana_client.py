@@ -87,24 +87,40 @@ class NanoBananaClient:
 2. Text must be clearly legible and prominently displayed
 3. Spell every word EXACTLY as provided - no corrections, no changes
 4. If text is in quotes, render it EXACTLY including capitalization
+5. TEXT MUST NEVER BE COVERED OR OBSCURED by any visual elements, characters, or assets
+6. Ensure adequate contrast between text and background for maximum readability
+7. Use professional typography hierarchy: headlines largest, subtext smaller, CTAs prominent
+
+## LAYOUT & COMPOSITION - ENTERPRISE GRADE
+8. Follow professional design patterns with clear visual hierarchy
+9. Leave breathing room around text - no elements should crowd or overlap text
+10. Characters/subjects should be positioned to COMPLEMENT text, never cover it
+11. Use rule of thirds for balanced composition
+12. Maintain consistent margins and padding throughout the design
+13. Text placement zones should be kept clear of busy visual elements
 
 ## CONTENT RULES
-5. DO NOT add any text, words, letters, numbers, dates, or labels unless explicitly specified in the prompt
-6. DO NOT invent or add extra items, elements, or details not mentioned in the prompt
-7. If the prompt says "3 items" - render EXACTLY 3, not more, not less
-8. If the prompt mentions specific days (e.g., "Monday, Wednesday, Friday") - show ONLY those days
-9. DO NOT add watermarks, signatures, timestamps, or any identifying marks
-10. Render ONLY what is explicitly described - nothing more, nothing less
+14. DO NOT add any text, words, letters, numbers, dates, or labels unless explicitly specified in the prompt
+15. DO NOT invent or add extra items, elements, or details not mentioned in the prompt
+16. If the prompt says "3 items" - render EXACTLY 3, not more, not less
+17. If the prompt mentions specific days (e.g., "Monday, Wednesday, Friday") - show ONLY those days
+18. DO NOT add watermarks, signatures, timestamps, or any identifying marks
+19. Render ONLY what is explicitly described - nothing more, nothing less
+
+## CHARACTER RENDERING (when applicable)
+20. If character details are provided (hair color, eye color, skin tone, expression, body type), render them EXACTLY as specified
+21. Characters should have consistent proportions and professional quality
+22. Expressions should be clear and match the mood of the content
 
 ## STYLE FREEDOM
-11. You may be creative with visual style, colors, and artistic interpretation
-12. You may NOT be creative with content, text, or quantity
+23. You may be creative with visual style, colors, and artistic interpretation
+24. You may NOT be creative with content, text, quantity, or character appearance when specified
 
 ## SCALABILITY FOR EMOTES/BADGES (when applicable)
-13. For emotes, badges, or icons: Create VECTOR-STYLE art with bold outlines and flat colors
-14. Design must be recognizable when scaled down to 28x28 pixels
-15. Use thick outlines (3-4px minimum), high contrast, and simple iconic shapes
-16. Avoid fine details, thin lines, or gradients that disappear at small sizes
+25. For emotes, badges, or icons: Create VECTOR-STYLE art with bold outlines and flat colors
+26. Design must be recognizable when scaled down to 28x28 pixels
+27. Use thick outlines (3-4px minimum), high contrast, and simple iconic shapes
+28. Avoid fine details, thin lines, or gradients that disappear at small sizes
 
 """
     
