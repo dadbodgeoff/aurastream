@@ -69,7 +69,7 @@ function BrandKitCard({
   onPress: () => void;
   onLongPress: () => void;
 }) {
-  const allColors = [...brandKit.primary_colors, ...brandKit.accent_colors].slice(0, 5);
+  const allColors = [...(brandKit.primary_colors || []), ...(brandKit.accent_colors || [])].slice(0, 5);
 
   return (
     <TouchableOpacity

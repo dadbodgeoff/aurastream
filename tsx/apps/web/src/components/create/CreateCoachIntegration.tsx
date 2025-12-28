@@ -120,8 +120,8 @@ function LegacyCoachIntegration({
         brand_context: selectedBrandKit ? {
           brand_kit_id: brandKitId || '',
           colors: [
-            ...selectedBrandKit.primary_colors,
-            ...selectedBrandKit.accent_colors,
+            ...(selectedBrandKit.primary_colors || []),
+            ...(selectedBrandKit.accent_colors || []),
           ].map((hex, i) => ({ hex, name: `Color ${i + 1}` })),
           tone: selectedBrandKit.tone || 'professional',
           fonts: {
@@ -271,8 +271,8 @@ export function CreateCoachIntegration({
       brand_context: selectedBrandKit ? {
         brand_kit_id: brandKitId || '',
         colors: [
-          ...selectedBrandKit.primary_colors,
-          ...selectedBrandKit.accent_colors,
+          ...(selectedBrandKit.primary_colors || []),
+          ...(selectedBrandKit.accent_colors || []),
         ].map((hex, i) => ({ hex, name: `Color ${i + 1}` })),
         tone: selectedBrandKit.tone || 'professional',
         fonts: {

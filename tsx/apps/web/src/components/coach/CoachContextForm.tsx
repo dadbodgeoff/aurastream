@@ -225,7 +225,7 @@ function BrandKitSelector({ brandKits, selectedKit, onSelect, isLoading }: Brand
     >
       {brandKits.map((kit) => {
         const isSelected = selectedKit?.id === kit.id;
-        const allColors = [...kit.primary_colors, ...kit.accent_colors];
+        const allColors = [...(kit.primary_colors || []), ...(kit.accent_colors || [])];
         
         return (
           <button

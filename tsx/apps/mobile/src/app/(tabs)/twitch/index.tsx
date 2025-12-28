@@ -196,7 +196,7 @@ function BrandKitCard({
   isSelected: boolean;
   onPress: () => void;
 }) {
-  const allColors = [...brandKit.primary_colors, ...brandKit.accent_colors].slice(0, 4);
+  const allColors = [...(brandKit.primary_colors || []), ...(brandKit.accent_colors || [])].slice(0, 4);
 
   return (
     <TouchableOpacity

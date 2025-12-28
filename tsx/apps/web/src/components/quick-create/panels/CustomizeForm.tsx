@@ -228,7 +228,7 @@ export function CustomizeForm(props: CustomizeFormProps) {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-text-primary truncate">{kit.name}</p>
                       <div className="flex gap-1 mt-2">
-                        {[...kit.primary_colors, ...kit.accent_colors].slice(0, 4).map((c, i) => (
+                        {[...(kit.primary_colors || []), ...(kit.accent_colors || [])].slice(0, 4).map((c, i) => (
                           <div key={i} className="w-4 h-4 rounded" style={{ backgroundColor: c }} />
                         ))}
                       </div>

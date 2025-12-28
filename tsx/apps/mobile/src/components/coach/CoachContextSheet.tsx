@@ -100,7 +100,7 @@ function generateColorName(_hex: string, index: number): string {
 }
 
 function brandKitToBrandContext(kit: BrandKit): BrandContext {
-  const allColors = [...kit.primary_colors, ...kit.accent_colors];
+  const allColors = [...(kit.primary_colors || []), ...(kit.accent_colors || [])];
   const colorInfos = allColors.map((hex, index) => ({
     hex: hex.startsWith('#') ? hex : `#${hex}`,
     name: generateColorName(hex, index),
@@ -319,7 +319,7 @@ const BrandKitCard = memo(function BrandKitCard({
   onPress,
   index,
 }: BrandKitCardProps) {
-  const allColors = [...brandKit.primary_colors, ...brandKit.accent_colors].slice(0, 4);
+  const allColors = [...(brandKit.primary_colors || []), ...(brandKit.accent_colors || [])].slice(0, 4);
 
   return (
     <AnimatedCard
