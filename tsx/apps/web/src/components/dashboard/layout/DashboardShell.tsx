@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks';
-import { MobileDrawer, MobileHeader } from '@/components/mobile';
+import { MobileDrawer, MobileHeader, MobileBottomNav } from '@/components/mobile';
 import { Logo } from '@/components/brand';
 import { LogoutIcon } from '../icons';
 import { 
@@ -130,13 +130,14 @@ export function DashboardShell({
   const isMobile = useIsMobile();
 
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  const openMobileMenu = () => setIsMobileMenuOpen(true);
 
   return (
     <div className={cn('flex h-screen bg-background-default', className)}>
       {/* Desktop Sidebar - hidden on mobile via Sidebar's own classes */}
       <Sidebar user={user} isAdmin={isAdmin} onLogout={onLogout} />
       
-      {/* Mobile Drawer - only rendered on mobile */}
+      {/* Mobile Drawer - only rendered on mobile, opened via "More" button */}
       {isMobile && (
         <MobileDrawer 
           isOpen={isMobileMenuOpen} 
@@ -155,15 +156,20 @@ export function DashboardShell({
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Header - only visible on mobile */}
         <MobileHeader 
-          onMenuClick={() => setIsMobileMenuOpen(true)} 
+          onMenuClick={openMobileMenu} 
           title={pageTitle}
         />
         
-        {/* Content with responsive padding */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        {/* Content with responsive padding - add bottom padding on mobile for bottom nav */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-20 md:pb-8">
           {children}
         </div>
       </main>
+      
+      {/* Mobile Bottom Navigation - fixed at bottom on mobile */}
+      {isMobile && (
+        <MobileBottomNav onMoreClick={openMobileMenu} />
+      )}
     </div>
   );
 }

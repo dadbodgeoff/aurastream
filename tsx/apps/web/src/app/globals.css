@@ -387,6 +387,11 @@ body {
   padding-right: var(--safe-area-inset-right);
 }
 
+/* Safe area bottom - adds padding for iPhone home indicator */
+.safe-area-bottom {
+  padding-bottom: max(var(--safe-area-inset-bottom), 0px);
+}
+
 
 /* ============================================
    CSS SCROLL-DRIVEN ANIMATIONS
