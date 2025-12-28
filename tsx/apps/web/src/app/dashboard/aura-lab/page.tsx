@@ -7,6 +7,7 @@ import { Beaker, Package, Zap, AlertCircle, Clock } from 'lucide-react';
 import { analytics } from '@aurastream/shared';
 import { toast } from '@/components/ui/Toast';
 import { downloadAsset, getAssetFilename } from '@/utils/download';
+import { PageHeader } from '@/components/navigation';
 import {
   TestSubjectPanel,
   ElementGrid,
@@ -325,22 +326,13 @@ export default function AuraLabPage() {
 
   return (
     <div className="min-h-screen bg-background-base text-white">
-      {/* Header */}
-      <div className="border-b border-border-subtle bg-background-surface/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Title */}
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-interactive-600 to-accent-600 flex items-center justify-center">
-                <Beaker className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-white">The Aura Lab</h1>
-                <p className="text-xs text-text-tertiary">Experimental Fusion Chamber</p>
-              </div>
-            </div>
-
-            {/* Usage Indicator */}
+      {/* Page Header with Breadcrumbs */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <PageHeader 
+          title="The Aura Lab"
+          subtitle="Experimental Fusion Chamber"
+          showBack={true}
+          actions={
             <div className="flex items-center gap-4">
               {!isLoadingUsage && usage && (
                 <div className="flex items-center gap-3 px-4 py-2 rounded-lg bg-background-elevated/50 border border-border-default">
@@ -397,8 +389,8 @@ export default function AuraLabPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       {/* Main Content */}

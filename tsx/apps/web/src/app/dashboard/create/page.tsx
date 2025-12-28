@@ -11,6 +11,7 @@ import {
 import type { LogoPosition, LogoSize } from '@aurastream/api-client';
 import { useUser, createDevLogger } from '@aurastream/shared';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/navigation';
 
 // Dev logger for this page
 const log = createDevLogger({ prefix: '[CreatePage]' });
@@ -191,25 +192,11 @@ export default function CreatePage() {
     return (
       <div className="h-[calc(100vh-8rem)] flex flex-col">
         {/* Header with back button */}
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={handleBackToSelect}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-surface rounded-lg transition-colors"
-          >
-            <ArrowLeftIcon />
-            Back
-          </button>
-          <div>
-            <h1 className="text-xl font-semibold text-text-primary flex items-center gap-2">
-              <SparklesIcon />
-              Prompt Coach
-            </h1>
-            <p className="text-sm text-text-tertiary">
-              Creating {filteredAssetTypes.find(a => a.id === selectedAssetType)?.label}
-              {selectedBrandKit ? ` with ${selectedBrandKit.name}` : ''}
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Prompt Coach"
+          subtitle={`Creating ${filteredAssetTypes.find(a => a.id === selectedAssetType)?.label}${selectedBrandKit ? ` with ${selectedBrandKit.name}` : ''}`}
+          backUrl="/dashboard/create"
+        />
 
         {/* Coach Integration */}
         <div className="flex-1 min-h-0">
@@ -235,22 +222,11 @@ export default function CreatePage() {
     return (
       <div className="space-y-8">
         {/* Header with back button */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleBackToSelect}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-surface rounded-lg transition-colors"
-          >
-            <ArrowLeftIcon />
-            Back
-          </button>
-          <div>
-            <h1 className="text-xl font-semibold text-text-primary">Describe Your Asset</h1>
-            <p className="text-sm text-text-tertiary">
-              Creating {filteredAssetTypes.find(a => a.id === selectedAssetType)?.label}
-              {selectedBrandKit ? ` with ${selectedBrandKit.name}` : ''}
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title="Describe Your Asset"
+          subtitle={`Creating ${filteredAssetTypes.find(a => a.id === selectedAssetType)?.label}${selectedBrandKit ? ` with ${selectedBrandKit.name}` : ''}`}
+          backUrl="/dashboard/create"
+        />
 
         {/* Prompt Input */}
         <div>

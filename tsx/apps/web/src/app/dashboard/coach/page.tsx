@@ -18,6 +18,7 @@ import { CoachContextForm } from '../../../components/coach/CoachContextForm';
 import { CoachChatIntegrated, COACH_UX_2025_ENABLED } from '../../../components/coach';
 import { CoachChat } from '../../../components/coach/CoachChat';
 import { CoachTips } from '../../../components/coach/CoachTips';
+import { PageHeader } from '@/components/navigation';
 import type { StartCoachRequest } from '../../../hooks/useCoachContext';
 import type { Asset } from '../../../components/coach/generation';
 
@@ -207,6 +208,11 @@ export default function CoachPage() {
   if (!isPremium) {
     return (
       <div className="p-6">
+        <PageHeader 
+          title="Prompt Coach"
+          subtitle="AI-powered prompt refinement for better assets"
+          showBack={false}
+        />
         <CoachTips />
       </div>
     );
@@ -218,6 +224,11 @@ export default function CoachPage() {
       {phase === 'context' ? (
         // Phase 1: Context Capture
         <div className="p-6 overflow-y-auto">
+          <PageHeader 
+            title="Prompt Coach"
+            subtitle="Select your context to get started"
+            showBack={false}
+          />
           <CoachContextForm
             onStartChat={handleStartChat}
             isLoading={isStartingSession}

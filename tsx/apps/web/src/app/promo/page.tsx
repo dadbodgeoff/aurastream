@@ -21,6 +21,7 @@ import {
 import { usePromoMessages, usePinnedMessage, useLeaderboard } from '@aurastream/api-client';
 import type { PromoMessage, LeaderboardEntry, UserBadges } from '@aurastream/api-client';
 import { PromoComposeModal } from '@/components/promo/PromoComposeModal';
+import { PageHeader } from '@/components/navigation';
 
 // ============================================================================
 // Helper Functions
@@ -364,47 +365,42 @@ export default function PromoPage() {
 
   return (
     <div className="min-h-screen bg-background-base">
-      {/* Header */}
-      <div className="sticky top-0 z-30 bg-background-base/80 backdrop-blur-xl border-b border-border-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+      {/* Page Header with Breadcrumbs */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <PageHeader 
+          title="Promo Board"
+          subtitle="Community Spotlight • $1/message"
+          showBack={true}
+          actions={
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-interactive-600 to-accent-600 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-white" />
+              {/* Quick Stats (Desktop) */}
+              <div className="hidden md:flex items-center gap-6">
+                <div className="flex items-center gap-2 text-sm">
+                  <Users className="w-4 h-4 text-text-tertiary" />
+                  <span className="text-text-secondary">{leaderboard?.entries.length ?? 0} donors</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MessageSquare className="w-4 h-4 text-text-tertiary" />
+                  <span className="text-text-secondary">{totalMessages} messages</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <TrendingUp className="w-4 h-4 text-green-400" />
+                  <span className="text-green-400 font-medium">{formatCurrency(totalDonations)} raised</span>
+                </div>
               </div>
-              <div>
-                <h1 className="text-lg font-bold text-text-primary">Promo Board</h1>
-                <p className="text-xs text-text-tertiary">Community Spotlight • $1/message</p>
-              </div>
-            </div>
 
-            {/* Quick Stats (Desktop) */}
-            <div className="hidden md:flex items-center gap-6">
-              <div className="flex items-center gap-2 text-sm">
-                <Users className="w-4 h-4 text-text-tertiary" />
-                <span className="text-text-secondary">{leaderboard?.entries.length ?? 0} donors</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <MessageSquare className="w-4 h-4 text-text-tertiary" />
-                <span className="text-text-secondary">{totalMessages} messages</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm">
-                <TrendingUp className="w-4 h-4 text-green-400" />
-                <span className="text-green-400 font-medium">{formatCurrency(totalDonations)} raised</span>
-              </div>
+              {/* Post Button */}
+              <button
+                onClick={() => setShowCompose(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-interactive-600 to-accent-600 hover:from-interactive-500 hover:to-accent-500 text-white font-semibold rounded-lg shadow-lg shadow-interactive-500/25 transition-all hover:scale-105"
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline">Post Message</span>
+                <span className="sm:hidden">Post</span>
+              </button>
             </div>
-
-            {/* Post Button */}
-            <button
-              onClick={() => setShowCompose(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-interactive-600 to-accent-600 hover:from-interactive-500 hover:to-accent-500 text-white font-semibold rounded-lg shadow-lg shadow-interactive-500/25 transition-all hover:scale-105"
-            >
-              <Send className="w-4 h-4" />
-              <span className="hidden sm:inline">Post Message</span>
-              <span className="sm:hidden">Post</span>
-            </button>
-          </div>
-        </div>
+          }
+        />
       </div>
 
       {/* Main Content */}
