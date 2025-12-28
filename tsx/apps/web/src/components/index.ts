@@ -3,6 +3,9 @@
 
 export { ProtectedRoute, withProtectedRoute, useProtectedRoute } from './ProtectedRoute';
 
+// Navigation components
+export * from './navigation';
+
 // Landing page components
 export * from './landing';
 

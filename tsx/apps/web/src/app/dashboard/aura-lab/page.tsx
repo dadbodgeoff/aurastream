@@ -293,6 +293,7 @@ export default function AuraLabPage() {
       filename: getAssetFilename('fusion', labState.currentFusion.fusionId),
       onSuccess: () => toast.success('Download started!'),
       onError: (error) => toast.error('Download failed', { description: error.message }),
+      onShowIOSInstructions: () => toast.info('Long-press the image and tap "Add to Photos" to save'),
     });
   }, [labState.currentFusion]);
 
@@ -303,6 +304,7 @@ export default function AuraLabPage() {
       filename: getAssetFilename('fusion', fusion.id),
       onSuccess: () => toast.success('Download started!'),
       onError: (error) => toast.error('Download failed', { description: error.message }),
+      onShowIOSInstructions: () => toast.info('Long-press the image and tap "Add to Photos" to save'),
     });
   }, []);
 

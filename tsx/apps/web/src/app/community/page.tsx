@@ -20,6 +20,7 @@ import {
   CreatorSpotlight,
   InspirationGallery,
 } from '@/components/community';
+import { PageHeader } from '@/components/navigation';
 
 type GalleryTab = 'all' | 'featured' | 'following' | 'trending' | 'new';
 
@@ -129,6 +130,13 @@ export default function CommunityPage() {
   return (
     <div className="min-h-screen bg-background-base">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+        {/* Page Header */}
+        <PageHeader 
+          title="Community"
+          subtitle="Discover and share amazing stream assets"
+          showBack={false}
+        />
+
         {/* Hero Carousel */}
         <HeroCarousel banners={HERO_BANNERS} />
 

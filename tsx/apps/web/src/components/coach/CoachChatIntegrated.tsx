@@ -698,6 +698,9 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
                           downloadAsset({
                             url: generationAsset.url,
                             filename: getAssetFilename(generationAsset.assetType, generationAsset.id),
+                            onShowIOSInstructions: () => {
+                              // Toast will be shown by the download utility
+                            },
                           });
                         }}
                         onShare={() => {

@@ -22,6 +22,8 @@ export { useMicroInteraction } from './useMicroInteraction';
 export type { MicroInteractionType } from './useMicroInteraction';
 export { useCoachAccess } from './useCoachAccess';
 export type { UseCoachAccessReturn } from './useCoachAccess';
+export { useDownload } from './useDownload';
+export type { UseDownloadOptions, DownloadState } from './useDownload';
 
 // Aura Lab hooks - re-exported from api-client for convenience
 export {

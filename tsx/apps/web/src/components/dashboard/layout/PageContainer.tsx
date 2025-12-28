@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/navigation';
 
 export interface PageContainerProps {
   title?: string;
@@ -8,6 +9,12 @@ export interface PageContainerProps {
   actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  /** Show back button (auto-detected from route by default) */
+  showBack?: boolean;
+  /** Custom back URL */
+  backUrl?: string;
+  /** Make header sticky */
+  stickyHeader?: boolean;
 }
 
 export function PageContainer({
@@ -16,25 +23,21 @@ export function PageContainer({
   actions,
   children,
   className,
+  showBack,
+  backUrl,
+  stickyHeader = false,
 }: PageContainerProps) {
   return (
     <div className={cn('space-y-6', className)}>
       {(title || description || actions) && (
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            {title && (
-              <h1 className="text-2xl font-semibold text-text-primary">{title}</h1>
-            )}
-            {description && (
-              <p className="mt-1 text-text-secondary">{description}</p>
-            )}
-          </div>
-          {actions && (
-            <div className="flex items-center gap-3 flex-shrink-0">
-              {actions}
-            </div>
-          )}
-        </div>
+        <PageHeader
+          title={title}
+          subtitle={description}
+          actions={actions}
+          showBack={showBack}
+          backUrl={backUrl}
+          sticky={stickyHeader}
+        />
       )}
       {children}
     </div>

@@ -11,6 +11,7 @@ import {
   useCreatorProfile, useReportPost,
 } from '@aurastream/api-client';
 import { LikeButton, FollowButton, CommentSection } from '@/components/community';
+import { PageHeader } from '@/components/navigation';
 import { cn } from '@/lib/utils';
 
 function PostDetailSkeleton() {
@@ -128,11 +129,11 @@ export default function PostDetailPage() {
   return (
     <div className="min-h-screen bg-background-base">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Back Link */}
-        <Link href="/community" className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-6 transition-colors">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          Back to Gallery
-        </Link>
+        {/* Page Header with Breadcrumbs */}
+        <PageHeader 
+          title={post.title}
+          backUrl="/community"
+        />
 
         {/* Asset Image */}
         <div className="relative aspect-video rounded-xl overflow-hidden bg-background-elevated mb-6">
@@ -140,7 +141,6 @@ export default function PostDetailPage() {
         </div>
 
         {/* Post Info */}
-        <h1 className="text-2xl font-bold text-text-primary mb-2">{post.title}</h1>
         {post.description && <p className="text-text-secondary mb-4">{post.description}</p>}
 
         {/* Tags */}

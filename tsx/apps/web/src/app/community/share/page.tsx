@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAssets, useCreatePost } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/components/navigation';
 
 const Spinner = () => (
   <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -110,8 +111,10 @@ export default function ShareAssetPage() {
   return (
     <div className="min-h-screen bg-background-base">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-text-primary mb-2">Share to Community</h1>
-        <p className="text-text-muted mb-8">Select an asset and add details to share with the community.</p>
+        <PageHeader 
+          title="Share to Community"
+          subtitle="Select an asset and add details to share with the community."
+        />
 
         {/* Asset Selector Grid */}
         <div className="mb-8">

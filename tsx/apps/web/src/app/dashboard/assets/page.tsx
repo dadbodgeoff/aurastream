@@ -137,6 +137,7 @@ export default function AssetsPage() {
       filename,
       onSuccess: () => toast.success('Download started'),
       onError: (error) => toast.error(`Download failed: ${error.message}`),
+      onShowIOSInstructions: () => toast.info('Long-press the image and tap "Add to Photos" to save'),
     });
   }, []);
 
