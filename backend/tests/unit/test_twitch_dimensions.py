@@ -244,12 +244,12 @@ class TestGetAssetDirective:
     def test_get_asset_directive_twitch_emote(self):
         """Test get_asset_directive returns correct directive for twitch_emote."""
         directive = get_asset_directive("twitch_emote")
-        assert directive == "sticker style, solid green background, expressive, clear silhouette"
+        assert directive == "vector art style, sticker style, bold thick outlines, flat colors, high contrast, simple iconic design, solid green background, expressive, clear silhouette, scales to 28px"
     
     def test_get_asset_directive_twitch_badge(self):
         """Test get_asset_directive returns correct directive for twitch_badge."""
         directive = get_asset_directive("twitch_badge")
-        assert directive == "badge style, solid green background, iconic, simple"
+        assert directive == "badge style, solid green background, iconic, simple, bold outlines, flat colors"
     
     def test_get_asset_directive_youtube_thumbnail(self):
         """Test get_asset_directive returns correct directive for youtube_thumbnail."""

@@ -100,6 +100,12 @@ class NanoBananaClient:
 11. You may be creative with visual style, colors, and artistic interpretation
 12. You may NOT be creative with content, text, or quantity
 
+## SCALABILITY FOR EMOTES/BADGES (when applicable)
+13. For emotes, badges, or icons: Create VECTOR-STYLE art with bold outlines and flat colors
+14. Design must be recognizable when scaled down to 28x28 pixels
+15. Use thick outlines (3-4px minimum), high contrast, and simple iconic shapes
+16. Avoid fine details, thin lines, or gradients that disappear at small sizes
+
 """
     
     def __init__(

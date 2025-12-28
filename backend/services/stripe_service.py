@@ -140,7 +140,9 @@ class StripeService:
         if existing_customer_id:
             try:
                 customer = stripe.Customer.retrieve(existing_customer_id)
-                if not customer.deleted:
+                # Check if customer is deleted (handle both attribute and dict access)
+                is_deleted = getattr(customer, 'deleted', False) or customer.get('deleted', False)
+                if not is_deleted:
                     logger.debug(
                         "Retrieved existing Stripe customer",
                         extra={"user_id": user_id, "customer_id": existing_customer_id}
@@ -152,6 +154,13 @@ class StripeService:
                     extra={"user_id": user_id, "invalid_customer_id": existing_customer_id}
                 )
                 # Customer doesn't exist, create new one
+            except AttributeError:
+                # Customer object doesn't have deleted attribute, assume valid
+                logger.debug(
+                    "Retrieved existing Stripe customer (no deleted attr)",
+                    extra={"user_id": user_id, "customer_id": existing_customer_id}
+                )
+                return customer.id
         
         # Create new customer
         try:
@@ -207,6 +216,8 @@ class StripeService:
                 subscription_data={
                     "metadata": {"user_id": user_id},
                 },
+                # Allow users to enter coupon/promotion codes at checkout
+                allow_promotion_codes=True,
             )
             logger.info(
                 "Created Stripe checkout session",

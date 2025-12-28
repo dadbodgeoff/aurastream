@@ -5,19 +5,33 @@ base_prompt: |
   Use colors: {primary_colors}.
   Accent colors: {accent_colors}.
   Style reference: {style_reference}
-  The emote should be expressive, readable at small sizes (28px, 56px, 112px), and have a clear silhouette.
+  
+  CRITICAL SCALABILITY REQUIREMENTS:
+  - Design as VECTOR-STYLE ART that scales perfectly from 28px to 112px
+  - Use BOLD, THICK OUTLINES (minimum 3-4px at 112px scale) for visibility at tiny sizes
+  - NO fine details, thin lines, or intricate patterns that disappear when scaled down
+  - HIGH CONTRAST between subject and background for clear silhouette
+  - SIMPLE, ICONIC shapes - think emoji/sticker style, not realistic
+  - FLAT or MINIMAL shading - avoid gradients that muddy at small sizes
+  - SOLID COLOR FILLS with clean edges
+  - The emote MUST be recognizable and expressive at 28x28 pixels
+  
+  The emote should be expressive, readable at all Twitch sizes (28px, 56px, 112px), and have a clear silhouette.
   Use a transparent or solid color background suitable for Twitch chat.
   {custom_prompt}
 quality_modifiers:
-  - "emote style"
+  - "vector art style"
+  - "sticker style"
+  - "bold thick outlines"
+  - "flat colors"
+  - "high contrast"
+  - "simple iconic design"
   - "expressive"
-  - "small-size optimized"
   - "clear silhouette"
   - "Twitch chat ready"
-  - "112x112 pixels"
+  - "scales perfectly to 28px"
   - "transparent background"
-  - "bold colors"
-  - "readable at all sizes"
+  - "no fine details"
 placeholders:
   - tone
   - primary_colors

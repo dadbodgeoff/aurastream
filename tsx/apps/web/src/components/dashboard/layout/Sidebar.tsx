@@ -52,15 +52,16 @@ const toolsNavItems: NavItem[] = [
 
 const settingsNavItems: NavItem[] = [
   { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
-  { name: 'Analytics', href: '/analytics', icon: AnalyticsIcon, adminOnly: true },
+  { name: 'Analytics', href: '/admin/analytics', icon: AnalyticsIcon, adminOnly: true },
 ];
 
-function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
+function NavLink({ item, isActive, onClick }: { item: NavItem; isActive: boolean; onClick?: () => void }) {
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
       data-tour={item.dataTour}
+      onClick={onClick}
       className={cn(
         'flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium',
         'transition-all duration-75',

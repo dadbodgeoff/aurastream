@@ -59,9 +59,9 @@ function MobileSidebarContent({
         {/* Main */}
         <div>
           <p className="px-3 mb-2 text-xs font-medium text-text-muted uppercase tracking-wider">Main</p>
-          <div className="space-y-1" onClick={handleNavClick}>
+          <div className="space-y-1">
             {mainNavItems.map((item) => (
-              <NavLink key={item.href} item={item} isActive={isActive(item.href)} />
+              <NavLink key={item.href} item={item} isActive={isActive(item.href)} onClick={handleNavClick} />
             ))}
           </div>
         </div>
@@ -69,9 +69,9 @@ function MobileSidebarContent({
         {/* Tools */}
         <div>
           <p className="px-3 mb-2 text-xs font-medium text-text-muted uppercase tracking-wider">Tools</p>
-          <div className="space-y-1" onClick={handleNavClick}>
+          <div className="space-y-1">
             {toolsNavItems.map((item) => (
-              <NavLink key={item.href} item={item} isActive={isActive(item.href)} />
+              <NavLink key={item.href} item={item} isActive={isActive(item.href)} onClick={handleNavClick} />
             ))}
           </div>
         </div>
@@ -79,11 +79,11 @@ function MobileSidebarContent({
         {/* Settings */}
         <div>
           <p className="px-3 mb-2 text-xs font-medium text-text-muted uppercase tracking-wider">Account</p>
-          <div className="space-y-1" onClick={handleNavClick}>
+          <div className="space-y-1">
             {settingsNavItems
               .filter((item: NavItem) => !item.adminOnly || isAdmin)
               .map((item) => (
-                <NavLink key={item.href} item={item} isActive={isActive(item.href)} />
+                <NavLink key={item.href} item={item} isActive={isActive(item.href)} onClick={handleNavClick} />
               ))}
           </div>
         </div>

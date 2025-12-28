@@ -154,23 +154,25 @@ class StorageService:
         self, 
         user_id: str, 
         job_id: str, 
-        extension: str
+        extension: str,
+        suffix: str = ""
     ) -> str:
         """
         Build the storage path for an asset.
         
-        Path structure: {user_id}/{job_id}/{uuid}.{extension}
+        Path structure: {user_id}/{job_id}/{uuid}{suffix}.{extension}
         
         Args:
             user_id: User's UUID
             job_id: Generation job's UUID
             extension: File extension (without dot)
+            suffix: Optional suffix to add before extension (e.g., "_112x112")
             
         Returns:
             Full storage path within the bucket
         """
         unique_id = str(uuid4())
-        return f"{user_id}/{job_id}/{unique_id}.{extension}"
+        return f"{user_id}/{job_id}/{unique_id}{suffix}.{extension}"
     
     def _get_public_url(self, path: str) -> str:
         """
@@ -189,20 +191,22 @@ class StorageService:
         user_id: str,
         job_id: str,
         image_data: bytes,
-        content_type: str = "image/png"
+        content_type: str = "image/png",
+        suffix: str = ""
     ) -> UploadResult:
         """
         Upload an asset to Supabase Storage.
         
         Creates a unique file path using UUID to prevent collisions.
         The asset is uploaded to the 'assets' bucket with the structure:
-        {user_id}/{job_id}/{uuid}.{extension}
+        {user_id}/{job_id}/{uuid}{suffix}.{extension}
         
         Args:
             user_id: User's UUID who owns the asset
             job_id: Generation job's UUID that created the asset
             image_data: Raw image bytes to upload
             content_type: MIME type of the image (default: 'image/png')
+            suffix: Optional suffix to add to filename (e.g., "_112x112" for emote sizes)
             
         Returns:
             UploadResult with url, path, and file_size
@@ -219,14 +223,23 @@ class StorageService:
                 content_type="image/png"
             )
             # result.path = "user-123/job-456/abc-def-123.png"
-            # result.url = "https://project.supabase.co/storage/v1/object/public/assets/..."
+            
+            # With suffix for emote sizes:
+            result = await storage.upload_asset(
+                user_id="user-123",
+                job_id="job-456",
+                image_data=png_bytes,
+                content_type="image/png",
+                suffix="_112x112"
+            )
+            # result.path = "user-123/job-456/abc-def-123_112x112.png"
             ```
         """
         # Get file extension from content type
         extension = self._get_extension_from_content_type(content_type)
         
         # Build unique storage path
-        path = self._build_storage_path(user_id, job_id, extension)
+        path = self._build_storage_path(user_id, job_id, extension, suffix)
         
         try:
             logger.info(f"Uploading asset to {self._bucket}/{path}")

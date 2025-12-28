@@ -459,7 +459,7 @@ export default function SignupPage() {
         </button>
       </form>
       
-      {/* Divider */}
+      {/* OAuth temporarily disabled
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-border-default" />
@@ -469,7 +469,6 @@ export default function SignupPage() {
         </div>
       </div>
       
-      {/* OAuth buttons */}
       <div className="grid grid-cols-3 gap-3">
         <button
           type="button"
@@ -496,6 +495,7 @@ export default function SignupPage() {
           <DiscordIcon />
         </button>
       </div>
+      */}
       
       {/* Link to login */}
       <p className="mt-6 text-center text-sm text-text-secondary">

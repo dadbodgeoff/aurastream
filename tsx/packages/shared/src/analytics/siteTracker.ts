@@ -138,6 +138,9 @@ class SiteTracker {
     this.currentPage = window.location.pathname;
     this.pageEnterTime = Date.now();
     this.pagesViewed = 1;
+    
+    // Mark as initialized BEFORE tracking calls so guards pass
+    this.isInitialized = true;
 
     // Track visitor
     this.trackVisitor();
@@ -161,7 +164,6 @@ class SiteTracker {
     // Setup session end handler
     this.setupSessionEndHandler();
 
-    this.isInitialized = true;
     this.log('Initialized', { visitorId: this.visitorId, sessionId: this.sessionId });
   }
 

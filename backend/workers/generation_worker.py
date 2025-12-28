@@ -7,9 +7,10 @@ It handles the complete lifecycle of asset generation:
 2. Updates job status to PROCESSING
 3. Calls Nano Banana (Gemini) API to generate image
 4. Optionally composites brand logo onto generated image
-5. Uploads generated image to Supabase Storage
-6. Creates asset record in database
-7. Updates job status to COMPLETED (or FAILED on error)
+5. For Twitch emotes: removes background and creates all 3 required sizes (112, 56, 28)
+6. Uploads generated image(s) to Supabase Storage
+7. Creates asset record(s) in database
+8. Updates job status to COMPLETED (or FAILED on error)
 
 Usage:
     python -m backend.workers.generation_worker
@@ -19,8 +20,10 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Optional
+from io import BytesIO
+from typing import List
 
+from PIL import Image
 from redis import Redis
 from rq import Worker, Queue
 
@@ -55,6 +58,102 @@ logger = logging.getLogger(__name__)
 
 QUEUE_NAME = "generation"
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+# Twitch emote sizes required for upload (largest to smallest)
+TWITCH_EMOTE_SIZES = [112, 56, 28]
+
+
+def is_twitch_emote(asset_type: str) -> bool:
+    """Check if asset type is a Twitch emote that needs multi-size processing."""
+    return asset_type in {"twitch_emote", "twitch_emote_112"}
+
+
+async def process_twitch_emote_sizes(
+    image_data: bytes,
+    user_id: str,
+    job_id: str,
+    generation_service,
+    storage_service,
+) -> List[dict]:
+    """
+    Process a Twitch emote into all three required sizes (112, 56, 28).
+    
+    Steps:
+    1. Remove background using rembg
+    2. Resize to each Twitch size using Lanczos
+    3. Upload each size to storage
+    4. Create asset records for each size
+    
+    Args:
+        image_data: Raw image bytes from AI generation
+        user_id: User ID for storage path
+        job_id: Job ID for storage path and asset linking
+        generation_service: Service for creating asset records
+        storage_service: Service for uploading to storage
+        
+    Returns:
+        List of created asset dicts with id, url, width, height
+    """
+    import rembg
+    
+    # Step 1: Remove background
+    logger.info(f"Removing background for emote: job_id={job_id}")
+    transparent_bytes = rembg.remove(image_data)
+    
+    # Load as PIL Image for resizing
+    img = Image.open(BytesIO(transparent_bytes)).convert("RGBA")
+    
+    created_assets = []
+    
+    # Step 2-4: Process each size
+    for size in TWITCH_EMOTE_SIZES:
+        logger.info(f"Processing emote size {size}x{size}: job_id={job_id}")
+        
+        # Resize using Lanczos for best quality
+        resized = img.resize((size, size), Image.Resampling.LANCZOS)
+        
+        # Export as PNG with transparency
+        buffer = BytesIO()
+        resized.save(buffer, format="PNG", optimize=True)
+        buffer.seek(0)
+        png_bytes = buffer.read()
+        
+        # Determine asset type for this size
+        asset_type = f"twitch_emote_{size}"
+        
+        # Upload to storage
+        upload_result = await storage_service.upload_asset(
+            user_id=user_id,
+            job_id=job_id,
+            image_data=png_bytes,
+            content_type="image/png",
+            suffix=f"_{size}x{size}"  # Add size suffix to filename
+        )
+        
+        # Create asset record
+        asset = await generation_service.create_asset(
+            job_id=job_id,
+            user_id=user_id,
+            asset_type=asset_type,
+            url=upload_result.url,
+            storage_path=upload_result.path,
+            width=size,
+            height=size,
+            file_size=len(png_bytes),
+            is_public=False
+        )
+        
+        created_assets.append({
+            "id": asset.id,
+            "url": upload_result.url,
+            "width": size,
+            "height": size,
+            "asset_type": asset_type,
+        })
+        
+        logger.info(f"Created emote asset {size}x{size}: asset_id={asset.id}")
+    
+    return created_assets
 
 
 def get_redis_connection() -> Redis:
@@ -142,72 +241,117 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
                 # Log but don't fail the job if logo compositing fails
                 logger.error(f"Logo compositing failed, continuing without logo: job_id={job_id}, error={e}")
         
-        # Step 6: Upload to storage
+        # Step 6 & 7: Process and upload assets
+        # For Twitch emotes, create all 3 required sizes (112, 56, 28)
         await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=70)
         
-        upload_result = await storage_service.upload_asset(
-            user_id=user_id,
-            job_id=job_id,
-            image_data=image_data,
-            content_type="image/png"
-        )
-        
-        logger.info(f"Image uploaded: job_id={job_id}, path={upload_result.path}")
-        
-        # Step 7: Create asset record
-        await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=85)
-        
-        asset = await generation_service.create_asset(
-            job_id=job_id,
-            user_id=user_id,
-            asset_type=asset_type,
-            url=upload_result.url,
-            storage_path=upload_result.path,
-            width=width,
-            height=height,
-            file_size=upload_result.file_size,
-            is_public=False
-        )
-        
-        # Increment user's asset counter
-        try:
-            from backend.database.supabase_client import get_supabase_client
-            db = get_supabase_client()
-            db.rpc("increment_user_usage", {"p_user_id": user_id}).execute()
-            logger.info(f"Incremented usage counter: user_id={user_id}")
-        except Exception as e:
-            # Don't fail the job if counter increment fails
-            logger.warning(f"Failed to increment usage counter: {e}")
-        
-        # Link asset to coach session if this was generated from coach
-        coach_session_id = job_params.get("coach_session_id")
-        if coach_session_id:
+        if is_twitch_emote(asset_type):
+            # Process Twitch emote into all 3 sizes with background removal
+            logger.info(f"Processing Twitch emote multi-size: job_id={job_id}")
+            
+            created_assets = await process_twitch_emote_sizes(
+                image_data=image_data,
+                user_id=user_id,
+                job_id=job_id,
+                generation_service=generation_service,
+                storage_service=storage_service,
+            )
+            
+            # Use the largest (112x112) as the primary asset for response
+            primary_asset = created_assets[0]  # 112x112 is first
+            asset_id = primary_asset["id"]
+            
+            logger.info(f"Created {len(created_assets)} emote sizes: job_id={job_id}")
+            
+            # Increment usage counter once for the emote (counts as 1 generation)
             try:
                 from backend.database.supabase_client import get_supabase_client
                 db = get_supabase_client()
-                
-                # Update asset with coach_session_id
-                db.table("assets").update({"coach_session_id": coach_session_id}).eq("id", asset.id).execute()
-                
-                # Add asset ID to session's generated_asset_ids array
-                db.rpc("array_append_unique", {
-                    "table_name": "coach_sessions",
-                    "column_name": "generated_asset_ids",
-                    "row_id": coach_session_id,
-                    "new_value": asset.id
-                }).execute()
-                
-                logger.info(f"Linked asset to coach session: asset_id={asset.id}, session_id={coach_session_id}")
+                db.rpc("increment_user_usage", {"p_user_id": user_id}).execute()
+                logger.info(f"Incremented usage counter: user_id={user_id}")
             except Exception as e:
-                # Don't fail the job if linking fails
-                logger.warning(f"Failed to link asset to coach session: {e}")
+                logger.warning(f"Failed to increment usage counter: {e}")
+            
+            # Link all assets to coach session if applicable
+            coach_session_id = job_params.get("coach_session_id")
+            if coach_session_id:
+                try:
+                    from backend.database.supabase_client import get_supabase_client
+                    db = get_supabase_client()
+                    
+                    for asset_info in created_assets:
+                        db.table("assets").update({"coach_session_id": coach_session_id}).eq("id", asset_info["id"]).execute()
+                        db.rpc("array_append_unique", {
+                            "table_name": "coach_sessions",
+                            "column_name": "generated_asset_ids",
+                            "row_id": coach_session_id,
+                            "new_value": asset_info["id"]
+                        }).execute()
+                    
+                    logger.info(f"Linked emote assets to coach session: session_id={coach_session_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to link assets to coach session: {e}")
+        else:
+            # Standard single-asset processing
+            upload_result = await storage_service.upload_asset(
+                user_id=user_id,
+                job_id=job_id,
+                image_data=image_data,
+                content_type="image/png"
+            )
+            
+            logger.info(f"Image uploaded: job_id={job_id}, path={upload_result.path}")
+            
+            await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=85)
+            
+            asset = await generation_service.create_asset(
+                job_id=job_id,
+                user_id=user_id,
+                asset_type=asset_type,
+                url=upload_result.url,
+                storage_path=upload_result.path,
+                width=width,
+                height=height,
+                file_size=upload_result.file_size,
+                is_public=False
+            )
+            
+            asset_id = asset.id
+            
+            # Increment user's asset counter
+            try:
+                from backend.database.supabase_client import get_supabase_client
+                db = get_supabase_client()
+                db.rpc("increment_user_usage", {"p_user_id": user_id}).execute()
+                logger.info(f"Incremented usage counter: user_id={user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to increment usage counter: {e}")
+            
+            # Link asset to coach session if this was generated from coach
+            coach_session_id = job_params.get("coach_session_id")
+            if coach_session_id:
+                try:
+                    from backend.database.supabase_client import get_supabase_client
+                    db = get_supabase_client()
+                    
+                    db.table("assets").update({"coach_session_id": coach_session_id}).eq("id", asset.id).execute()
+                    db.rpc("array_append_unique", {
+                        "table_name": "coach_sessions",
+                        "column_name": "generated_asset_ids",
+                        "row_id": coach_session_id,
+                        "new_value": asset.id
+                    }).execute()
+                    
+                    logger.info(f"Linked asset to coach session: asset_id={asset.id}, session_id={coach_session_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to link asset to coach session: {e}")
         
         # Step 8: Update job status to COMPLETED
         await generation_service.update_job_status(job_id=job_id, status=JobStatus.COMPLETED, progress=100)
         
-        logger.info(f"Generation job completed: job_id={job_id}, asset_id={asset.id}")
+        logger.info(f"Generation job completed: job_id={job_id}, asset_id={asset_id}")
         
-        return {"job_id": job_id, "status": "completed", "asset_id": asset.id}
+        return {"job_id": job_id, "status": "completed", "asset_id": asset_id}
         
     except RateLimitError as e:
         error_message = f"Rate limit exceeded. Retry after {e.retry_after} seconds."
@@ -291,7 +435,7 @@ def run_worker():
         handlers=[logging.StreamHandler(sys.stdout)]
     )
     
-    logger.info(f"Starting generation worker...")
+    logger.info("Starting generation worker...")
     logger.info(f"Redis URL: {REDIS_URL}")
     logger.info(f"Queue name: {QUEUE_NAME}")
     

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@aurastream/shared';
+import { apiClient } from '@aurastream/api-client';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -13,13 +14,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 // Data Fetching
 // =============================================================================
 
-function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
-}
-
 async function fetchWithAuth(path: string) {
-  const token = getAccessToken();
+  const token = apiClient.getAccessToken();
   if (!token) throw new Error('Not authenticated');
   
   const response = await fetch(`${API_BASE}/api/v1/site-analytics${path}`, {
@@ -99,11 +95,21 @@ export default function AnalyticsDashboardPage() {
     Date.now() - (dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90) * 24 * 60 * 60 * 1000
   ).toISOString().split('T')[0];
 
-  const { data: summary, isLoading: summaryLoading } = useDashboardSummary(startDate, endDate);
-  const { data: funnel, isLoading: funnelLoading } = useFunnelData(startDate, endDate);
-  const { data: flow, isLoading: flowLoading } = usePageFlow(startDate, endDate);
-  const { data: sessions, isLoading: sessionsLoading } = useRecentSessions(20);
-  const { data: topPages, isLoading: pagesLoading } = useTopPages(startDate, endDate);
+  const { data: summary, isLoading: summaryLoading, error: summaryError } = useDashboardSummary(startDate, endDate);
+  const { data: funnel, isLoading: funnelLoading, error: funnelError } = useFunnelData(startDate, endDate);
+  const { data: flow, isLoading: flowLoading, error: flowError } = usePageFlow(startDate, endDate);
+  const { data: sessions, isLoading: sessionsLoading, error: sessionsError } = useRecentSessions(20);
+  const { data: topPages, isLoading: pagesLoading, error: pagesError } = useTopPages(startDate, endDate);
+
+  // Debug: log errors and data
+  useEffect(() => {
+    if (summaryError) console.error('Summary error:', summaryError);
+    if (funnelError) console.error('Funnel error:', funnelError);
+    if (flowError) console.error('Flow error:', flowError);
+    if (sessionsError) console.error('Sessions error:', sessionsError);
+    if (pagesError) console.error('Pages error:', pagesError);
+    if (summary) console.log('Summary data:', summary);
+  }, [summary, summaryError, funnelError, flowError, sessionsError, pagesError]);
 
   if (authLoading) {
     return (
@@ -143,6 +149,14 @@ export default function AnalyticsDashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Error Display */}
+        {(summaryError || sessionsError) && (
+          <div className="bg-error-main/10 border border-error-main/30 rounded-xl p-4 text-error-light">
+            <p className="font-medium">Error loading analytics:</p>
+            <p className="text-sm mt-1">{summaryError?.message || sessionsError?.message}</p>
+          </div>
+        )}
+
         {/* Key Metrics */}
         <section>
           <h2 className="text-lg font-semibold text-text-primary mb-4">Key Metrics</h2>

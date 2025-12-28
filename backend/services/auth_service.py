@@ -61,6 +61,7 @@ class User:
     privacy_version: Optional[str]
     created_at: datetime
     updated_at: datetime
+    last_login_at: Optional[datetime]
     
     @classmethod
     def from_db_row(cls, row: dict) -> "User":
@@ -80,6 +81,7 @@ class User:
             privacy_version=row.get("privacy_version"),
             created_at=_parse_datetime(row["created_at"]),
             updated_at=_parse_datetime(row["updated_at"]),
+            last_login_at=_parse_datetime_optional(row.get("last_login_at")),
         )
 
 
@@ -264,6 +266,26 @@ class AuthService:
         # Verify password
         if not self.password_service.verify_password(password, user_row.get("password_hash", "")):
             raise InvalidCredentialsError()
+        
+        # Update last_login_at timestamp (if column exists)
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            self.supabase.table("users").update({
+                "last_login_at": now,
+                "updated_at": now,
+            }).eq("id", user_row["id"]).execute()
+            user_row["last_login_at"] = now
+            user_row["updated_at"] = now
+        except Exception as e:
+            # Column may not exist yet, just update updated_at
+            logger.warning(f"Failed to update last_login_at (column may not exist): {e}")
+            try:
+                self.supabase.table("users").update({
+                    "updated_at": now,
+                }).eq("id", user_row["id"]).execute()
+                user_row["updated_at"] = now
+            except Exception:
+                pass
         
         # Create tokens
         user = User.from_db_row(user_row)

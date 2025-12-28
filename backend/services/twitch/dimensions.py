@@ -136,8 +136,8 @@ DIMENSION_SPECS: Dict[str, DimensionSpec] = {
 # ============================================================================
 
 ASSET_TYPE_DIRECTIVES: Dict[str, str] = {
-    "twitch_emote": "sticker style, solid green background, expressive, clear silhouette",
-    "twitch_badge": "badge style, solid green background, iconic, simple",
+    "twitch_emote": "vector art style, sticker style, bold thick outlines, flat colors, high contrast, simple iconic design, solid green background, expressive, clear silhouette, scales to 28px",
+    "twitch_badge": "badge style, solid green background, iconic, simple, bold outlines, flat colors",
     "youtube_thumbnail": "high contrast, cinematic lighting, eye-catching, bold",
     "twitch_banner": "wide composition, text-safe zones, dynamic",
     "tiktok_story": "vertical composition, mobile-optimized, vibrant",

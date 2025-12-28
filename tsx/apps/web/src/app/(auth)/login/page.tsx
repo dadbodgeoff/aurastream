@@ -202,6 +202,7 @@ function LoginForm() {
         </button>
       </form>
       
+      {/* OAuth temporarily disabled
       <div className="relative my-6">
         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border-default" /></div>
         <div className="relative flex justify-center text-sm"><span className="px-4 bg-background-surface text-text-tertiary">Or continue with</span></div>
@@ -212,6 +213,7 @@ function LoginForm() {
         <button type="button" onClick={() => handleOAuthLogin('twitch')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Twitch"><TwitchIcon /></button>
         <button type="button" onClick={() => handleOAuthLogin('discord')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Discord"><DiscordIcon /></button>
       </div>
+      */}
       
       <p className="mt-6 text-center text-sm text-text-secondary">
         Don&apos;t have an account?{' '}

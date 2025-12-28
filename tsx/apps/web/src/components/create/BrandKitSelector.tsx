@@ -90,7 +90,7 @@ export function BrandKitSelector({
             )}
           </div>
           <div className="flex gap-1">
-            {[...kit.primary_colors, ...kit.accent_colors].slice(0, 4).map((color, i) => (
+            {[...(kit.primary_colors || []), ...(kit.accent_colors || [])].slice(0, 4).map((color, i) => (
               <div
                 key={i}
                 className="w-6 h-6 rounded-md border border-white/10"

@@ -224,7 +224,11 @@ async def get_dashboard_summary(
     service: SiteAnalyticsService = Depends(get_service),
 ) -> dict:
     """Get dashboard summary. Admin only."""
-    return service.get_dashboard_summary(start_date, end_date)
+    try:
+        return service.get_dashboard_summary(start_date, end_date)
+    except Exception as e:
+        logger.error(f"Dashboard summary error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dashboard/funnel")
@@ -235,7 +239,11 @@ async def get_funnel_data(
     service: SiteAnalyticsService = Depends(get_service),
 ) -> dict:
     """Get funnel conversion data. Admin only."""
-    return service.get_funnel_data(start_date, end_date)
+    try:
+        return service.get_funnel_data(start_date, end_date)
+    except Exception as e:
+        logger.error(f"Funnel data error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dashboard/flow")
@@ -247,7 +255,11 @@ async def get_page_flow(
     service: SiteAnalyticsService = Depends(get_service),
 ) -> dict:
     """Get page flow data for flow charts. Admin only."""
-    return service.get_page_flow(start_date, end_date, limit)
+    try:
+        return service.get_page_flow(start_date, end_date, limit)
+    except Exception as e:
+        logger.error(f"Page flow error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dashboard/sessions")
@@ -257,8 +269,12 @@ async def get_recent_sessions(
     service: SiteAnalyticsService = Depends(get_service),
 ) -> dict:
     """Get recent sessions. Admin only."""
-    sessions = service.get_recent_sessions(limit)
-    return {'sessions': sessions}
+    try:
+        sessions = service.get_recent_sessions(limit)
+        return {'sessions': sessions}
+    except Exception as e:
+        logger.error(f"Sessions error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dashboard/pages")
@@ -270,8 +286,12 @@ async def get_top_pages(
     service: SiteAnalyticsService = Depends(get_service),
 ) -> dict:
     """Get top pages by views. Admin only."""
-    pages = service.get_top_pages(start_date, end_date, limit)
-    return {'pages': pages}
+    try:
+        pages = service.get_top_pages(start_date, end_date, limit)
+        return {'pages': pages}
+    except Exception as e:
+        logger.error(f"Top pages error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/aggregate")
