@@ -248,7 +248,7 @@ class AuraLabService:
     """Service for The Aura Lab feature."""
     
     TIER_LIMITS = {
-        "free": 5,
+        "free": 1,  # Free users get 1 fusion per 28 days via free_tier_service
         "pro": 20,
         "studio": 999999
     }

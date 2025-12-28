@@ -66,9 +66,9 @@ router = APIRouter()
 # =============================================================================
 
 TIER_ACCESS = {
-    "free": {"coach_access": False, "feature": "tips_only", "grounding": False, "trial_eligible": True},
-    "pro": {"coach_access": True, "feature": "full_coach", "grounding": False, "trial_eligible": False},
-    "studio": {"coach_access": True, "feature": "full_coach", "grounding": True, "trial_eligible": False},
+    "free": {"coach_access": False, "feature": "tips_only", "grounding": False},
+    "pro": {"coach_access": True, "feature": "full_coach", "grounding": False},
+    "studio": {"coach_access": True, "feature": "full_coach", "grounding": True},
 }
 
 
@@ -85,44 +85,41 @@ def check_premium_access(tier: str) -> bool:
     return TIER_ACCESS.get(tier, TIER_ACCESS["free"])["coach_access"]
 
 
-async def check_trial_eligibility(user_id: str, tier: str) -> dict:
+async def check_free_tier_eligibility(user_id: str, tier: str) -> dict:
     """
-    Check if user is eligible for a free coach trial.
-    
-    Free and Pro users get 1 trial session to experience the coach.
+    Check if free tier user can use coach (1 session per 28 days).
     
     Args:
         user_id: User's ID
         tier: User's subscription tier
         
     Returns:
-        dict with trial_eligible, trial_used, and can_use_coach
+        dict with can_use_coach, days_remaining, next_available
     """
-    from backend.database.supabase_client import get_supabase_client
+    from backend.services.free_tier_service import get_free_tier_service
     
-    # Studio users have full access, no trial needed
+    # Pro/Studio users have full access
     if check_premium_access(tier):
-        return {"trial_eligible": False, "trial_used": False, "can_use_coach": True}
+        return {"can_use_coach": True, "is_free_use": False, "days_remaining": 0, "next_available": None}
     
-    # Check if user has used their trial
-    db = get_supabase_client()
-    result = db.table("users").select("coach_trial_used").eq("id", user_id).single().execute()
-    
-    trial_used = result.data.get("coach_trial_used", False) if result.data else False
+    # Check free tier usage
+    service = get_free_tier_service()
+    usage = await service.check_usage(user_id, "coach")
     
     return {
-        "trial_eligible": True,
-        "trial_used": trial_used,
-        "can_use_coach": not trial_used,
+        "can_use_coach": usage.can_use,
+        "is_free_use": True,
+        "days_remaining": usage.days_remaining,
+        "next_available": usage.next_available.isoformat() if usage.next_available else None,
     }
 
 
-async def mark_trial_used(user_id: str) -> None:
-    """Mark user's coach trial as used."""
-    from backend.database.supabase_client import get_supabase_client
+async def mark_free_tier_used(user_id: str) -> None:
+    """Mark free tier coach usage."""
+    from backend.services.free_tier_service import get_free_tier_service
     
-    db = get_supabase_client()
-    db.table("users").update({"coach_trial_used": True}).eq("id", user_id).execute()
+    service = get_free_tier_service()
+    await service.mark_used(user_id, "coach")
 
 
 # =============================================================================
@@ -207,12 +204,13 @@ async def get_tips(
     - feature: Available feature level (full_coach or tips_only)
     - grounding: Whether game context grounding is available
     - upgrade_message: Message for non-premium users
-    - trial_available: Whether user can use their free trial (free/pro only)
-    - trial_used: Whether user has already used their trial
+    - free_use_available: Whether free user can use their 28-day session
+    - days_until_next: Days until next free use (if applicable)
     
     **Tier Access:**
-    - Free/Pro: Tips only + 1 free trial session, no grounding
-    - Studio: Full coach with grounding
+    - Free: 1 session per 28 days, no grounding
+    - Pro: Unlimited sessions, no grounding
+    - Studio: Unlimited sessions with grounding
     """,
     responses={
         200: {"description": "Access level retrieved successfully"},
@@ -227,7 +225,7 @@ async def check_access(
     
     Returns the user's access level based on their subscription tier,
     including whether they have full coach access and grounding capabilities.
-    Also includes rate limit status for premium users and trial info for free/pro.
+    Free users get 1 session every 28 days.
     
     Args:
         current_user: Authenticated user's token payload
@@ -238,29 +236,30 @@ async def check_access(
     tier = current_user.tier or "free"
     access = TIER_ACCESS.get(tier, TIER_ACCESS["free"])
     
-    # Check trial eligibility for non-premium users
-    trial_info = await check_trial_eligibility(current_user.sub, tier)
+    # Check free tier eligibility
+    free_tier_info = await check_free_tier_eligibility(current_user.sub, tier)
     
-    # Get rate limit status for users who can use coach (premium or trial)
+    # Get rate limit status for users who can use coach
     rate_limits = None
-    if access["coach_access"] or trial_info["can_use_coach"]:
+    if access["coach_access"] or free_tier_info["can_use_coach"]:
         rate_limits = get_coach_rate_limit_status(current_user.sub)
     
     # Determine effective access
-    has_access = access["coach_access"] or trial_info["can_use_coach"]
+    has_access = access["coach_access"] or free_tier_info["can_use_coach"]
     
     # Build upgrade message
     upgrade_message = None
     if not access["coach_access"]:
-        if trial_info["trial_used"]:
+        if free_tier_info["can_use_coach"]:
             upgrade_message = (
-                "You've used your free trial! Upgrade to Studio to continue "
-                "using Prompt Coach with unlimited sessions and game context."
+                "You have 1 free Coach session available! "
+                "Upgrade to Pro for unlimited sessions."
             )
         else:
+            days = free_tier_info["days_remaining"]
             upgrade_message = (
-                "Try Prompt Coach free! You have 1 trial session to experience "
-                "AI-powered prompt refinement. Upgrade to Studio for unlimited access."
+                f"Your next free session is available in {days} days. "
+                "Upgrade to Pro for unlimited access."
             )
     
     return CoachAccessResponse(
@@ -269,8 +268,8 @@ async def check_access(
         grounding=access["grounding"],
         upgrade_message=upgrade_message,
         rate_limits=rate_limits,
-        trial_available=trial_info["trial_eligible"] and not trial_info["trial_used"],
-        trial_used=trial_info["trial_used"],
+        trial_available=free_tier_info.get("is_free_use", False) and free_tier_info["can_use_coach"],
+        trial_used=not free_tier_info["can_use_coach"] if free_tier_info.get("is_free_use", False) else False,
     )
 
 
@@ -329,7 +328,7 @@ async def start_coach_session(
     Returns a Server-Sent Events stream with the coach's initial response,
     including prompt suggestions and validation results.
     
-    Free/Pro users can use their 1 free trial session here.
+    Free users get 1 session every 28 days.
     
     Args:
         request: FastAPI request object for audit logging
@@ -340,32 +339,34 @@ async def start_coach_session(
         StreamingResponse: SSE stream with coach response
         
     Raises:
-        HTTPException: 403 if user doesn't have access (no subscription, trial used)
+        HTTPException: 403 if user doesn't have access
         HTTPException: 429 if rate limit exceeded
     """
     tier = current_user.tier or "free"
     
-    # Check if user can use coach (premium or trial)
-    trial_info = await check_trial_eligibility(current_user.sub, tier)
+    # Check if user can use coach (premium or free tier allowance)
+    free_tier_info = await check_free_tier_eligibility(current_user.sub, tier)
     
-    if not check_premium_access(tier) and not trial_info["can_use_coach"]:
+    if not check_premium_access(tier) and not free_tier_info["can_use_coach"]:
+        days = free_tier_info["days_remaining"]
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
-                "error": "upgrade_required",
-                "message": "You've used your free trial! Upgrade to Studio for unlimited Prompt Coach access.",
+                "error": "cooldown_active",
+                "message": f"Your next free session is available in {days} days. Upgrade to Pro for unlimited access.",
                 "feature": "full_coach",
-                "trial_used": True,
+                "days_remaining": days,
+                "next_available": free_tier_info["next_available"],
             },
         )
     
     # Check rate limit for session creation
     await check_coach_session_rate_limit(current_user.sub)
     
-    # Mark trial as used for non-premium users (before starting session)
-    is_trial_session = not check_premium_access(tier) and trial_info["can_use_coach"]
-    if is_trial_session:
-        await mark_trial_used(current_user.sub)
+    # Mark free tier usage (before starting session)
+    is_free_session = free_tier_info.get("is_free_use", False) and free_tier_info["can_use_coach"]
+    if is_free_session:
+        await mark_free_tier_used(current_user.sub)
     
     coach_service = get_coach_service()
     
@@ -381,14 +382,14 @@ async def start_coach_session(
     async def event_generator():
         """Generate SSE events from coach service."""
         try:
-            # Send trial info at start for UI feedback
-            if is_trial_session:
-                trial_event = json.dumps({
-                    "type": "trial_started",
-                    "content": "This is your free trial session! Experience the full power of Prompt Coach.",
-                    "metadata": {"is_trial": True},
+            # Send free tier info at start for UI feedback
+            if is_free_session:
+                free_event = json.dumps({
+                    "type": "free_session_started",
+                    "content": "This is your free session! You get 1 session every 28 days. Upgrade for unlimited access.",
+                    "metadata": {"is_free_use": True, "cooldown_days": 28},
                 })
-                yield f"data: {trial_event}\n\n"
+                yield f"data: {free_event}\n\n"
             
             async for chunk in coach_service.start_with_context(
                 user_id=current_user.sub,
@@ -399,7 +400,7 @@ async def start_coach_session(
                 custom_mood=data.custom_mood,
                 game_id=data.game_id,
                 game_name=data.game_name,
-                tier="studio",  # Grant full access for trial sessions
+                tier=tier if check_premium_access(tier) else "pro",  # Grant pro-level access for free sessions
             ):
                 event_data = json.dumps({
                     "type": chunk.type,
@@ -425,7 +426,7 @@ async def start_coach_session(
         details={
             "asset_type": data.asset_type,
             "mood": data.mood,
-            "is_trial": is_trial_session,
+            "is_free_session": is_free_session,
         },
         ip_address=request.client.host if request.client else None,
     )
@@ -500,15 +501,13 @@ async def continue_coach_chat(
         HTTPException: 403 if user doesn't have access
         HTTPException: 429 if rate limit exceeded
     """
-    tier = current_user.tier or "free"
-    
     # For continue, we need to verify the user owns this session
-    # Trial users can continue their own session even after trial_used is True
+    # Free tier users can continue their own session even after cooldown starts
     session_manager = get_session_manager()
     
     try:
         # This verifies ownership
-        session = await session_manager.get_or_raise(session_id, current_user.sub)
+        _ = await session_manager.get_or_raise(session_id, current_user.sub)
     except SessionNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -516,9 +515,7 @@ async def continue_coach_chat(
         )
     
     # Premium users always have access, non-premium can continue their own sessions
-    if not check_premium_access(tier):
-        # Session ownership already verified above, so they can continue
-        pass
+    # (ownership already verified above)
     
     # Check rate limit for messages
     await check_coach_message_rate_limit(current_user.sub)

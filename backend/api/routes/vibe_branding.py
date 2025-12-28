@@ -77,25 +77,43 @@ async def analyze_uploaded_image(
     Optionally creates a brand kit from the extracted data.
     
     **Tier Limits:**
-    - Free: 1 analysis/month
+    - Free: 1 analysis per 28 days
     - Pro: 5 analyses/month
     - Studio: Unlimited
     
     **Supported formats:** JPEG, PNG, WebP (max 15MB)
     """
-    service = get_vibe_branding_service()
+    from backend.services.free_tier_service import get_free_tier_service
     
-    # Check quota
-    quota = await service.check_user_quota(current_user.sub, current_user.tier)
-    if not quota["can_analyze"]:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": "quota_exceeded",
-                "message": f"You've used all {quota['limit']} vibe analyses this month",
-                "upgrade_url": "/dashboard/settings?tab=billing"
-            }
-        )
+    service = get_vibe_branding_service()
+    tier = current_user.tier or "free"
+    
+    # Check quota - use free tier system for free users
+    if tier == "free":
+        free_tier_service = get_free_tier_service()
+        usage = await free_tier_service.check_usage(current_user.sub, "vibe_branding")
+        if not usage.can_use:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "cooldown_active",
+                    "message": f"Your next free analysis is available in {usage.days_remaining} days. Upgrade to Pro for more analyses.",
+                    "days_remaining": usage.days_remaining,
+                    "next_available": usage.next_available.isoformat() if usage.next_available else None,
+                    "upgrade_url": "/dashboard/settings?tab=billing"
+                }
+            )
+    else:
+        quota = await service.check_user_quota(current_user.sub, tier)
+        if not quota["can_analyze"]:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "quota_exceeded",
+                    "message": f"You've used all {quota['limit']} vibe analyses this month",
+                    "upgrade_url": "/dashboard/settings?tab=billing"
+                }
+            )
     
     # Validate file type
     if file.content_type not in ALLOWED_MIME_TYPES:
@@ -139,8 +157,11 @@ async def analyze_uploaded_image(
         logger.exception(f"Unexpected error during vibe analysis for user {current_user.sub}: {e}")
         raise
     
-    # Increment usage
-    await service.increment_usage(current_user.sub)
+    # Mark usage - free tier uses 28-day cooldown, paid uses monthly counter
+    if tier == "free":
+        await free_tier_service.mark_used(current_user.sub, "vibe_branding")
+    else:
+        await service.increment_usage(current_user.sub)
     
     # Create brand kit if requested
     brand_kit_id = None
@@ -174,23 +195,41 @@ async def analyze_image_url(
     Optionally creates a brand kit from the extracted data.
     
     **Tier Limits:**
-    - Free: 1 analysis/month
+    - Free: 1 analysis per 28 days
     - Pro: 5 analyses/month
     - Studio: Unlimited
     """
-    service = get_vibe_branding_service()
+    from backend.services.free_tier_service import get_free_tier_service
     
-    # Check quota
-    quota = await service.check_user_quota(current_user.sub, current_user.tier)
-    if not quota["can_analyze"]:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": "quota_exceeded",
-                "message": f"You've used all {quota['limit']} vibe analyses this month",
-                "upgrade_url": "/dashboard/settings?tab=billing"
-            }
-        )
+    service = get_vibe_branding_service()
+    tier = current_user.tier or "free"
+    
+    # Check quota - use free tier system for free users
+    if tier == "free":
+        free_tier_service = get_free_tier_service()
+        usage = await free_tier_service.check_usage(current_user.sub, "vibe_branding")
+        if not usage.can_use:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "cooldown_active",
+                    "message": f"Your next free analysis is available in {usage.days_remaining} days. Upgrade to Pro for more analyses.",
+                    "days_remaining": usage.days_remaining,
+                    "next_available": usage.next_available.isoformat() if usage.next_available else None,
+                    "upgrade_url": "/dashboard/settings?tab=billing"
+                }
+            )
+    else:
+        quota = await service.check_user_quota(current_user.sub, tier)
+        if not quota["can_analyze"]:
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "quota_exceeded",
+                    "message": f"You've used all {quota['limit']} vibe analyses this month",
+                    "upgrade_url": "/dashboard/settings?tab=billing"
+                }
+            )
     
     # Fetch image from URL
     try:
@@ -240,8 +279,11 @@ async def analyze_image_url(
             detail="Failed to analyze image. Please try a different image."
         )
     
-    # Increment usage
-    await service.increment_usage(current_user.sub)
+    # Mark usage - free tier uses 28-day cooldown, paid uses monthly counter
+    if tier == "free":
+        await free_tier_service.mark_used(current_user.sub, "vibe_branding")
+    else:
+        await service.increment_usage(current_user.sub)
     
     # Create brand kit if requested
     brand_kit_id = None
@@ -268,13 +310,36 @@ async def get_usage(
     current_user: TokenPayload = Depends(get_current_user)
 ):
     """
-    Get user's vibe branding usage for current month.
+    Get user's vibe branding usage.
     
     Returns the number of analyses used, the limit for the user's tier,
     and when the usage counter resets.
+    
+    **Tier Limits:**
+    - Free: 1 analysis per 28 days
+    - Pro: 5 analyses/month
+    - Studio: Unlimited
     """
+    from backend.services.free_tier_service import get_free_tier_service
+    
+    tier = current_user.tier or "free"
+    
+    # For free tier, use the 28-day cooldown system
+    if tier == "free":
+        free_tier_service = get_free_tier_service()
+        usage = await free_tier_service.check_usage(current_user.sub, "vibe_branding")
+        
+        return UsageResponse(
+            used=0 if usage.can_use else 1,
+            limit=1,
+            remaining=1 if usage.can_use else 0,
+            can_analyze=usage.can_use,
+            resets_at=usage.next_available.isoformat() if usage.next_available else None
+        )
+    
+    # For paid tiers, use the monthly limit system
     service = get_vibe_branding_service()
-    quota = await service.check_user_quota(current_user.sub, current_user.tier)
+    quota = await service.check_user_quota(current_user.sub, tier)
     
     # Calculate reset date (first of next month)
     now = datetime.now(timezone.utc)

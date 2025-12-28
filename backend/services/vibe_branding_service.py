@@ -66,7 +66,7 @@ class VibeAnalysis(BaseModel):
 
 # Tier limits for vibe analyses per month
 TIER_LIMITS = {
-    "free": 1,
+    "free": 1,  # Free users get 1 analysis per 28 days via free_tier_service
     "pro": 5,
     "studio": 999999  # Effectively unlimited
 }

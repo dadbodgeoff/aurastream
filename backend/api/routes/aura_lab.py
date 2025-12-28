@@ -168,7 +168,7 @@ async def fuse(
     rarity scores and may be a first discovery.
     
     **Tier Limits:**
-    - Free: 5 fusions/day
+    - Free: 1 fusion per 28 days
     - Pro: 20 fusions/day
     - Studio: Unlimited
     
@@ -176,7 +176,10 @@ async def fuse(
     
     **Returns:** Fusion result with image URL, rarity, and scores.
     """
+    from backend.services.free_tier_service import get_free_tier_service
+    
     service = AuraLabService()
+    tier = current_user.tier or "free"
     
     try:
         # Validate element exists
@@ -185,9 +188,24 @@ async def fuse(
         
         element = ELEMENTS[request.element_id]
         
-        # Check premium access
-        if element["premium"] and (current_user.tier or "free") == "free":
+        # Check premium access for premium elements
+        if element["premium"] and tier == "free":
             raise HTTPException(status_code=403, detail="Premium element requires Pro or Studio tier")
+        
+        # Check free tier usage (28-day cooldown)
+        if tier == "free":
+            free_tier_service = get_free_tier_service()
+            usage = await free_tier_service.check_usage(current_user.sub, "aura_lab")
+            if not usage.can_use:
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "cooldown_active",
+                        "message": f"Your next free fusion is available in {usage.days_remaining} days. Upgrade to Pro for unlimited fusions.",
+                        "days_remaining": usage.days_remaining,
+                        "next_available": usage.next_available.isoformat() if usage.next_available else None,
+                    }
+                )
         
         # Get the subject
         subject = await service.get_subject(current_user.sub, request.subject_id)
@@ -260,12 +278,16 @@ async def fuse(
                 detail=f"Failed to save fusion result: {str(e)}"
             )
         
+        # Mark free tier usage BEFORE recording fusion (so it counts even if DB fails)
+        if tier == "free":
+            await free_tier_service.mark_used(current_user.sub, "aura_lab")
+        
         # Record the fusion in the database
         result = await service.fuse(
             current_user.sub,
             request.subject_id,
             request.element_id,
-            current_user.tier or "free",
+            tier,
             generated_image_url,
             storage_path
         )
@@ -401,20 +423,37 @@ async def get_usage(
     current_user: TokenPayload = Depends(get_current_user)
 ):
     """
-    Get user's daily fusion usage.
+    Get user's fusion usage.
     
-    Returns the number of fusions used today, the daily limit
-    based on subscription tier, and when the counter resets.
+    Returns the number of fusions used, the limit based on subscription tier,
+    and when the counter resets.
     
     **Tier Limits:**
-    - Free: 5 fusions/day
+    - Free: 1 fusion per 28 days
     - Pro: 20 fusions/day
     - Studio: Unlimited (999999)
     
     **Returns:** Usage statistics and reset time.
     """
+    from backend.services.free_tier_service import get_free_tier_service
+    
+    tier = current_user.tier or "free"
+    
+    # For free tier, use the 28-day cooldown system
+    if tier == "free":
+        free_tier_service = get_free_tier_service()
+        usage = await free_tier_service.check_usage(current_user.sub, "aura_lab")
+        
+        return UsageResponse(
+            used_today=0 if usage.can_use else 1,
+            limit=1,
+            remaining=1 if usage.can_use else 0,
+            resets_at=usage.next_available.isoformat() + "Z" if usage.next_available else None
+        )
+    
+    # For paid tiers, use the daily limit system
     service = AuraLabService()
-    result = await service.get_usage(current_user.sub, current_user.tier or "free")
+    result = await service.get_usage(current_user.sub, tier)
     
     return UsageResponse(**result)
 

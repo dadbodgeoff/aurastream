@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useLongPress } from '@aurastream/shared';
 import { ContextMenu } from '@/components/ui/ContextMenu';
@@ -17,6 +18,8 @@ export interface AssetCardProps {
   createdAt: string | Date;
   selected?: boolean;
   selectable?: boolean;
+  /** When true, clicking the card triggers download instead of onClick */
+  clickToDownload?: boolean;
   onSelect?: (id: string) => void;
   onClick?: () => void;
   onDownload?: () => void;
@@ -47,6 +50,7 @@ export function AssetCard({
   createdAt,
   selected = false,
   selectable = false,
+  clickToDownload = false,
   onSelect,
   onClick,
   onDownload,
@@ -79,6 +83,15 @@ export function AssetCard({
     resetLongPress();
   };
 
+  // Handle card click - either download or custom onClick
+  const handleCardClick = () => {
+    if (clickToDownload && onDownload) {
+      onDownload();
+    } else {
+      onClick?.();
+    }
+  };
+
   // Build context menu items based on available handlers
   const contextMenuItems = [
     ...(onDownload ? [{
@@ -109,11 +122,12 @@ export function AssetCard({
         selected
           ? 'border-interactive-600 ring-2 ring-interactive-600/20'
           : 'border-border-subtle hover:border-border-default',
+        clickToDownload && 'hover:scale-105',
         className
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={onClick}
+      onClick={handleCardClick}
       {...longPressHandlers}
     >
 
@@ -152,40 +166,65 @@ export function AssetCard({
       </div>
 
       {/* Hover Actions */}
-      <div className={cn(
-        'absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-between p-3 transition-opacity',
-        isHovered ? 'opacity-100' : 'opacity-0'
-      )}>
-        <div className="flex gap-1">
-          {onDownload && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDownload(); }}
-              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-              title="Download"
-            >
-              <DownloadIcon size="sm" />
-            </button>
-          )}
-          {onToggleVisibility && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
-              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
-              title={isPublic ? 'Make Private' : 'Make Public'}
-            >
-              {isPublic ? <EyeIcon size="sm" /> : <EyeOffIcon size="sm" />}
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-white transition-colors"
-              title="Delete"
-            >
-              <TrashIcon size="sm" />
-            </button>
-          )}
-        </div>
-      </div>
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={cn(
+              'absolute inset-0 flex items-end justify-between p-3 transition-opacity',
+              clickToDownload 
+                ? 'bg-background-surface/80 backdrop-blur-sm items-center justify-center'
+                : 'bg-gradient-to-t from-black/60 via-transparent to-transparent'
+            )}
+          >
+            {clickToDownload ? (
+              /* Click-to-download mode: centered download button */
+              <motion.button
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                onClick={(e) => { e.stopPropagation(); onDownload?.(); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-background-base font-semibold text-sm hover:bg-neutral-100 transition-colors"
+              >
+                <DownloadIcon size="sm" />
+                Download
+              </motion.button>
+            ) : (
+              /* Standard mode: action buttons at bottom */
+              <div className="flex gap-1">
+                {onDownload && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDownload(); }}
+                    className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                    title="Download"
+                  >
+                    <DownloadIcon size="sm" />
+                  </button>
+                )}
+                {onToggleVisibility && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
+                    className="p-2 bg-white/20 hover:bg-white/30 rounded-lg text-white transition-colors"
+                    title={isPublic ? 'Make Private' : 'Make Public'}
+                  >
+                    {isPublic ? <EyeIcon size="sm" /> : <EyeOffIcon size="sm" />}
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-white transition-colors"
+                    title="Delete"
+                  >
+                    <TrashIcon size="sm" />
+                  </button>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Info Footer */}
       <div className="p-3 bg-background-surface border-t border-border-subtle">

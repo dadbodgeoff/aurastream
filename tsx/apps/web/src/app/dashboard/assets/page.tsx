@@ -61,6 +61,7 @@ export default function AssetsPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [clickToDownload, setClickToDownload] = useState(false);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'single' | 'bulk' } | null>(null);
@@ -242,6 +243,22 @@ export default function AssetsPage() {
             onChange={(v) => setTypeFilter(v as string)}
           />
           <ViewToggle value={viewMode} onChange={setViewMode} />
+          {/* Quick Download Toggle */}
+          <button
+            onClick={() => setClickToDownload(!clickToDownload)}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+              clickToDownload
+                ? 'bg-interactive-600 text-white'
+                : 'bg-background-elevated text-text-secondary hover:text-text-primary'
+            )}
+            title={clickToDownload ? 'Click cards to download' : 'Click cards to preview'}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Quick DL
+          </button>
         </div>
       </div>
 
@@ -264,7 +281,8 @@ export default function AssetsPage() {
               isPublic={asset.is_public}
               createdAt={asset.created_at}
               selected={selectedAssets.has(asset.id)}
-              selectable
+              selectable={!clickToDownload}
+              clickToDownload={clickToDownload}
               onSelect={toggleAssetSelection}
               onClick={() => openPreview(asset)}
               onDownload={() => handleDownload(asset)}
