@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -85,6 +86,20 @@ function NavLink({ item, isActive, onClick }: { item: NavItem; isActive: boolean
 export function Sidebar({ user, isAdmin = false, onLogout, className }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  
+  // Don't render on mobile at all (backup for CSS hidden)
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  
+  // Check if we're on mobile viewport
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  
+  // Don't render on mobile
+  if (isMounted && isMobile) {
+    return null;
+  }
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
