@@ -228,7 +228,7 @@ export class APIClient {
      * Initiate OAuth flow for a provider (google, twitch, discord)
      */
     oauthInitiate: async (provider: string): Promise<OAuthInitiateResponse> => {
-      return this.request<OAuthInitiateResponse>('GET', `/api/v1/oauth/${provider}/initiate`, {
+      return this.request<OAuthInitiateResponse>('POST', `/api/v1/auth/oauth/${provider}`, {
         requiresAuth: false,
       });
     },
