@@ -24,12 +24,12 @@ const ROUTE_CONFIG: Record<string, { label: string; parent?: string }> = {
   '/dashboard/aura-lab': { label: 'Aura Lab', parent: '/dashboard' },
   
   // Community routes
-  '/community': { label: 'Community' },
+  '/community': { label: 'Community', parent: '/dashboard' },
   '/community/share': { label: 'Share Asset', parent: '/community' },
   '/community/creators': { label: 'Creators', parent: '/community' },
   
   // Promo routes
-  '/promo': { label: 'Promo Chat' },
+  '/promo': { label: 'Promo Chat', parent: '/dashboard' },
   
   // Admin routes
   '/admin': { label: 'Admin' },

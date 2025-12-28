@@ -28,25 +28,13 @@
  * </AnalyticsProvider>
  * ```
  * 
- * 2. Use hooks in components:
- * ```tsx
- * import { useModalTracking, useFeatureTracking } from '@aurastream/shared';
- * 
- * const { trackOpen, trackComplete } = useModalTracking('brand-kit', 'Brand Kit Editor');
- * const { trackBrandKit } = useFeatureTracking();
- * 
- * // Track modal open
- * trackOpen('sidebar_button');
- * 
- * // Track feature usage
- * trackBrandKit('logo_uploaded', { fileSize: 1024 });
- * ```
- * 
- * 3. Or use the tracker directly:
+ * 2. Use the tracker directly:
  * ```tsx
  * import { analytics } from '@aurastream/shared';
  * 
  * analytics.track('custom_event', { key: 'value' });
+ * analytics.page('dashboard');
+ * analytics.error(new Error('Something went wrong'), { context: 'generation' });
  * ```
  */
 
@@ -55,16 +43,6 @@ export { analytics, default } from './tracker';
 
 // React integration
 export { AnalyticsProvider, useAnalytics, withAnalytics } from './provider';
-
-// Hooks
-export {
-  usePageTracking,
-  useModalTracking,
-  useWizardTracking,
-  useInteractionTracking,
-  usePerformanceTracking,
-  useFeatureTracking,
-} from './hooks';
 
 // Types
 export type {
@@ -98,21 +76,13 @@ export {
 } from './utils';
 
 // =============================================================================
-// Site Analytics (Production Visitor/Session/Funnel Tracking)
-// =============================================================================
-
-export { siteTracker, type FunnelStep, type SiteTrackerConfig } from './siteTracker';
-export { SiteAnalyticsProvider } from './SiteAnalyticsProvider';
-export { useSiteAnalytics } from './useSiteAnalytics';
-
-// =============================================================================
 // Enterprise Analytics (Comprehensive Tracking with Heatmaps, Journeys, etc.)
 // =============================================================================
 
 export { 
   enterpriseTracker,
   type EnterpriseTrackerConfig,
-  type FunnelStep as EnterpriseFunnelStep,
+  type FunnelStep,
   type AbandonmentType,
 } from './enterpriseTracker';
 

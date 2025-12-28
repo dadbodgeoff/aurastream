@@ -7,19 +7,21 @@ Enterprise-grade analytics tracker for Aurastream. Zero performance impact, full
 ### 1. Wrap Your App with the Provider
 
 ```tsx
-// apps/web/src/app/layout.tsx or providers.tsx
-import { AnalyticsProvider } from '@aurastream/shared';
+// apps/web/src/app/providers.tsx
+import { AnalyticsProvider, useAuth } from '@aurastream/shared';
 
-export function Providers({ children }: { children: React.ReactNode }) {
+function AnalyticsWrapper({ children, config }) {
+  const { user } = useAuth();
+  
   return (
-    <AnalyticsProvider
-      config={{
-        endpoint: '/api/v1/analytics',
-        debug: process.env.NODE_ENV === 'development',
-        batchSize: 10,
-        flushInterval: 30000,
-      }}
+    <AnalyticsProvider 
+      config={config} 
       userId={user?.id}
+      userTraits={user ? {
+        email: user.email,
+        displayName: user.displayName,
+        subscriptionTier: user.subscriptionTier,
+      } : undefined}
     >
       {children}
     </AnalyticsProvider>
@@ -27,162 +29,64 @@ export function Providers({ children }: { children: React.ReactNode }) {
 }
 ```
 
-### 2. Track Page Views
-
-```tsx
-import { usePageTracking } from '@aurastream/shared';
-
-export function DashboardPage() {
-  usePageTracking('dashboard', { section: 'main' });
-  
-  return <div>...</div>;
-}
-```
-
-### 3. Track Modals
-
-```tsx
-import { useModalTracking } from '@aurastream/shared';
-
-export function BrandKitModal({ isOpen, onClose }) {
-  const { trackOpen, trackClose, trackComplete } = useModalTracking(
-    'brand-kit-editor',
-    'Brand Kit Editor'
-  );
-
-  useEffect(() => {
-    if (isOpen) trackOpen('sidebar_button');
-  }, [isOpen, trackOpen]);
-
-  const handleSave = async () => {
-    await saveBrandKit();
-    trackComplete({ itemsSaved: 5 });
-    onClose();
-  };
-
-  const handleClose = () => {
-    trackClose();
-    onClose();
-  };
-
-  return <Modal onClose={handleClose}>...</Modal>;
-}
-```
-
-### 4. Track Wizards/Multi-Step Flows
-
-```tsx
-import { useWizardTracking } from '@aurastream/shared';
-
-export function QuickCreateWizard() {
-  const {
-    trackStart,
-    trackStepComplete,
-    trackAbandon,
-    trackComplete,
-  } = useWizardTracking('quick-create', 'Quick Create Wizard', 3);
-
-  // Track wizard start
-  useEffect(() => {
-    trackStart({ entryPoint: 'dashboard' });
-  }, []);
-
-  const handleNextStep = (currentStep: number) => {
-    trackStepComplete(currentStep, STEPS[currentStep], {
-      templateSelected: template?.id,
-    });
-    setStep(currentStep + 1);
-  };
-
-  const handleGenerate = async () => {
-    await generate();
-    trackComplete({
-      templateId: template.id,
-      vibeId: selectedVibe,
-      brandKitUsed: !!brandKitId,
-    });
-  };
-
-  return <div>...</div>;
-}
-```
-
-### 5. Track Feature Usage
-
-```tsx
-import { useFeatureTracking } from '@aurastream/shared';
-
-export function LogoUploader() {
-  const { trackBrandKit } = useFeatureTracking();
-
-  const handleUpload = async (file: File) => {
-    await uploadLogo(file);
-    trackBrandKit('logo_uploaded', {
-      fileSize: file.size,
-      fileType: file.type,
-    });
-  };
-
-  return <Uploader onUpload={handleUpload} />;
-}
-```
-
-### 6. Track Performance
-
-```tsx
-import { usePerformanceTracking } from '@aurastream/shared';
-
-export function AssetGenerator() {
-  const { trackApiCall } = usePerformanceTracking();
-
-  const handleGenerate = async () => {
-    const startTime = Date.now();
-    try {
-      await generateAsset();
-      trackApiCall('/api/v1/generate', 'POST', startTime, true);
-    } catch (error) {
-      trackApiCall('/api/v1/generate', 'POST', startTime, false, {
-        errorType: error.name,
-      });
-    }
-  };
-}
-```
-
-### 7. Direct Tracker Usage
+### 2. Track Events Directly
 
 ```tsx
 import { analytics } from '@aurastream/shared';
 
 // Track custom events
-analytics.track('custom_event', { key: 'value' }, 'feature');
+analytics.track('button_clicked', { buttonId: 'cta-hero' }, 'user_action');
+
+// Track page views
+analytics.page('dashboard', { section: 'main' });
 
 // Track errors
 analytics.error(new Error('Something went wrong'), { context: 'generation' });
 
-// Identify user on login
+// Track modals
+analytics.modal('modal_opened', { modalId: 'brand-kit', modalName: 'Brand Kit Editor' });
+
+// Track wizard progress
+analytics.wizard('wizard_step_completed', {
+  wizardId: 'quick-create',
+  wizardName: 'Quick Create',
+  currentStep: 2,
+  totalSteps: 3,
+});
+
+// Track performance
+analytics.timing('api_call', 250, { endpoint: '/api/v1/generate' });
+```
+
+### 3. User Identification
+
+```tsx
+// Identify user on login (handled automatically by AnalyticsWrapper)
 analytics.identify(userId, { plan: 'pro', signupDate: '2024-01-01' });
 
-// Reset on logout
+// Reset on logout (handled automatically by auth store)
 analytics.reset();
+```
 
-// Manage consent
-analytics.setConsent(false); // Stops all tracking
+### 4. Consent Management
+
+```tsx
+// Manage GDPR consent
+analytics.setConsent(false); // Stops all tracking and clears queue
+analytics.setConsent(true);  // Resumes tracking
 ```
 
 ## Event Categories
 
 | Category | Use Case |
 |----------|----------|
-| `page_view` | Page navigation |
+| `page` | Page navigation |
 | `modal` | Modal open/close/complete |
 | `wizard` | Multi-step flow progress |
 | `user_action` | Clicks, form submissions |
 | `feature` | Feature-specific actions |
 | `error` | Error tracking |
 | `performance` | Timing metrics |
-| `engagement` | Time on page, scroll depth |
-| `conversion` | Signups, purchases |
 
 ## Configuration Options
 
@@ -206,8 +110,7 @@ interface AnalyticsConfig {
 ## Best Practices
 
 1. **Initialize early** - Set up the provider at the app root
-2. **Use hooks** - Prefer hooks over direct tracker calls for React components
-3. **Be consistent** - Use the same event names across the app
-4. **Don't over-track** - Focus on actionable metrics
-5. **Respect privacy** - Always check consent before tracking
-6. **Test in debug mode** - Enable `debug: true` during development
+2. **Be consistent** - Use the same event names across the app
+3. **Don't over-track** - Focus on actionable metrics
+4. **Respect privacy** - Always check consent before tracking
+5. **Test in debug mode** - Enable `debug: true` during development

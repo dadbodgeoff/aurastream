@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useCommunityPosts,
   useFeaturedPosts,
@@ -12,7 +13,9 @@ import {
   useFollowUser,
   useUnfollowUser,
   useSpotlightCreators,
+  communityKeys,
 } from '@aurastream/api-client';
+import { useMobileDetection } from '@aurastream/shared';
 import {
   HeroCarousel,
   HeroBanner,
@@ -21,6 +24,7 @@ import {
   InspirationGallery,
 } from '@/components/community';
 import { PageHeader } from '@/components/navigation';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 
 type GalleryTab = 'all' | 'featured' | 'following' | 'trending' | 'new';
 
@@ -56,6 +60,8 @@ const HERO_BANNERS: HeroBanner[] = [
 
 export default function CommunityPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { isMobile } = useMobileDetection();
   const [activeTab, setActiveTab] = useState<GalleryTab>('all');
   const [assetType, setAssetType] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,62 +133,87 @@ export default function CommunityPage() {
   const handleFollow = (userId: string) => followMutation.mutate(userId);
   const handleUnfollow = (userId: string) => unfollowMutation.mutate(userId);
 
+  // Pull-to-refresh handler - invalidates queries based on active tab
+  const handleRefresh = useCallback(async () => {
+    // Always invalidate spotlight creators
+    await queryClient.invalidateQueries({ queryKey: communityKeys.spotlightCreators() });
+
+    // Invalidate queries based on active tab
+    switch (activeTab) {
+      case 'featured':
+        await queryClient.invalidateQueries({ queryKey: communityKeys.featured() });
+        break;
+      case 'trending':
+        await queryClient.invalidateQueries({ queryKey: communityKeys.trending(assetType) });
+        break;
+      case 'following':
+        await queryClient.invalidateQueries({ queryKey: communityKeys.followingFeed() });
+        break;
+      case 'all':
+      case 'new':
+      default:
+        await queryClient.invalidateQueries({ queryKey: communityKeys.postsList() });
+        break;
+    }
+  }, [queryClient, activeTab, assetType]);
+
   return (
     <div className="min-h-screen bg-background-base">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
-        {/* Page Header */}
-        <PageHeader 
-          title="Community"
-          subtitle="Discover and share amazing stream assets"
-          showBack={false}
-        />
-
-        {/* Hero Carousel */}
-        <HeroCarousel banners={HERO_BANNERS} />
-
-        {/* Quick Action Cards */}
-        <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">
-            What would you like to create today?
-          </h2>
-          <QuickActionCards />
-        </section>
-
-        {/* Creator Spotlight */}
-        <CreatorSpotlight
-          creators={spotlightCreators ?? []}
-          isLoading={creatorsLoading}
-          onFollow={handleFollow}
-          onUnfollow={handleUnfollow}
-        />
-
-        {/* Inspiration Gallery */}
-        <div id="gallery">
-          <InspirationGallery
-            posts={filteredPosts.map((post) => ({
-              id: post.id,
-              title: post.title,
-              assetUrl: post.assetUrl,
-              assetType: post.assetType,
-              author: post.author,
-              likeCount: post.likeCount,
-              commentCount: post.commentCount,
-              tags: post.tags,
-              isFeatured: post.isFeatured,
-              isLiked: post.isLiked,
-            }))}
-            isLoading={isLoading}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            assetTypeFilter={assetType}
-            onAssetTypeChange={setAssetType}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onPostClick={handlePostClick}
-            onLike={handleLike}
-            onAuthorClick={handleAuthorClick}
+        <PullToRefresh onRefresh={handleRefresh} disabled={!isMobile}>
+          {/* Page Header */}
+          <PageHeader 
+            title="Community"
+            subtitle="Discover and share amazing stream assets"
           />
-        </div>
+
+          {/* Hero Carousel */}
+          <HeroCarousel banners={HERO_BANNERS} />
+
+          {/* Quick Action Cards */}
+          <section>
+            <h2 className="text-lg font-semibold text-text-primary mb-4">
+              What would you like to create today?
+            </h2>
+            <QuickActionCards />
+          </section>
+
+          {/* Creator Spotlight */}
+          <CreatorSpotlight
+            creators={spotlightCreators ?? []}
+            isLoading={creatorsLoading}
+            onFollow={handleFollow}
+            onUnfollow={handleUnfollow}
+          />
+
+          {/* Inspiration Gallery */}
+          <div id="gallery">
+            <InspirationGallery
+              posts={filteredPosts.map((post) => ({
+                id: post.id,
+                title: post.title,
+                assetUrl: post.assetUrl,
+                assetType: post.assetType,
+                author: post.author,
+                likeCount: post.likeCount,
+                commentCount: post.commentCount,
+                tags: post.tags,
+                isFeatured: post.isFeatured,
+                isLiked: post.isLiked,
+              }))}
+              isLoading={isLoading}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              assetTypeFilter={assetType}
+              onAssetTypeChange={setAssetType}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onPostClick={handlePostClick}
+              onLike={handleLike}
+              onAuthorClick={handleAuthorClick}
+            />
+          </div>
+        </PullToRefresh>
       </div>
     </div>
   );

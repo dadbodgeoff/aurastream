@@ -196,6 +196,7 @@ export interface AnalyticsTracker {
   error: (error: Error, properties?: CustomProperties) => void;
   flush: () => Promise<void>;
   reset: () => void;
+  destroy: () => void;
   setConsent: (hasConsent: boolean) => void;
   getSessionId: () => string;
   getState: () => AnalyticsState;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageSquare, 
@@ -18,10 +18,13 @@ import {
   Shield,
   Zap
 } from 'lucide-react';
-import { usePromoMessages, usePinnedMessage, useLeaderboard } from '@aurastream/api-client';
+import { useQueryClient } from '@tanstack/react-query';
+import { usePromoMessages, usePinnedMessage, useLeaderboard, promoKeys } from '@aurastream/api-client';
 import type { PromoMessage, LeaderboardEntry, UserBadges } from '@aurastream/api-client';
+import { useMobileDetection } from '@aurastream/shared';
 import { PromoComposeModal } from '@/components/promo/PromoComposeModal';
 import { PageHeader } from '@/components/navigation';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 
 // ============================================================================
 // Helper Functions
@@ -348,6 +351,8 @@ function EmptyState() {
 export default function PromoPage() {
   const [showCompose, setShowCompose] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const { isMobile } = useMobileDetection();
   
   const { 
     data: messagesData, 
@@ -362,6 +367,14 @@ export default function PromoPage() {
   const allMessages = messagesData?.pages.flatMap((p) => p.messages) ?? [];
   const totalMessages = messagesData?.pages[0]?.totalCount ?? 0;
   const totalDonations = leaderboard?.entries.reduce((sum, e) => sum + e.totalDonationsCents, 0) ?? 0;
+
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: promoKeys.messages() }),
+      queryClient.invalidateQueries({ queryKey: promoKeys.pinned() }),
+      queryClient.invalidateQueries({ queryKey: promoKeys.leaderboard() }),
+    ]);
+  }, [queryClient]);
 
   return (
     <div className="min-h-screen bg-background-base">
@@ -405,7 +418,8 @@ export default function PromoPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
+        <PullToRefresh onRefresh={handleRefresh} disabled={!isMobile}>
+          <div className="flex gap-6">
           {/* Chat Feed */}
           <div className="flex-1 min-w-0">
             {/* King of the Hill Banner */}
@@ -555,6 +569,7 @@ export default function PromoPage() {
             </div>
           </aside>
         </div>
+        </PullToRefresh>
       </div>
 
       {/* Compose Modal */}

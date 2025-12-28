@@ -28,9 +28,14 @@ export const AnalyticsProvider: React.FC<AnalyticsProviderProps> = ({
   userId,
   userTraits,
 }) => {
-  // Initialize analytics on mount
+  // Initialize analytics on mount, cleanup on unmount
   useEffect(() => {
     analytics.init(config ?? {});
+    
+    return () => {
+      // Cleanup on unmount to prevent memory leaks
+      analytics.destroy();
+    };
   }, [config]);
 
   // Identify user when userId changes
@@ -70,6 +75,7 @@ export const useAnalytics = (): AnalyticsTracker => {
       error: () => {},
       flush: async () => {},
       reset: () => {},
+      destroy: () => {},
       setConsent: () => {},
       getSessionId: () => '',
       getState: () => ({

@@ -14,9 +14,14 @@ The actual mega-prompt construction happens in the generation pipeline.
 This is a Premium-only feature.
 """
 
+import logging
 import time
 from typing import Optional, Dict, Any, AsyncGenerator, List
 from dataclasses import dataclass
+
+# Configure logger for prompt debugging
+logger = logging.getLogger(__name__)
+prompt_logger = logging.getLogger("aurastream.coach.prompts")
 
 from backend.services.coach.models import CoachSession, CoachMessage
 from backend.services.coach.session_manager import (
@@ -273,6 +278,22 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             {"role": "user", "content": first_message},
         ]
         
+        # Log the full messages being sent to the LLM
+        prompt_logger.info(
+            "=== COACH LLM REQUEST (start_with_context) ===\n"
+            f"User ID: {user_id}\n"
+            f"Session ID: {session.session_id}\n"
+            f"Brand Context Received:\n"
+            f"  - brand_kit_id: {brand_context.get('brand_kit_id')}\n"
+            f"  - colors: {brand_context.get('colors')}\n"
+            f"  - tone: {brand_context.get('tone')}\n"
+            f"  - fonts: {brand_context.get('fonts')}\n"
+            f"  - logo_url: {brand_context.get('logo_url')}\n"
+            f"Messages to LLM:\n"
+            f"  [SYSTEM]: {system_prompt}\n"
+            f"  [USER]: {first_message}\n"
+            "=== END LLM REQUEST ==="
+        )
         full_response = ""
         tokens_in = 0
         tokens_out = 0
@@ -585,13 +606,27 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         mood_section = custom_mood or mood or "flexible"
         game_section = game_context if game_context else "none"
         
-        return self.SYSTEM_PROMPT_BASE.format(
+        system_prompt = self.SYSTEM_PROMPT_BASE.format(
             asset_type=asset_type,
             brand_context=brand_section,
             game_context=game_section,
             mood_context=mood_section,
             color_list=color_list,
         )
+        
+        # Log the system prompt for debugging
+        prompt_logger.info(
+            "=== COACH SYSTEM PROMPT ===\n"
+            f"Asset Type: {asset_type}\n"
+            f"Brand Context: {brand_section}\n"
+            f"Colors: {color_list}\n"
+            f"Mood: {mood_section}\n"
+            f"Game Context: {game_section}\n"
+            f"Full System Prompt:\n{system_prompt}\n"
+            "=== END SYSTEM PROMPT ==="
+        )
+        
+        return system_prompt
     
     def _build_system_prompt_from_session(self, session: CoachSession) -> str:
         """Rebuild system prompt from session data."""

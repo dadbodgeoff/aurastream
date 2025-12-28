@@ -82,11 +82,25 @@ export const useAuthStore = create<AuthState>()(
           const { apiClient } = await import('@aurastream/api-client');
           await apiClient.auth.logout();
           apiClient.clearTokens();
+          
+          // Reset analytics to clear user data and start fresh session
+          const { analytics } = await import('../analytics/tracker');
+          analytics.reset();
+          
           set({ user: null, isAuthenticated: false, isLoading: false, error: null });
         } catch (error) {
           // Still clear local state even if API call fails
           const { apiClient } = await import('@aurastream/api-client');
           apiClient.clearTokens();
+          
+          // Reset analytics even on error
+          try {
+            const { analytics } = await import('../analytics/tracker');
+            analytics.reset();
+          } catch {
+            // Ignore analytics reset errors
+          }
+          
           set({ user: null, isAuthenticated: false, isLoading: false });
         }
       },

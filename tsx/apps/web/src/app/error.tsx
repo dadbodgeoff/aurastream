@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
+import { analytics } from '@aurastream/shared';
+
 export default function Error({
   error,
   reset,
@@ -7,6 +10,15 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Track error in analytics
+  useEffect(() => {
+    analytics.error(error, {
+      digest: error.digest,
+      context: 'error_boundary',
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    });
+  }, [error]);
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background-base">
       <h1 className="text-4xl font-bold text-text-primary">500</h1>

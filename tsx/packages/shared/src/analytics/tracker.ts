@@ -60,6 +60,10 @@ let state: AnalyticsState = {
 
 let flushTimer: ReturnType<typeof setInterval> | null = null;
 
+// Store event listener references for cleanup
+let visibilityHandler: (() => void) | null = null;
+let beforeUnloadHandler: (() => void) | null = null;
+
 // Debug logger
 const log = (...args: unknown[]) => {
   if (config.debug) {
@@ -134,14 +138,14 @@ const enqueue = (event: AnalyticsEvent, priority: QueueItem['priority'] = 'norma
 
 
 // Send events to endpoint
-const sendEvents = async (events: AnalyticsEvent[]): Promise<boolean> => {
+const sendEvents = async (events: AnalyticsEvent[]): Promise<{ success: boolean; retryable: boolean }> => {
   if (!config.endpoint) {
     log('No endpoint configured, events logged locally:', events);
     // In development, just log events
     if (config.debug) {
       events.forEach((e) => console.table({ name: e.name, category: e.category, ...e.properties }));
     }
-    return true;
+    return { success: true, retryable: false };
   }
 
   try {
@@ -163,10 +167,22 @@ const sendEvents = async (events: AnalyticsEvent[]): Promise<boolean> => {
       keepalive: true,
     });
 
-    return response.ok;
+    if (!response.ok) {
+      // Log detailed error info
+      const errorText = await response.text().catch(() => 'Unable to read response');
+      log(`Failed to send events: HTTP ${response.status} - ${errorText}`);
+      
+      // 4xx errors are not retryable (validation errors, etc.)
+      // 5xx errors are retryable (server issues)
+      const retryable = response.status >= 500;
+      return { success: false, retryable };
+    }
+
+    return { success: true, retryable: false };
   } catch (error) {
-    log('Failed to send events:', error);
-    return false;
+    log('Failed to send events (network error):', error);
+    // Network errors are retryable
+    return { success: false, retryable: true };
   }
 };
 
@@ -189,12 +205,12 @@ const flush = async (): Promise<void> => {
   const batch = sortedQueue.slice(0, config.batchSize);
   const events = batch.map((item) => item.event);
 
-  let success = false;
+  let result = { success: false, retryable: true };
   let retries = 0;
 
-  while (!success && retries < config.maxRetries) {
-    success = await sendEvents(events);
-    if (!success) {
+  while (!result.success && result.retryable && retries < config.maxRetries) {
+    result = await sendEvents(events);
+    if (!result.success && result.retryable) {
       retries++;
       if (retries < config.maxRetries) {
         await new Promise((resolve) => setTimeout(resolve, config.retryDelay * retries));
@@ -202,7 +218,7 @@ const flush = async (): Promise<void> => {
     }
   }
 
-  if (success) {
+  if (result.success) {
     // Remove sent events from queue
     const sentIds = new Set(events.map((e) => e.id));
     state.queue = state.queue.filter((item) => !sentIds.has(item.event.id));
@@ -214,12 +230,23 @@ const flush = async (): Promise<void> => {
     }
     
     log('Flush successful, sent:', events.length, 'events');
+  } else if (!result.retryable) {
+    // Non-retryable error (4xx) - drop the events to prevent infinite retries
+    const sentIds = new Set(events.map((e) => e.id));
+    state.queue = state.queue.filter((item) => !sentIds.has(item.event.id));
+    state.totalEventsDropped += events.length;
+    
+    if (config.persistQueue) {
+      persistQueue(state.queue);
+    }
+    
+    log('Events dropped due to non-retryable error:', events.length, 'events');
   } else {
-    // Mark events with retry count
+    // Mark events with retry count for next attempt
     events.forEach((e) => {
       e.retryCount = (e.retryCount || 0) + 1;
     });
-    log('Flush failed after', config.maxRetries, 'retries');
+    log('Flush failed after', config.maxRetries, 'retries, will retry later');
   }
 
   state.isFlushing = false;
@@ -234,9 +261,13 @@ const flush = async (): Promise<void> => {
 const startFlushTimer = () => {
   if (flushTimer) return;
   
-  flushTimer = setInterval(() => {
+  flushTimer = setInterval(async () => {
     if (state.queue.length > 0) {
-      flush();
+      try {
+        await flush();
+      } catch (error) {
+        log('Flush timer error:', error);
+      }
     }
   }, config.flushInterval);
 };
@@ -249,34 +280,41 @@ const stopFlushTimer = () => {
   }
 };
 
+// Cleanup lifecycle handlers
+const cleanupLifecycleHandlers = () => {
+  if (typeof window === 'undefined') return;
+  
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler);
+    visibilityHandler = null;
+  }
+  
+  if (beforeUnloadHandler) {
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
+    beforeUnloadHandler = null;
+  }
+};
+
 // Setup page visibility and unload handlers
 const setupLifecycleHandlers = () => {
   if (typeof window === 'undefined') return;
 
+  // Clean up any existing handlers first
+  cleanupLifecycleHandlers();
+
   // Flush on page hide (works better than unload on mobile)
-  document.addEventListener('visibilitychange', () => {
+  visibilityHandler = () => {
     if (document.visibilityState === 'hidden') {
-      flush();
+      flush().catch((err) => log('Visibility flush error:', err));
     }
-  });
+  };
+  document.addEventListener('visibilitychange', visibilityHandler);
 
   // Flush on beforeunload
-  window.addEventListener('beforeunload', () => {
-    flush();
-  });
-
-  // Track page visibility for engagement
-  let hiddenTime = 0;
-  let lastHidden = 0;
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-      lastHidden = Date.now();
-    } else if (lastHidden > 0) {
-      hiddenTime += Date.now() - lastHidden;
-      lastHidden = 0;
-    }
-  });
+  beforeUnloadHandler = () => {
+    flush().catch((err) => log('Beforeunload flush error:', err));
+  };
+  window.addEventListener('beforeunload', beforeUnloadHandler);
 };
 
 
@@ -433,6 +471,16 @@ const reset = (): void => {
 };
 
 /**
+ * Destroy the tracker (cleanup all resources)
+ */
+const destroy = (): void => {
+  stopFlushTimer();
+  cleanupLifecycleHandlers();
+  state.initialized = false;
+  log('Tracker destroyed');
+};
+
+/**
  * Get current session ID
  */
 const getTrackerSessionId = (): string => state.sessionId;
@@ -454,6 +502,7 @@ export const analytics: AnalyticsTracker = {
   error,
   flush,
   reset,
+  destroy,
   setConsent,
   getSessionId: getTrackerSessionId,
   getState,

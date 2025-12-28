@@ -13,6 +13,7 @@ Security Notes:
 - Asset visibility can be controlled per asset
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -29,6 +30,10 @@ from backend.services.exceptions import (
 from backend.services.prompt_engine import AssetType, get_prompt_engine
 from backend.services.brand_kit_service import get_brand_kit_service
 from backend.services.quick_create_service import get_quick_create_service
+
+# Configure logger for generation prompt debugging
+logger = logging.getLogger(__name__)
+generation_prompt_logger = logging.getLogger("aurastream.generation.prompts")
 
 
 class JobStatus(str, Enum):
@@ -316,6 +321,22 @@ class GenerationService:
                 )
         
         now = datetime.now(timezone.utc).isoformat()
+        
+        # Log the final prompt being sent to image generation (Nano Banana)
+        generation_prompt_logger.info(
+            "=== GENERATION PROMPT (create_job) ===\n"
+            f"User ID: {user_id}\n"
+            f"Asset Type: {asset_type}\n"
+            f"Brand Kit ID: {brand_kit_id}\n"
+            f"Brand Kit Data: {brand_kit if brand_kit else 'None'}\n"
+            f"Custom Prompt Input: {custom_prompt[:200] if custom_prompt else 'None'}...\n"
+            f"Parameters: {parameters}\n"
+            f"Final Prompt to Nano Banana:\n"
+            f"{'='*50}\n"
+            f"{prompt}\n"
+            f"{'='*50}\n"
+            "=== END GENERATION PROMPT ==="
+        )
         
         # Build job record
         job_data = {

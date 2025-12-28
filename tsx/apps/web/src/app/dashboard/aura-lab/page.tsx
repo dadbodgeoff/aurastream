@@ -3,11 +3,13 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Beaker, Package, Zap, AlertCircle, Clock } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { analytics } from '@aurastream/shared';
+import { analytics, useMobileDetection } from '@aurastream/shared';
 import { toast } from '@/components/ui/Toast';
 import { downloadAsset, getAssetFilename } from '@/utils/download';
 import { PageHeader } from '@/components/navigation';
+import { PullToRefresh } from '@/components/ui/PullToRefresh';
 import {
   TestSubjectPanel,
   ElementGrid,
@@ -26,6 +28,7 @@ import {
   useAuraLabInventory,
   useAuraLabUsage,
   useAuraLabElements,
+  auraLabKeys,
 } from '@aurastream/api-client';
 
 type TabType = 'lab' | 'inventory';
@@ -55,6 +58,10 @@ export default function AuraLabPage() {
   // Selection state
   const [isSubjectLocked, setIsSubjectLocked] = useState(false);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+
+  // Mobile detection and query client for pull-to-refresh
+  const { isMobile } = useMobileDetection();
+  const queryClient = useQueryClient();
 
   // API hooks
   const setSubjectMutation = useSetSubject();
@@ -324,6 +331,14 @@ export default function AuraLabPage() {
     return `${minutes}m`;
   }, []);
 
+  // Handle pull-to-refresh for inventory tab
+  const handleRefreshInventory = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: auraLabKeys.inventory() }),
+      queryClient.invalidateQueries({ queryKey: auraLabKeys.usage() }),
+    ]);
+  }, [queryClient]);
+
   return (
     <div className="min-h-screen bg-background-base text-white">
       {/* Page Header with Breadcrumbs */}
@@ -357,7 +372,7 @@ export default function AuraLabPage() {
                 <button
                   onClick={() => setActiveTab('lab')}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+                    flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium
                     transition-all duration-200
                     ${activeTab === 'lab'
                       ? 'bg-interactive-600 text-white shadow-lg shadow-interactive-500/25'
@@ -365,13 +380,13 @@ export default function AuraLabPage() {
                     }
                   `}
                 >
-                  <Beaker className="w-4 h-4" />
-                  Lab
+                  <Beaker className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden xs:inline sm:inline">Lab</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('inventory')}
                   className={`
-                    flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+                    flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium
                     transition-all duration-200
                     ${activeTab === 'inventory'
                       ? 'bg-interactive-600 text-white shadow-lg shadow-interactive-500/25'
@@ -379,8 +394,8 @@ export default function AuraLabPage() {
                     }
                   `}
                 >
-                  <Package className="w-4 h-4" />
-                  Inventory
+                  <Package className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden xs:inline sm:inline">Inventory</span>
                   {inventory && inventory.total > 0 && (
                     <span className="px-1.5 py-0.5 text-xs rounded-full bg-background-elevated text-text-secondary">
                       {inventory.total}
@@ -405,9 +420,9 @@ export default function AuraLabPage() {
               transition={{ duration: 0.2 }}
             >
               {/* Lab Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 mb-8">
                 {/* Test Subject Panel */}
-                <div className="lg:col-span-3 h-[500px]">
+                <div className="lg:col-span-3 h-[280px] lg:h-[500px]">
                   <TestSubjectPanel
                     subjectId={labState.subjectId}
                     subjectImageUrl={labState.subjectImageUrl}
@@ -421,7 +436,7 @@ export default function AuraLabPage() {
 
                 {/* Fusion Core */}
                 <div className="lg:col-span-5">
-                  <div className="h-[500px] rounded-2xl bg-zinc-900/80 backdrop-blur-sm border-2 border-zinc-700/50 flex items-center justify-center">
+                  <div className="h-[320px] lg:h-[500px] rounded-2xl bg-zinc-900/80 backdrop-blur-sm border-2 border-zinc-700/50 flex items-center justify-center">
                     <FusionCore
                       subjectImageUrl={labState.subjectImageUrl}
                       selectedElement={selectedElement}
@@ -433,7 +448,7 @@ export default function AuraLabPage() {
                 </div>
 
                 {/* Element Grid */}
-                <div className="lg:col-span-4 h-[500px]">
+                <div className="lg:col-span-4 h-[280px] lg:h-[500px]">
                   <ElementGrid
                     elements={elements}
                     selectedElementId={selectedElementId}
@@ -486,11 +501,13 @@ export default function AuraLabPage() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
             >
-              <InventoryGallery
-                inventory={inventory}
-                isLoading={isLoadingInventory}
-                onDownload={handleDownloadInventoryItem}
-              />
+              <PullToRefresh onRefresh={handleRefreshInventory} disabled={!isMobile}>
+                <InventoryGallery
+                  inventory={inventory}
+                  isLoading={isLoadingInventory}
+                  onDownload={handleDownloadInventoryItem}
+                />
+              </PullToRefresh>
             </motion.div>
           )}
         </AnimatePresence>

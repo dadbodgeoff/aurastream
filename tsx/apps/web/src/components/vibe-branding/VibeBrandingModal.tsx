@@ -4,10 +4,11 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 
 import { analytics } from '@aurastream/shared';
 import { useAnalyzeImage, useVibeBrandingUsage } from '@aurastream/api-client';
+import { ResponsiveModal } from '@/components/ui/ResponsiveModal';
 import { UploadDropzone } from './UploadDropzone';
 import { AnalyzingTerminal } from './AnalyzingTerminal';
 import { VibeResultsDisplay } from './VibeResultsDisplay';
@@ -117,38 +118,19 @@ export function VibeBrandingModal({
     disabled: step === 'analyzing',
   });
   
-  if (!isOpen) return null;
-  
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-2xl bg-background-surface border border-border-subtle rounded-xl overflow-hidden shadow-2xl mx-4"
-      >
-        {/* Header */}
-        <div className="p-6 border-b border-border-subtle flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-interactive-500" />
-              Vibe Branding
-            </h2>
-            <p className="text-text-secondary text-sm">
-              Upload a screenshot. Extract the aesthetic.
-            </p>
-          </div>
-          <button 
-            onClick={handleClose}
-            className="p-2 text-text-tertiary hover:text-text-secondary rounded-lg hover:bg-background-elevated transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        
+    <ResponsiveModal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="Vibe Branding"
+      description="Upload a screenshot. Extract the aesthetic."
+      maxHeight="90vh"
+      className="max-w-2xl"
+    >
+      <div className="space-y-4">
         {/* Usage indicator */}
         {usage && step === 'upload' && (
-          <div className="px-6 py-2 bg-background-elevated/50 border-b border-border-subtle">
+          <div className="px-4 py-2 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 bg-background-elevated/50 border-b border-border-subtle">
             <p className="text-xs text-text-tertiary">
               {usage.remaining} of {usage.limit} analyses remaining this month
             </p>
@@ -156,7 +138,7 @@ export function VibeBrandingModal({
         )}
         
         {/* Content */}
-        <div className="p-8 min-h-[400px] flex flex-col justify-center">
+        <div className="min-h-[350px] flex flex-col justify-center">
           <AnimatePresence mode="wait">
             {step === 'upload' && (
               <UploadDropzone
@@ -204,7 +186,7 @@ export function VibeBrandingModal({
             )}
           </AnimatePresence>
         </div>
-      </motion.div>
-    </div>
+      </div>
+    </ResponsiveModal>
   );
 }
