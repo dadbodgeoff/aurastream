@@ -114,7 +114,7 @@ export function ProductHero() {
               {/* Headline - Enterprise sized */}
               <h1 
                 className={cn(
-                  "text-5xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.05]",
+                  "text-5xl sm:text-6xl lg:text-7xl font-bold text-text-primary tracking-tight leading-[1.05]",
                   "transition-all duration-700 ease-out delay-100",
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 )}
@@ -188,7 +188,7 @@ export function ProductHero() {
                   className={cn(
                     'w-full sm:w-auto inline-flex items-center justify-center gap-2',
                     'px-8 py-4 rounded-xl font-semibold text-base',
-                    'text-white hover:text-interactive-400',
+                    'text-text-primary hover:text-interactive-400',
                     'border border-border-default hover:border-interactive-500/50',
                     'hover:scale-[1.02] active:scale-[0.98]',
                     'transition-all duration-300'

@@ -4,6 +4,8 @@
  * 
  * Based on Premium UI Spec - Teal primary, professional neutrals
  * Updated: December 2025
+ * 
+ * NOTE: This is a DARK THEME app. Text colors should be light on dark backgrounds.
  */
 
 export const colors = {
@@ -88,26 +90,26 @@ export const colors = {
   
   // Backgrounds (Dark Theme) - Premium spec aligned
   background: {
-    default: '#FCFCF9',   // Cream for light mode
+    default: '#1F2121',   // Dark mode base (main app background)
     base: '#1F2121',      // Dark mode base
-    surface: '#262828',   // Dark mode surface
+    surface: '#262828',   // Dark mode surface (cards)
     elevated: '#334155',  // Elevated surfaces
     overlay: 'rgba(31, 33, 33, 0.8)',  // Modal overlay
   },
   
-  // Text - Premium spec aligned
+  // Text (Dark Theme) - Light text on dark backgrounds
   text: {
-    primary: '#131B3B',   // Charcoal - main text (light mode)
-    secondary: '#777C7C', // Medium gray - muted
-    tertiary: '#62756E',  // Slate - helper text
-    muted: '#A7A9A9',     // Light gray - very muted
-    disabled: '#777C7C',  // Disabled state at 40% opacity
-    inverse: '#FCFCF9',   // Cream for dark backgrounds
+    primary: '#FCFCF9',   // Cream - main text on dark backgrounds
+    secondary: '#A7A9A9', // Light gray - secondary text
+    tertiary: '#777C7C',  // Medium gray - helper text
+    muted: '#62756E',     // Slate - very muted text
+    disabled: 'rgba(167, 169, 169, 0.4)',  // Disabled state
+    inverse: '#131B3B',   // Charcoal for light backgrounds
   },
   
   // Borders - Premium spec aligned
   border: {
-    default: 'rgba(94, 82, 64, 0.20)',  // Premium spec card borders
+    default: 'rgba(167, 169, 169, 0.20)',  // Subtle borders for dark mode
     subtle: 'rgba(119, 124, 124, 0.30)', // Dark mode dividers
     strong: '#777C7C',
     focus: '#21808D',     // Primary color for focus
