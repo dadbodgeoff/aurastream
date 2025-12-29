@@ -124,10 +124,12 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
               } else if (data.type === 'intent_ready') {
                 setIsReady(true);
-                setRefinedDescription(data.metadata?.refinedDescription || data.metadata?.refined_description || null);
-                setConfidence(data.metadata?.confidence || 0);
+                const meta = data.metadata as Record<string, unknown> | undefined;
+                setRefinedDescription((meta?.refinedDescription || meta?.refined_description || null) as string | null);
+                setConfidence((meta?.confidence || 0) as number);
               } else if (data.type === 'done') {
-                setSessionId(data.metadata?.sessionId || data.metadata?.session_id || null);
+                const meta = data.metadata as Record<string, unknown> | undefined;
+                setSessionId((meta?.sessionId || meta?.session_id || null) as string | null);
               } else if (data.type === 'error') {
                 setError(data.content || 'An error occurred');
               }
@@ -193,8 +195,9 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
               } else if (data.type === 'intent_ready') {
                 setIsReady(true);
-                setRefinedDescription(data.metadata?.refinedDescription || data.metadata?.refined_description || null);
-                setConfidence(data.metadata?.confidence || 0);
+                const meta = data.metadata as Record<string, unknown> | undefined;
+                setRefinedDescription((meta?.refinedDescription || meta?.refined_description || null) as string | null);
+                setConfidence((meta?.confidence || 0) as number);
               }
             } catch (e) {}
           }

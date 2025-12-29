@@ -308,7 +308,7 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
       <div className="flex items-center justify-center min-h-[60vh]">
         <ErrorRecovery
           error={loadError}
-          onRetry={() => refetch()}
+          onRetry={() => { refetch(); }}
           variant="card"
           customActions={[
             {

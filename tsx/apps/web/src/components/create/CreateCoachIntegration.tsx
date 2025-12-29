@@ -195,7 +195,7 @@ function LegacyCoachIntegration({
       {/* Error Display */}
       {error && (
         <div className="px-4 py-3 bg-error-dark/10 border-t border-error-dark/20 text-error-light text-sm">
-          {error}
+          {typeof error === 'string' ? error : error.message || 'An error occurred'}
         </div>
       )}
 

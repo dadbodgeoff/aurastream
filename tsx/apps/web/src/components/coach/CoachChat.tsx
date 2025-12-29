@@ -307,8 +307,8 @@ export function CoachChat({
     setLocalError(null);
   }, []);
 
-  // Combined error
-  const displayError = localError || error;
+  // Combined error - convert to string for display
+  const displayError = localError || (error ? (typeof error === 'string' ? error : error.message || 'An error occurred') : null);
 
   // Determine if we should show empty state
   const showEmptyState = messages.length === 0;

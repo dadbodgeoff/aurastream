@@ -23,21 +23,20 @@ export type { GlassCardProps } from './GlassCard';
 export {
   Skeleton,
   SkeletonCard,
-  SkeletonList,
   SkeletonText,
-  SkeletonAvatar,
-  SkeletonAssetCard,
-  SkeletonBrandKit,
+  AssetGridSkeleton,
+  BrandKitCardSkeleton,
+  DashboardStatsSkeleton,
+  CoachMessageSkeleton,
+  TableRowSkeleton,
+  ProfileSkeleton,
+  PageSkeleton,
 } from './Skeleton';
 
 export type {
   SkeletonProps,
   SkeletonCardProps,
-  SkeletonListProps,
   SkeletonTextProps,
-  SkeletonAvatarProps,
-  SkeletonAssetCardProps,
-  SkeletonBrandKitProps,
 } from './Skeleton';
 
 // Toast notification system
