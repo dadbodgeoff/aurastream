@@ -96,23 +96,28 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   // Analytics configuration - sends events to backend API
+  // Reduced frequency to avoid performance impact
   const analyticsConfig = useMemo(() => ({
     enabled: true,
     debug: process.env.NODE_ENV === 'development',
     endpoint: `${API_BASE}/api/v1/analytics`,
-    batchSize: 10,
-    flushInterval: 30000, // 30 seconds
+    batchSize: 50,  // Larger batches, fewer requests
+    flushInterval: 60000, // 60 seconds instead of 30
     persistQueue: true,
   }), []);
+
+  // Disable enterprise analytics in production for now - causing performance issues
+  const enableEnterpriseAnalytics = process.env.NODE_ENV === 'development';
 
   return (
     <QueryClientProvider client={queryClient}>
       <EnterpriseAnalyticsProvider
         endpoint={`${API_BASE}/api/v1/enterprise-analytics`}
         debug={process.env.NODE_ENV === 'development'}
-        trackClicks={true}
-        trackScrollDepth={true}
+        trackClicks={false}  // Disable click heatmaps - too many events
+        trackScrollDepth={false}  // Disable scroll tracking
         trackTimeOnPage={true}
+        disabled={!enableEnterpriseAnalytics}  // Disable in production
       >
         <AnalyticsWrapper config={analyticsConfig}>
           <GlobalErrorHandler>
