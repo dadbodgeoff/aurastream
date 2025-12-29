@@ -101,7 +101,7 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
               Describe your asset
             </label>
             <div className="relative">
-              <div className="w-full px-4 py-3 rounded-lg bg-background-base border border-border-default text-sm text-text-primary min-h-[44px] flex items-center transition-all duration-300 focus-within:border-interactive-500/50 focus-within:ring-2 focus-within:ring-interactive-500/20">
+              <div className="w-full px-4 py-3 rounded-lg bg-background-base border border-border-default text-sm text-white min-h-[44px] flex items-center transition-all duration-300 focus-within:border-interactive-500/50 focus-within:ring-2 focus-within:ring-interactive-500/20">
                 <span className="truncate">{displayText}</span>
                 <span className={cn(
                   "ml-0.5 w-0.5 h-5 bg-interactive-500 transition-opacity",
