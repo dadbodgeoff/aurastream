@@ -29,7 +29,7 @@ export function LogoOptionsPanel({
   onSizeChange,
 }: LogoOptionsPanelProps) {
   return (
-    <div className="p-5 bg-background-surface/50 border border-border-subtle rounded-xl space-y-4">
+    <div className="p-6 bg-background-surface/50 border border-border-subtle rounded-xl space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-medium text-text-primary">Include Logo</h3>

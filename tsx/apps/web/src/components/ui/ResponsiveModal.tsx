@@ -66,6 +66,11 @@ import { useMobileDetection, useReducedMotion } from '@aurastream/shared';
 
 /**
  * Props for the ResponsiveModal component.
+ * 
+ * Default sizing:
+ * - Desktop: max-w-lg (512px) - Override via className prop
+ * - Mobile: Full width bottom sheet
+ * - Padding: p-4 (mobile) / p-6 (desktop) - Responsive pattern
  */
 export interface ResponsiveModalProps {
   /** Whether the modal is open */

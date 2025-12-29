@@ -1,172 +1,186 @@
 """
-Usage tracking route handlers for Aurastream.
+Usage Limits API Routes.
 
-This module implements usage statistics endpoints:
-- GET /usage - Get current usage stats and limits
-
-Provides tier-aware usage information for the frontend
-to display quotas and limits to users.
+Endpoints for checking and displaying usage limits.
 """
 
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
 
 from backend.api.middleware.auth import get_current_user
-from backend.api.schemas.usage import UsageStatsResponse
 from backend.services.jwt_service import TokenPayload
-from backend.database.supabase_client import get_supabase_client
+from backend.services.usage_limit_service import get_usage_limit_service
 
 
 router = APIRouter()
 
 
 # =============================================================================
-# Tier Configuration
+# Response Models
 # =============================================================================
 
-TIER_CONFIG = {
-    "free": {
-        "display": "Free",
-        "generations_limit": 3,  # 3 free generations total + 1 coach trial
-        "coach_messages_per_session": 10,
-        "coach_available": False,  # Only via trial
-        "upgrade_benefits": [
-            "50 generations per month",
-            "Full Prompt Coach access",
-            "Priority generation queue",
-            "Advanced brand kit features"
-        ]
-    },
-    "pro": {
-        "display": "Pro",
-        "generations_limit": 50,  # 50 per month
-        "coach_messages_per_session": 10,
-        "coach_available": True,  # Full coach access
-        "upgrade_benefits": [
-            "Unlimited generations",
-            "Game context grounding",
-            "Priority support",
-            "Custom brand guidelines"
-        ]
-    },
-    "studio": {
-        "display": "Studio",
-        "generations_limit": -1,  # Unlimited
-        "coach_messages_per_session": 10,
-        "coach_available": True,
-        "upgrade_benefits": []  # Already at top tier
-    }
-}
+class FeatureUsageResponse(BaseModel):
+    """Usage stats for a single feature."""
+    used: int
+    limit: int
+    remaining: int
+    unlimited: bool = False
+
+
+class UsageStatusResponse(BaseModel):
+    """Complete usage status response."""
+    tier: str
+    vibe_branding: FeatureUsageResponse
+    aura_lab: FeatureUsageResponse
+    coach: FeatureUsageResponse
+    creations: FeatureUsageResponse
+    profile_creator: FeatureUsageResponse
+    resets_at: Optional[str] = None
+
+
+class UsageCheckResponse(BaseModel):
+    """Response for checking a specific feature."""
+    can_use: bool
+    used: int
+    limit: int
+    remaining: int
+    tier: str
+    resets_at: Optional[str] = None
+    upgrade_message: Optional[str] = None
 
 
 # =============================================================================
-# Usage Endpoint
+# Endpoints
 # =============================================================================
 
 @router.get(
-    "",
-    response_model=UsageStatsResponse,
-    summary="Get usage statistics",
+    "/status",
+    response_model=UsageStatusResponse,
+    summary="Get usage status",
     description="""
-    Get current usage statistics and limits for the authenticated user.
+    Get complete monthly usage status for the current user.
     
     **Returns:**
-    - Current tier and display name
-    - Generations used/remaining this period
-    - Coach access status and trial info
-    - Billing period info (for paid tiers)
-    - Upgrade benefits (for non-studio tiers)
+    - tier: User's subscription tier (free, pro, studio)
+    - vibe_branding: Vibe Branding usage (used/limit/remaining)
+    - aura_lab: Aura Lab fusion usage
+    - coach: Coach session usage
+    - creations: Asset creation usage
+    - resets_at: When usage counters reset (start of next month)
     
     **Tier Limits:**
-    - Free: 3 generations total + 1 coach trial
-    - Pro: 50 generations/month + 1 coach trial
-    - Studio: Unlimited generations + full coach access
+    - Free: 1 vibe, 2 aura lab, 1 coach, 3 creations
+    - Pro: 10 vibe, 25 aura lab, unlimited coach, 50 creations
     """,
-    responses={
-        200: {"description": "Usage stats retrieved successfully"},
-        401: {"description": "Authentication required"},
-    },
 )
-async def get_usage_stats(
+async def get_usage_status(
     current_user: TokenPayload = Depends(get_current_user),
-) -> UsageStatsResponse:
-    """
-    Get current usage statistics for the authenticated user.
+) -> UsageStatusResponse:
+    """Get complete usage status for the current user."""
+    service = get_usage_limit_service()
+    status = await service.get_status(current_user.sub)
     
-    Retrieves the user's current usage against their tier limits,
-    including generation counts, coach access, and billing period info.
-    """
-    tier = current_user.tier or "free"
-    config = TIER_CONFIG.get(tier, TIER_CONFIG["free"])
+    return UsageStatusResponse(
+        tier=status.tier,
+        vibe_branding=FeatureUsageResponse(
+            used=status.vibe_branding.used,
+            limit=status.vibe_branding.limit,
+            remaining=status.vibe_branding.remaining,
+            unlimited=status.vibe_branding.limit == -1,
+        ),
+        aura_lab=FeatureUsageResponse(
+            used=status.aura_lab.used,
+            limit=status.aura_lab.limit,
+            remaining=status.aura_lab.remaining,
+            unlimited=status.aura_lab.limit == -1,
+        ),
+        coach=FeatureUsageResponse(
+            used=status.coach.used,
+            limit=status.coach.limit,
+            remaining=status.coach.remaining,
+            unlimited=status.coach.limit == -1,
+        ),
+        creations=FeatureUsageResponse(
+            used=status.creations.used,
+            limit=status.creations.limit,
+            remaining=status.creations.remaining,
+            unlimited=status.creations.limit == -1,
+        ),
+        profile_creator=FeatureUsageResponse(
+            used=status.profile_creator.used,
+            limit=status.profile_creator.limit,
+            remaining=status.profile_creator.remaining,
+            unlimited=status.profile_creator.limit == -1,
+        ),
+        resets_at=status.resets_at.isoformat() if status.resets_at else None,
+    )
+
+
+@router.get(
+    "/check/{feature}",
+    response_model=UsageCheckResponse,
+    summary="Check feature usage",
+    description="""
+    Check if user can use a specific feature.
     
-    # Get user data from database
-    db = get_supabase_client()
-    user_result = db.table("users").select(
-        "assets_generated_this_month, coach_trial_used"
-    ).eq("id", current_user.sub).single().execute()
+    **Features:**
+    - vibe_branding: Vibe Branding analysis
+    - aura_lab: Aura Lab fusion
+    - coach: Coach session
+    - creations: Asset creation
     
-    user_data = user_result.data or {}
-    generations_used = user_data.get("assets_generated_this_month", 0)
-    coach_trial_used = user_data.get("coach_trial_used", False) or False
+    **Returns:**
+    - can_use: Whether user can use the feature
+    - used/limit/remaining: Usage stats
+    - upgrade_message: Message if limit reached
+    """,
+)
+async def check_feature_usage(
+    feature: str,
+    current_user: TokenPayload = Depends(get_current_user),
+) -> UsageCheckResponse:
+    """Check if user can use a specific feature."""
+    valid_features = ["vibe_branding", "aura_lab", "coach", "creations", "profile_creator"]
+    if feature not in valid_features:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid feature. Must be one of: {', '.join(valid_features)}",
+        )
     
-    # Get subscription data for paid tiers (optional - may not exist)
-    period_start = None
-    period_end = None
-    days_remaining = None
+    service = get_usage_limit_service()
+    check = await service.check_limit(current_user.sub, feature)
     
-    if tier in ("pro", "studio"):
-        try:
-            sub_result = db.table("subscriptions").select(
-                "current_period_start, current_period_end"
-            ).eq("user_id", current_user.sub).single().execute()
-            
-            if sub_result.data:
-                sub_data = sub_result.data
-                period_start = sub_data.get("current_period_start")
-                period_end = sub_data.get("current_period_end")
-                
-                # Calculate days remaining
-                if period_end:
-                    try:
-                        end_date = datetime.fromisoformat(period_end.replace("Z", "+00:00"))
-                        now = datetime.now(end_date.tzinfo)
-                        days_remaining = max(0, (end_date - now).days)
-                    except (ValueError, TypeError):
-                        pass
-        except Exception:
-            # Subscription record may not exist, that's okay
-            pass
+    # Build upgrade message if limit reached
+    upgrade_message = None
+    if not check.can_use:
+        feature_names = {
+            "vibe_branding": "Vibe Branding analyses",
+            "aura_lab": "Aura Lab fusions",
+            "coach": "Coach sessions",
+            "creations": "asset creations",
+            "profile_creator": "profile picture/logo creations",
+        }
+        feature_name = feature_names.get(feature, feature)
+        
+        if check.tier == "free":
+            upgrade_message = (
+                f"You've used all {check.limit} {feature_name} this month. "
+                "Upgrade to Pro for more!"
+            )
+        else:
+            upgrade_message = (
+                f"You've reached your monthly limit of {check.limit} {feature_name}. "
+                "Your usage resets at the start of next month."
+            )
     
-    # Calculate remaining and percentage
-    limit = config["generations_limit"]
-    if limit == -1:
-        remaining = -1
-        percentage = 0.0
-    else:
-        remaining = max(0, limit - generations_used)
-        percentage = min(100.0, (generations_used / limit) * 100) if limit > 0 else 0.0
-    
-    # Determine coach availability
-    coach_available = config["coach_available"]
-    coach_trial_available = not coach_available and not coach_trial_used
-    
-    # If trial is available, coach is effectively available
-    effective_coach_available = coach_available or coach_trial_available
-    
-    return UsageStatsResponse(
-        tier=tier,
-        tier_display=config["display"],
-        generations_used=generations_used,
-        generations_limit=limit,
-        generations_remaining=remaining,
-        generations_percentage=round(percentage, 2),
-        coach_available=effective_coach_available,
-        coach_messages_per_session=config["coach_messages_per_session"],
-        coach_trial_available=coach_trial_available,
-        coach_trial_used=coach_trial_used,
-        period_start=period_start,
-        period_end=period_end,
-        days_remaining=days_remaining,
-        can_upgrade=tier != "studio",
-        upgrade_benefits=config["upgrade_benefits"],
+    return UsageCheckResponse(
+        can_use=check.can_use,
+        used=check.used,
+        limit=check.limit,
+        remaining=check.remaining,
+        tier=check.tier,
+        resets_at=check.resets_at.isoformat() if check.resets_at else None,
+        upgrade_message=upgrade_message,
     )

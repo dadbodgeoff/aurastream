@@ -19,7 +19,7 @@ import { useReducedMotion } from '@aurastream/shared';
 export interface DashboardStatsSkeletonProps {
   /** Number of stat cards to render (default: 4) */
   count?: number;
-  /** Whether to use brand-colored shimmer (purple tint) */
+  /** Whether to use brand-colored shimmer (teal tint) */
   brandColored?: boolean;
   /** Additional CSS classes */
   className?: string;
@@ -46,7 +46,7 @@ const StatCardSkeleton = memo(function StatCardSkeleton({
   return (
     <div
       aria-hidden="true"
-      className="bg-background-surface/50 border border-border-subtle rounded-xl p-5"
+      className="bg-background-surface/50 border border-border-subtle rounded-xl p-6"
     >
       {/* Header with icon and trend */}
       <div className="flex items-start justify-between mb-3">

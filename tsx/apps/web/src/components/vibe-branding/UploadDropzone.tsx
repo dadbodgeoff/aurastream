@@ -22,7 +22,7 @@ export function UploadDropzone({
       {...getRootProps()}
       className={`
         relative cursor-pointer rounded-xl border-2 border-dashed p-12
-        transition-all duration-200 ease-out
+        transition-all duration-200 ease-standard
         ${isDragActive 
           ? 'border-interactive-500 bg-interactive-500/10 scale-[1.02]' 
           : 'border-border-default hover:border-border-strong hover:bg-background-elevated/50'
@@ -79,7 +79,7 @@ export function UploadDropzone({
           animate={{ opacity: 1 }}
           className="absolute inset-0 rounded-xl pointer-events-none"
           style={{
-            boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)',
+            boxShadow: '0 0 30px rgba(33, 128, 141, 0.3)',
           }}
         />
       )}

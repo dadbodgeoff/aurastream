@@ -18,12 +18,42 @@ export interface JobCardProps {
   className?: string;
 }
 
-const statusConfig: Record<JobStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode }> = {
-  queued: { label: 'Queued', color: 'text-text-muted', bgColor: 'bg-background-elevated', icon: <ClockIcon size="sm" /> },
-  processing: { label: 'Processing', color: 'text-interactive-600', bgColor: 'bg-interactive-600/10', icon: <SpinnerIcon size="sm" /> },
-  completed: { label: 'Completed', color: 'text-emerald-500', bgColor: 'bg-emerald-500/10', icon: <CheckIcon size="sm" /> },
-  failed: { label: 'Failed', color: 'text-red-500', bgColor: 'bg-red-500/10', icon: <XIcon size="sm" /> },
-  partial: { label: 'Partial', color: 'text-amber-500', bgColor: 'bg-amber-500/10', icon: <CheckIcon size="sm" /> },
+const statusConfig: Record<JobStatus, { label: string; color: string; bgColor: string; icon: React.ReactNode; borderColor: string }> = {
+  queued: { 
+    label: 'Queued', 
+    color: 'text-text-muted', 
+    bgColor: 'bg-background-elevated', 
+    borderColor: 'border-border-subtle',
+    icon: <ClockIcon size="sm" /> 
+  },
+  processing: { 
+    label: 'Processing', 
+    color: 'text-interactive-500', 
+    bgColor: 'bg-interactive-500/10', 
+    borderColor: 'border-interactive-500/30',
+    icon: <SpinnerIcon size="sm" /> 
+  },
+  completed: { 
+    label: 'Completed', 
+    color: 'text-emerald-500', 
+    bgColor: 'bg-emerald-500/10', 
+    borderColor: 'border-emerald-500/30',
+    icon: <CheckIcon size="sm" /> 
+  },
+  failed: { 
+    label: 'Failed', 
+    color: 'text-red-500', 
+    bgColor: 'bg-red-500/10', 
+    borderColor: 'border-red-500/30',
+    icon: <XIcon size="sm" /> 
+  },
+  partial: { 
+    label: 'Partial', 
+    color: 'text-amber-500', 
+    bgColor: 'bg-amber-500/10', 
+    borderColor: 'border-amber-500/30',
+    icon: <CheckIcon size="sm" /> 
+  },
 };
 
 function formatAssetType(type: string | undefined | null): string {
@@ -31,11 +61,23 @@ function formatAssetType(type: string | undefined | null): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-function formatDate(date: string | Date | undefined | null): string {
+function formatRelativeTime(date: string | Date | undefined | null): string {
   if (!date) return 'Recently';
   const d = typeof date === 'string' ? new Date(date) : date;
   if (isNaN(d.getTime())) return 'Recently';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function JobCard({
@@ -56,22 +98,34 @@ export function JobCard({
     <button
       onClick={onClick}
       className={cn(
-        'w-full text-left p-4 rounded-xl border border-border-subtle bg-background-surface/50 hover:border-border-default transition-all',
+        'w-full text-left p-4 rounded-xl border bg-background-surface/50',
+        'shadow-sm hover:shadow-md transition-all duration-200 ease-standard',
+        'hover:scale-[1.01] active:scale-[0.99]',
+        config.borderColor,
+        'hover:border-border-default',
         className
       )}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', config.bgColor, config.color)}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={cn(
+            'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+            config.bgColor, 
+            config.color
+          )}>
             {config.icon}
           </div>
-          <div>
-            <h3 className="font-medium text-text-primary">{formatAssetType(assetType)}</h3>
-            <p className="text-sm text-text-muted mt-0.5">{formatDate(createdAt)}</p>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-text-primary truncate">{formatAssetType(assetType)}</h3>
+            <p className="text-xs text-text-muted mt-0.5">{formatRelativeTime(createdAt)}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={cn('px-2 py-1 text-xs font-medium rounded-full', config.bgColor, config.color)}>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={cn(
+            'px-2.5 py-1 text-xs font-semibold rounded-full',
+            config.bgColor, 
+            config.color
+          )}>
             {config.label}
           </span>
           <ChevronRightIcon size="sm" className="text-text-muted" />
@@ -103,15 +157,15 @@ export function JobCard({
 
       {/* Completed Info */}
       {status === 'completed' && (
-        <div className="mt-3 flex items-center justify-between text-sm">
+        <div className="mt-3 flex items-center justify-between text-xs">
           {assetsCount !== undefined && (
-            <span className="text-text-muted">
+            <span className="text-text-secondary font-medium">
               {assetsCount} asset{assetsCount !== 1 ? 's' : ''} generated
             </span>
           )}
           {completedAt && (
             <span className="text-text-muted">
-              Completed {formatDate(completedAt)}
+              {formatRelativeTime(completedAt)}
             </span>
           )}
         </div>

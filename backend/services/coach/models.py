@@ -115,6 +115,9 @@ class CoachSession:
     # Brand aesthetic (cached from initial analysis)
     brand_aesthetic: Optional[Dict[str, Any]] = None
     
+    # Generic metadata for extensions (e.g., profile creator)
+    metadata: Optional[Dict[str, Any]] = None
+    
     # Timestamps
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     updated_at: float = field(default_factory=lambda: datetime.now().timestamp())
@@ -231,6 +234,7 @@ class CoachSession:
             "prompt_history": [p.to_dict() for p in self.prompt_history],
             "current_prompt_draft": self.current_prompt_draft,
             "brand_aesthetic": self.brand_aesthetic,
+            "metadata": self.metadata,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -271,6 +275,7 @@ class CoachSession:
             prompt_history=prompt_history,
             current_prompt_draft=data.get("current_prompt_draft"),
             brand_aesthetic=data.get("brand_aesthetic"),
+            metadata=data.get("metadata"),
             created_at=data.get("created_at", datetime.now().timestamp()),
             updated_at=data.get("updated_at", datetime.now().timestamp()),
         )

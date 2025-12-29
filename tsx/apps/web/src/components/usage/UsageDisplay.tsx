@@ -4,7 +4,7 @@
  * UsageDisplay Component
  * 
  * A sleek, enterprise-grade usage tracking display that shows
- * generation limits, coach access, and tier information.
+ * all 4 feature limits: Vibe Branding, Aura Lab, Coach, and Creations.
  * 
  * @module usage/UsageDisplay
  */
@@ -12,8 +12,7 @@
 import React, { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { useReducedMotion } from '@aurastream/shared';
-import { useUsageStats } from '../../hooks/useUsageStats';
-import type { UsageStats } from '@aurastream/api-client/src/types/usage';
+import { useUsageLimits, FEATURE_CONFIG, type FeatureType } from '@aurastream/api-client';
 
 // ============================================================================
 // Type Definitions
@@ -42,11 +41,15 @@ const SparklesIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const ImageIcon = ({ className }: { className?: string }) => (
+const PaletteIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <polyline points="21,15 16,10 5,21" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+  </svg>
+);
+
+const FlaskIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
   </svg>
 );
 
@@ -56,15 +59,17 @@ const ChatIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const ArrowUpIcon = ({ className }: { className?: string }) => (
+const ImageIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <polyline points="21,15 16,10 5,21" />
   </svg>
 );
 
-const CheckIcon = ({ className }: { className?: string }) => (
+const ArrowUpIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
   </svg>
 );
 
@@ -74,200 +79,158 @@ const InfinityIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const UserIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+  </svg>
+);
+
+// Feature icon mapping
+const FeatureIcons: Record<FeatureType, React.FC<{ className?: string }>> = {
+  vibeBranding: PaletteIcon,
+  auraLab: FlaskIcon,
+  coach: ChatIcon,
+  creations: ImageIcon,
+  profileCreator: UserIcon,
+};
+
+// Feature color mapping
+const FeatureColors: Record<FeatureType, { bg: string; text: string; bar: string }> = {
+  vibeBranding: { bg: 'bg-purple-500/20', text: 'text-purple-400', bar: 'bg-purple-500' },
+  auraLab: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', bar: 'bg-cyan-500' },
+  coach: { bg: 'bg-amber-500/20', text: 'text-amber-400', bar: 'bg-amber-500' },
+  creations: { bg: 'bg-green-500/20', text: 'text-green-400', bar: 'bg-green-500' },
+  profileCreator: { bg: 'bg-pink-500/20', text: 'text-pink-400', bar: 'bg-pink-500' },
+};
+
 // ============================================================================
 // Sub-Components
 // ============================================================================
 
 interface TierBadgeProps {
-  tier: UsageStats['tier'];
-  tierDisplay: string;
+  tier: string;
 }
 
-const TierBadge = memo(function TierBadge({ tier, tierDisplay }: TierBadgeProps) {
-  const colors = {
+const TierBadge = memo(function TierBadge({ tier }: TierBadgeProps) {
+  const colors: Record<string, string> = {
     free: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
     pro: 'bg-interactive-600/10 text-interactive-400 border-interactive-500/30',
     studio: 'bg-accent-600/10 text-accent-400 border-accent-500/30',
   };
 
+  const display = tier === 'free' ? 'Free' : tier === 'pro' ? 'Pro' : 'Studio';
+
   return (
     <span className={cn(
-      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border',
-      colors[tier]
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border',
+      colors[tier] || colors.free
     )}>
-      {tier === 'studio' && <SparklesIcon className="w-3 h-3" />}
-      {tierDisplay}
+      {tier === 'studio' && <SparklesIcon className="w-2.5 h-2.5" />}
+      {display}
     </span>
   );
 });
 
 TierBadge.displayName = 'TierBadge';
 
-interface ProgressRingProps {
-  percentage: number;
-  size?: number;
-  strokeWidth?: number;
-  isUnlimited?: boolean;
-}
-
-const ProgressRing = memo(function ProgressRing({
-  percentage,
-  size = 48,
-  strokeWidth = 4,
-  isUnlimited = false,
-}: ProgressRingProps) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (percentage / 100) * circumference;
-
-  // Color based on usage
-  const getColor = () => {
-    if (isUnlimited) return 'stroke-accent-500';
-    if (percentage >= 100) return 'stroke-red-500';
-    if (percentage >= 80) return 'stroke-yellow-500';
-    return 'stroke-interactive-500';
-  };
-
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90" width={size} height={size}>
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-white/10"
-        />
-        {/* Progress circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={isUnlimited ? 0 : offset}
-          className={cn('transition-all duration-500', getColor())}
-        />
-      </svg>
-      {/* Center content */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        {isUnlimited ? (
-          <InfinityIcon className="w-5 h-5 text-accent-400" />
-        ) : (
-          <span className={cn(
-            'text-xs font-bold',
-            percentage >= 100 ? 'text-red-400' : percentage >= 80 ? 'text-yellow-400' : 'text-text-primary'
-          )}>
-            {Math.round(percentage)}%
-          </span>
-        )}
-      </div>
-    </div>
-  );
-});
-
-ProgressRing.displayName = 'ProgressRing';
-
-interface UsageBarProps {
+interface FeatureUsageBarProps {
+  feature: FeatureType;
   used: number;
   limit: number;
-  label: string;
-  icon: React.ReactNode;
+  unlimited: boolean;
 }
 
-const UsageBar = memo(function UsageBar({ used, limit, label, icon }: UsageBarProps) {
-  const isUnlimited = limit === -1;
-  const percentage = isUnlimited ? 0 : Math.min(100, (used / limit) * 100);
+const FeatureUsageBar = memo(function FeatureUsageBar({ 
+  feature, 
+  used, 
+  limit, 
+  unlimited 
+}: FeatureUsageBarProps) {
+  const config = FEATURE_CONFIG[feature];
+  const colors = FeatureColors[feature];
+  const Icon = FeatureIcons[feature];
+  
+  const percentage = unlimited ? 100 : limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+  const remaining = unlimited ? Infinity : Math.max(0, limit - used);
+  const isAtLimit = !unlimited && remaining === 0;
   
   const getBarColor = () => {
-    if (isUnlimited) return 'bg-accent-500';
-    if (percentage >= 100) return 'bg-red-500';
+    if (unlimited) return colors.bar;
+    if (isAtLimit) return 'bg-red-500';
     if (percentage >= 80) return 'bg-yellow-500';
-    return 'bg-interactive-500';
+    return colors.bar;
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-text-secondary">
-          {icon}
-          <span>{label}</span>
+        <div className="flex items-center gap-2">
+          <div className={cn('w-5 h-5 rounded flex items-center justify-center', colors.bg)}>
+            <Icon className={cn('w-3 h-3', colors.text)} />
+          </div>
+          <div>
+            <span className="text-xs font-medium text-text-primary">{config.label}</span>
+          </div>
         </div>
-        <span className="text-sm font-medium text-text-primary">
-          {isUnlimited ? (
+        <span className="text-xs font-medium text-text-primary">
+          {unlimited ? (
             <span className="flex items-center gap-1">
-              {used} <InfinityIcon className="w-4 h-4 text-accent-400" />
+              {used} <InfinityIcon className="w-3 h-3 text-accent-400" />
             </span>
           ) : (
-            `${used} / ${limit}`
+            <span className={isAtLimit ? 'text-red-400' : ''}>
+              {used} / {limit}
+            </span>
           )}
         </span>
       </div>
-      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-1 bg-white/5 rounded-full overflow-hidden">
         <div
           className={cn('h-full rounded-full transition-all duration-500', getBarColor())}
-          style={{ width: isUnlimited ? '100%' : `${percentage}%` }}
+          style={{ width: `${percentage}%` }}
         />
       </div>
     </div>
   );
 });
 
-UsageBar.displayName = 'UsageBar';
+FeatureUsageBar.displayName = 'FeatureUsageBar';
 
-interface CoachStatusProps {
-  available: boolean;
-  trialAvailable: boolean;
-  trialUsed: boolean;
-  messagesPerSession: number;
+interface CompactFeatureProps {
+  feature: FeatureType;
+  used: number;
+  limit: number;
+  unlimited: boolean;
 }
 
-const CoachStatus = memo(function CoachStatus({
-  available,
-  trialAvailable,
-  trialUsed,
-  messagesPerSession,
-}: CoachStatusProps) {
+const CompactFeature = memo(function CompactFeature({ 
+  feature, 
+  used, 
+  limit, 
+  unlimited 
+}: CompactFeatureProps) {
+  const colors = FeatureColors[feature];
+  const Icon = FeatureIcons[feature];
+  const remaining = unlimited ? Infinity : Math.max(0, limit - used);
+  const isAtLimit = !unlimited && remaining === 0;
+
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
-      <div className="flex items-center gap-3">
-        <div className={cn(
-          'w-10 h-10 rounded-lg flex items-center justify-center',
-          available ? 'bg-accent-500/20' : 'bg-white/10'
-        )}>
-          <ChatIcon className={cn('w-5 h-5', available ? 'text-accent-400' : 'text-text-tertiary')} />
-        </div>
-        <div>
-          <p className="text-sm font-medium text-text-primary">Prompt Coach</p>
-          <p className="text-xs text-text-tertiary">
-            {available ? (
-              trialAvailable ? '1 free trial session' : `${messagesPerSession} messages/session`
-            ) : (
-              trialUsed ? 'Trial used' : 'Studio only'
-            )}
-          </p>
-        </div>
+    <div className="flex items-center gap-1">
+      <div className={cn('w-4 h-4 rounded flex items-center justify-center', colors.bg)}>
+        <Icon className={cn('w-2.5 h-2.5', colors.text)} />
       </div>
-      <div className={cn(
-        'px-2 py-1 rounded text-xs font-medium',
-        available 
-          ? trialAvailable 
-            ? 'bg-yellow-500/20 text-yellow-400' 
-            : 'bg-green-500/20 text-green-400'
-          : 'bg-white/10 text-text-tertiary'
-      )}>
-        {available ? (trialAvailable ? 'Trial' : 'Active') : 'Locked'}
-      </div>
+      <span className={cn('text-[10px] font-medium', isAtLimit ? 'text-red-400' : 'text-text-primary')}>
+        {unlimited ? (
+          <InfinityIcon className="w-2.5 h-2.5 inline text-accent-400" />
+        ) : (
+          remaining
+        )}
+      </span>
     </div>
   );
 });
 
-CoachStatus.displayName = 'CoachStatus';
+CompactFeature.displayName = 'CompactFeature';
 
 // ============================================================================
 // Loading Skeleton
@@ -278,13 +241,17 @@ const UsageSkeleton = memo(function UsageSkeleton() {
     <div className="animate-pulse space-y-4">
       <div className="flex items-center justify-between">
         <div className="h-6 w-20 bg-white/10 rounded-full" />
-        <div className="h-12 w-12 bg-white/10 rounded-full" />
+        <div className="h-4 w-32 bg-white/10 rounded" />
       </div>
-      <div className="space-y-2">
-        <div className="h-4 w-full bg-white/10 rounded" />
-        <div className="h-2 w-full bg-white/10 rounded-full" />
-      </div>
-      <div className="h-16 w-full bg-white/10 rounded-lg" />
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="space-y-2">
+          <div className="flex justify-between">
+            <div className="h-4 w-24 bg-white/10 rounded" />
+            <div className="h-4 w-12 bg-white/10 rounded" />
+          </div>
+          <div className="h-1.5 w-full bg-white/10 rounded-full" />
+        </div>
+      ))}
     </div>
   );
 });
@@ -297,7 +264,7 @@ UsageSkeleton.displayName = 'UsageSkeleton';
 
 /**
  * UsageDisplay shows the user's current usage statistics
- * in a clean, enterprise-grade design.
+ * for all 4 features in a clean, enterprise-grade design.
  * 
  * @example
  * ```tsx
@@ -316,7 +283,7 @@ export const UsageDisplay = memo(function UsageDisplay({
   testId = 'usage-display',
 }: UsageDisplayProps) {
   const prefersReducedMotion = useReducedMotion();
-  const { data, isLoading, isNearLimit, isAtLimit } = useUsageStats();
+  const { data, isLoading, canCreate, isPro } = useUsageLimits();
 
   if (isLoading) {
     return (
@@ -330,29 +297,25 @@ export const UsageDisplay = memo(function UsageDisplay({
     return null;
   }
 
-  const isUnlimited = data.generationsLimit === -1;
+  const canUpgrade = data.tier === 'free';
+  const anyAtLimit = !canCreate || 
+    (!data.vibeBranding.unlimited && data.vibeBranding.remaining === 0) ||
+    (!data.auraLab.unlimited && data.auraLab.remaining === 0) ||
+    (!data.coach.unlimited && data.coach.remaining === 0);
 
-  // Minimal variant - just the progress ring
+  // Minimal variant - just icons with remaining counts
   if (variant === 'minimal') {
     return (
       <div data-testid={testId} className={cn('flex items-center gap-3', className)}>
-        <ProgressRing 
-          percentage={data.generationsPercentage} 
-          size={36} 
-          strokeWidth={3}
-          isUnlimited={isUnlimited}
-        />
-        <div className="text-sm">
-          <span className="font-medium text-text-primary">{data.generationsUsed}</span>
-          <span className="text-text-tertiary">
-            {isUnlimited ? ' used' : ` / ${data.generationsLimit}`}
-          </span>
-        </div>
+        <CompactFeature feature="vibeBranding" {...data.vibeBranding} />
+        <CompactFeature feature="auraLab" {...data.auraLab} />
+        <CompactFeature feature="coach" {...data.coach} />
+        <CompactFeature feature="creations" {...data.creations} />
       </div>
     );
   }
 
-  // Compact variant - horizontal layout
+  // Compact variant - horizontal layout with tier badge
   if (variant === 'compact') {
     return (
       <div 
@@ -364,22 +327,16 @@ export const UsageDisplay = memo(function UsageDisplay({
         )}
       >
         <div className="flex items-center gap-3">
-          <TierBadge tier={data.tier} tierDisplay={data.tierDisplay} />
+          <TierBadge tier={data.tier} />
           <div className="h-4 w-px bg-border-default" />
           <div className="flex items-center gap-2">
-            <ImageIcon className="w-4 h-4 text-text-tertiary" />
-            <span className="text-sm text-text-primary">
-              {isUnlimited ? (
-                <span className="flex items-center gap-1">
-                  {data.generationsUsed} <InfinityIcon className="w-3 h-3 text-purple-400" />
-                </span>
-              ) : (
-                `${data.generationsRemaining} left`
-              )}
-            </span>
+            <CompactFeature feature="vibeBranding" {...data.vibeBranding} />
+            <CompactFeature feature="auraLab" {...data.auraLab} />
+            <CompactFeature feature="coach" {...data.coach} />
+            <CompactFeature feature="creations" {...data.creations} />
           </div>
         </div>
-        {showUpgrade && data.canUpgrade && (
+        {showUpgrade && canUpgrade && (
           <button
             onClick={onUpgrade}
             className={cn(
@@ -394,107 +351,97 @@ export const UsageDisplay = memo(function UsageDisplay({
     );
   }
 
-  // Full variant - detailed card
+  // Full variant - detailed card with all features
   return (
     <div 
       data-testid={testId}
       className={cn(
-        'p-5 rounded-xl',
+        'p-4 rounded-xl',
         'bg-background-surface border border-border-default',
         className
       )}
     >
       {/* Header */}
-      <div className="flex items-start justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <TierBadge tier={data.tier} tierDisplay={data.tierDisplay} />
-          {data.daysRemaining !== null && (
-            <p className="text-xs text-text-tertiary mt-2">
-              {data.daysRemaining} days remaining
+          <TierBadge tier={data.tier} />
+          {data.resetsAt && (
+            <p className="text-[10px] text-text-tertiary mt-1.5">
+              Resets {new Date(data.resetsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
           )}
         </div>
-        <ProgressRing 
-          percentage={data.generationsPercentage}
-          isUnlimited={isUnlimited}
-        />
+        {isPro && (
+          <span className="text-[10px] text-accent-400 font-medium">
+            ✨ Pro Active
+          </span>
+        )}
       </div>
 
-      {/* Usage Bar */}
-      <div className="mb-5">
-        <UsageBar
-          used={data.generationsUsed}
-          limit={data.generationsLimit}
-          label="Generations"
-          icon={<ImageIcon className="w-4 h-4" />}
-        />
+      {/* Feature Usage Bars */}
+      <div className="space-y-3">
+        <FeatureUsageBar feature="vibeBranding" {...data.vibeBranding} />
+        <FeatureUsageBar feature="auraLab" {...data.auraLab} />
+        <FeatureUsageBar feature="coach" {...data.coach} />
+        <FeatureUsageBar feature="creations" {...data.creations} />
       </div>
-
-      {/* Coach Status */}
-      <CoachStatus
-        available={data.coachAvailable}
-        trialAvailable={data.coachTrialAvailable}
-        trialUsed={data.coachTrialUsed}
-        messagesPerSession={data.coachMessagesPerSession}
-      />
 
       {/* Warning Banner */}
-      {isNearLimit && !isUnlimited && (
-        <div className={cn(
-          'mt-4 p-3 rounded-lg',
-          isAtLimit 
-            ? 'bg-red-500/10 border border-red-500/30' 
-            : 'bg-yellow-500/10 border border-yellow-500/30'
-        )}>
-          <p className={cn(
-            'text-sm font-medium',
-            isAtLimit ? 'text-red-400' : 'text-yellow-400'
-          )}>
-            {isAtLimit 
-              ? "You've reached your limit" 
-              : `${data.generationsRemaining} generation${data.generationsRemaining === 1 ? '' : 's'} remaining`
-            }
+      {anyAtLimit && (
+        <div className="mt-3 p-2.5 rounded-lg bg-red-500/10 border border-red-500/30">
+          <p className="text-xs font-medium text-red-400">
+            You've reached a limit
           </p>
-          <p className="text-xs text-text-tertiary mt-1">
-            {isAtLimit 
-              ? 'Upgrade to continue creating assets'
-              : 'Consider upgrading for more generations'
+          <p className="text-[10px] text-text-tertiary mt-0.5">
+            {canUpgrade 
+              ? 'Upgrade to Pro for more usage'
+              : 'Resets at start of next month'
             }
           </p>
         </div>
       )}
 
       {/* Upgrade CTA */}
-      {showUpgrade && data.canUpgrade && (
+      {showUpgrade && canUpgrade && (
         <button
           onClick={onUpgrade}
           className={cn(
-            'w-full mt-4 py-2.5 px-4 rounded-lg',
+            'w-full mt-3 py-2 px-3 rounded-lg',
             'bg-accent-600 hover:bg-accent-500',
-            'text-white text-sm font-medium',
-            'flex items-center justify-center gap-2',
+            'text-white text-xs font-medium',
+            'flex items-center justify-center gap-1.5',
             'transition-colors',
             !prefersReducedMotion && 'transition-transform hover:scale-[1.02]'
           )}
         >
-          <ArrowUpIcon className="w-4 h-4" />
-          Upgrade to {data.tier === 'free' ? 'Pro' : 'Studio'}
+          <ArrowUpIcon className="w-3 h-3" />
+          Upgrade to Pro
         </button>
       )}
 
-      {/* Upgrade Benefits */}
-      {showUpgrade && data.canUpgrade && data.upgradeBenefits.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border-default">
-          <p className="text-xs font-medium text-text-secondary mb-2">
-            Upgrade benefits:
+      {/* Pro Benefits */}
+      {showUpgrade && canUpgrade && (
+        <div className="mt-3 pt-3 border-t border-border-default">
+          <p className="text-[10px] font-medium text-text-secondary mb-1.5">
+            Pro includes:
           </p>
-          <ul className="space-y-1.5">
-            {data.upgradeBenefits.slice(0, 3).map((benefit, i) => (
-              <li key={i} className="flex items-center gap-2 text-xs text-text-tertiary">
-                <CheckIcon className="w-3 h-3 text-green-400 flex-shrink-0" />
-                {benefit}
-              </li>
-            ))}
+          <ul className="grid grid-cols-2 gap-1 text-[10px] text-text-tertiary">
+            <li className="flex items-center gap-1">
+              <PaletteIcon className="w-2.5 h-2.5 text-purple-400" />
+              10 Vibe Branding
+            </li>
+            <li className="flex items-center gap-1">
+              <FlaskIcon className="w-2.5 h-2.5 text-cyan-400" />
+              25 Aura Lab
+            </li>
+            <li className="flex items-center gap-1">
+              <ChatIcon className="w-2.5 h-2.5 text-amber-400" />
+              Unlimited Coach
+            </li>
+            <li className="flex items-center gap-1">
+              <ImageIcon className="w-2.5 h-2.5 text-green-400" />
+              50 Creations
+            </li>
           </ul>
         </div>
       )}

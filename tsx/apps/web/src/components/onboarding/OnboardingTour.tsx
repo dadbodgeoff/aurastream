@@ -8,7 +8,7 @@
  *
  * Features:
  * - Step-by-step guided tour
- * - AuraStream brand styling (purple/violet theme)
+ * - AuraStream brand styling (teal theme)
  * - Progress indicator
  * - Skip button with "Don't show again" option
  * - Celebration on completion
@@ -124,15 +124,15 @@ const TOUR_STEPS: TourStep[] = [
 
 /**
  * Custom CSS styles for the tour
- * Matches AuraStream brand colors (purple/violet theme)
+ * Matches AuraStream brand colors (teal theme)
  * Uses !important to override driver.js default white theme
  */
 const TOUR_STYLES = `
   .driver-popover {
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%) !important;
-    border: 1px solid rgba(139, 92, 246, 0.4) !important;
+    background: linear-gradient(135deg, #1F2121 0%, #262828 100%) !important;
+    border: 1px solid rgba(33, 128, 141, 0.4) !important;
     border-radius: 16px !important;
-    box-shadow: 0 0 60px rgba(139, 92, 246, 0.25), 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+    box-shadow: 0 0 60px rgba(33, 128, 141, 0.25), 0 8px 32px rgba(0, 0, 0, 0.5) !important;
     color: #f8fafc !important;
     max-width: 380px !important;
     padding: 1.25rem !important;
@@ -158,7 +158,7 @@ const TOUR_STYLES = `
 
   .driver-popover-progress-text {
     font-size: 0.75rem !important;
-    color: #8b5cf6 !important;
+    color: #21808D !important;
     font-weight: 500 !important;
   }
 
@@ -178,28 +178,28 @@ const TOUR_STYLES = `
   }
 
   .driver-popover-prev-btn {
-    background: rgba(139, 92, 246, 0.15) !important;
-    border: 1px solid rgba(139, 92, 246, 0.4) !important;
-    color: #c4b5fd !important;
+    background: rgba(33, 128, 141, 0.15) !important;
+    border: 1px solid rgba(33, 128, 141, 0.4) !important;
+    color: #5eead4 !important;
   }
 
   .driver-popover-prev-btn:hover {
-    background: rgba(139, 92, 246, 0.25) !important;
-    border-color: rgba(139, 92, 246, 0.6) !important;
+    background: rgba(33, 128, 141, 0.25) !important;
+    border-color: rgba(33, 128, 141, 0.6) !important;
     transform: translateY(-1px);
   }
 
   .driver-popover-next-btn {
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%) !important;
+    background: linear-gradient(135deg, #21808D 0%, #1a6b76 100%) !important;
     border: none !important;
     color: white !important;
-    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4) !important;
+    box-shadow: 0 4px 12px rgba(33, 128, 141, 0.4) !important;
   }
 
   .driver-popover-next-btn:hover {
-    background: linear-gradient(135deg, #9d6efa 0%, #8b5cf6 100%) !important;
+    background: linear-gradient(135deg, #2a9aa8 0%, #21808D 100%) !important;
     transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.5) !important;
+    box-shadow: 0 6px 16px rgba(33, 128, 141, 0.5) !important;
   }
 
   .driver-popover-close-btn {
@@ -215,7 +215,7 @@ const TOUR_STYLES = `
 
   .driver-popover-close-btn:hover {
     color: #f8fafc !important;
-    background: rgba(139, 92, 246, 0.2) !important;
+    background: rgba(33, 128, 141, 0.2) !important;
   }
 
   .driver-popover-arrow {
@@ -223,25 +223,25 @@ const TOUR_STYLES = `
   }
 
   .driver-popover-arrow-side-left.driver-popover-arrow {
-    border-right: 8px solid #0f0f1a !important;
+    border-right: 8px solid #1F2121 !important;
     border-top: 8px solid transparent !important;
     border-bottom: 8px solid transparent !important;
   }
 
   .driver-popover-arrow-side-right.driver-popover-arrow {
-    border-left: 8px solid #0f0f1a !important;
+    border-left: 8px solid #1F2121 !important;
     border-top: 8px solid transparent !important;
     border-bottom: 8px solid transparent !important;
   }
 
   .driver-popover-arrow-side-top.driver-popover-arrow {
-    border-bottom: 8px solid #0f0f1a !important;
+    border-bottom: 8px solid #1F2121 !important;
     border-left: 8px solid transparent !important;
     border-right: 8px solid transparent !important;
   }
 
   .driver-popover-arrow-side-bottom.driver-popover-arrow {
-    border-top: 8px solid #0f0f1a !important;
+    border-top: 8px solid #1F2121 !important;
     border-left: 8px solid transparent !important;
     border-right: 8px solid transparent !important;
   }
@@ -251,12 +251,12 @@ const TOUR_STYLES = `
   }
 
   .driver-active-element {
-    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.5), 0 0 30px rgba(139, 92, 246, 0.4) !important;
+    box-shadow: 0 0 0 4px rgba(33, 128, 141, 0.5), 0 0 30px rgba(33, 128, 141, 0.4) !important;
     border-radius: 12px !important;
   }
 
   .driver-popover-footer {
-    border-top: 1px solid rgba(139, 92, 246, 0.2) !important;
+    border-top: 1px solid rgba(33, 128, 141, 0.2) !important;
     padding-top: 0.75rem !important;
     margin-top: 0.75rem !important;
   }
@@ -477,10 +477,10 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
   if (showSkipModal) {
     return (
       <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div className="mx-4 w-full max-w-md rounded-2xl border border-violet-500/30 bg-gradient-to-br from-[#0f0f1a] to-[#1a1a2e] p-6 shadow-2xl shadow-violet-500/20">
+        <div className="mx-4 w-full max-w-md rounded-2xl border border-interactive-500/30 bg-gradient-to-br from-[#1F2121] to-[#262828] p-6 shadow-2xl shadow-interactive-500/20">
           {/* AuraStream Logo/Header */}
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600">
               <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
@@ -489,32 +489,32 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
           </div>
 
           <h3 className="mb-2 text-xl font-bold text-white">Skip the Tour?</h3>
-          <p className="mb-6 text-sm leading-relaxed text-slate-400">
+          <p className="mb-6 text-sm leading-relaxed text-text-secondary">
             You can always restart the tour from Settings if you change your mind.
           </p>
 
           {/* Don't show again checkbox */}
-          <label className="mb-6 flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700/50 bg-slate-800/30 p-3 transition-colors hover:border-violet-500/30 hover:bg-slate-800/50">
+          <label className="mb-6 flex cursor-pointer items-center gap-3 rounded-lg border border-border-subtle bg-background-surface/30 p-3 transition-colors hover:border-interactive-500/30 hover:bg-background-surface/50">
             <input
               type="checkbox"
               checked={neverShowChecked}
               onChange={(e) => setNeverShowChecked(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500 focus:ring-offset-0"
+              className="h-4 w-4 rounded border-border-default bg-background-surface text-interactive-500 focus:ring-interactive-500 focus:ring-offset-0"
             />
-            <span className="text-sm text-slate-300">Don&apos;t show this tour again</span>
+            <span className="text-sm text-text-secondary">Don&apos;t show this tour again</span>
           </label>
 
           {/* Action buttons */}
           <div className="flex gap-3">
             <button
               onClick={cancelSkip}
-              className="flex-1 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm font-semibold text-violet-300 transition-all hover:border-violet-500/50 hover:bg-violet-500/20"
+              className="flex-1 rounded-xl border border-interactive-500/30 bg-interactive-500/10 px-4 py-3 text-sm font-semibold text-interactive-300 transition-all hover:border-interactive-500/50 hover:bg-interactive-500/20"
             >
               Continue Tour
             </button>
             <button
               onClick={confirmSkip}
-              className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/30 transition-all hover:from-violet-500 hover:to-purple-500 hover:shadow-violet-500/40"
+              className="flex-1 rounded-xl bg-gradient-to-r from-interactive-600 to-interactive-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-interactive-500/30 transition-all hover:from-interactive-500 hover:to-interactive-600 hover:shadow-interactive-500/40"
             >
               Skip Tour
             </button>

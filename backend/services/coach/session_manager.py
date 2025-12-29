@@ -361,6 +361,47 @@ class SessionManager:
         result = await self.redis.delete(key)
         return result > 0
     
+    async def update_session_metadata(
+        self,
+        session_id: str,
+        metadata: Dict[str, Any],
+    ) -> Optional[CoachSession]:
+        """
+        Update session with additional metadata.
+        
+        Args:
+            session_id: Session UUID
+            metadata: Metadata dict to merge into session
+            
+        Returns:
+            Updated CoachSession or None if not found
+        """
+        session = await self.get(session_id)
+        if session is None:
+            return None
+        
+        # Store metadata in a dedicated field
+        if not hasattr(session, 'metadata') or session.metadata is None:
+            session.metadata = {}
+        
+        session.metadata.update(metadata)
+        session.updated_at = datetime.now().timestamp()
+        
+        await self._save(session)
+        return session
+    
+    async def get_session(self, session_id: str) -> Optional[CoachSession]:
+        """
+        Alias for get() for compatibility.
+        
+        Args:
+            session_id: Session UUID
+            
+        Returns:
+            CoachSession if found, None otherwise
+        """
+        return await self.get(session_id)
+    
     async def _save(self, session: CoachSession) -> None:
         """
         Save session to Redis with TTL and persist to PostgreSQL.

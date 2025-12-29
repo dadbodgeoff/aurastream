@@ -86,12 +86,12 @@ export const LOGO_TYPES = [
 // ============================================================================
 
 export const PRESET_PALETTES = [
-  { name: 'Ocean Blue', primary: ['#3B82F6', '#2563EB'], accent: ['#F59E0B'] },
+  { name: 'Premium Teal', primary: ['#21808D', '#247380'], accent: ['#A84F2F'] },
+  { name: 'Ocean Teal', primary: ['#32B8C6', '#21808D'], accent: ['#F59E0B'] },
   { name: 'Forest Green', primary: ['#22C55E', '#16A34A'], accent: ['#EC4899'] },
-  { name: 'Sunset Orange', primary: ['#F97316', '#EA580C'], accent: ['#3B82F6'] },
+  { name: 'Sunset Orange', primary: ['#F97316', '#EA580C'], accent: ['#21808D'] },
   { name: 'Cherry Red', primary: ['#EF4444', '#DC2626'], accent: ['#F59E0B'] },
-  { name: 'Midnight', primary: ['#1E293B', '#0F172A'], accent: ['#F59E0B'] },
-  { name: 'Royal Purple', primary: ['#7C3AED', '#6D28D9'], accent: ['#F59E0B'] },
+  { name: 'Midnight', primary: ['#1E293B', '#0F172A'], accent: ['#21808D'] },
 ];
 
 // ============================================================================
@@ -100,7 +100,7 @@ export const PRESET_PALETTES = [
 
 export const DEFAULT_IDENTITY = {
   name: '',
-  primaryColors: ['#3B82F6'],
+  primaryColors: ['#21808D'],
   accentColors: [],
   headlineFont: 'Montserrat',
   bodyFont: 'Inter',

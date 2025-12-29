@@ -72,7 +72,7 @@ function NavLink({ item, isActive, onClick }: { item: NavItem; isActive: boolean
       data-tour={item.dataTour}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium',
+        'flex items-center gap-3 px-3 py-2 min-h-11 rounded-lg text-sm font-medium',
         'transition-all duration-75',
         'active:bg-background-elevated active:scale-[0.98]',
         isActive

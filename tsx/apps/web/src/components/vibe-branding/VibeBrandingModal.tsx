@@ -127,7 +127,8 @@ export function VibeBrandingModal({
       maxHeight="90vh"
       className="max-w-2xl"
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
+        {/* Form spacing: space-y-5 (20px) for consistent vertical rhythm */}
         {/* Usage indicator */}
         {usage && step === 'upload' && (
           <div className="px-4 py-2 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 bg-background-elevated/50 border-b border-border-subtle">

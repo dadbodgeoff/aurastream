@@ -67,7 +67,10 @@ export function FilterDropdown({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 bg-background-surface border rounded-lg text-sm transition-colors',
+          'flex items-center gap-2 px-3 py-2 min-h-[44px]',
+          'bg-background-surface border rounded-lg text-sm transition-all',
+          'focus:outline-none focus:ring-2 focus:ring-interactive-500/50',
+          'active:scale-[0.98]',
           selectedValues.length > 0
             ? 'border-interactive-600 text-text-primary'
             : 'border-border-subtle text-text-secondary hover:border-border-default'
@@ -78,7 +81,7 @@ export function FilterDropdown({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-48 bg-background-surface border border-border-subtle rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto">
+        <div className="absolute top-full left-0 mt-1 w-48 bg-background-surface border border-border-subtle rounded-lg shadow-lg z-50 py-1 max-h-60 overflow-y-auto animate-in fade-in-0 zoom-in-95 duration-150">
           {options.map((option) => {
             const isSelected = selectedValues.includes(option.value);
             return (
@@ -86,7 +89,8 @@ export function FilterDropdown({
                 key={option.value}
                 onClick={() => handleSelect(option.value)}
                 className={cn(
-                  'flex items-center justify-between w-full px-3 py-2 text-sm text-left transition-colors',
+                  'flex items-center justify-between w-full px-3 py-2 min-h-[44px] text-sm text-left transition-colors',
+                  'focus:outline-none focus:bg-background-elevated',
                   isSelected
                     ? 'bg-interactive-600/10 text-interactive-600'
                     : 'text-text-primary hover:bg-background-elevated'

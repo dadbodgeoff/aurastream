@@ -242,7 +242,7 @@ function UpgradeCTA() {
           <Link
             href={UPGRADE_CTA.buttonHref}
             className={cn(
-              'inline-flex items-center gap-2 px-5 py-2.5 rounded-lg',
+              'inline-flex items-center gap-2 px-6 py-3 rounded-lg',
               'bg-accent-600 text-white font-medium',
               'hover:bg-accent-500 transition-colors',
               'focus:outline-none focus:ring-2 focus:ring-accent-600/50'

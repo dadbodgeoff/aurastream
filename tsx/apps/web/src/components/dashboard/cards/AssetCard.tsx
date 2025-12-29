@@ -13,9 +13,9 @@ export interface AssetCardProps {
   assetType: string;
   width: number;
   height: number;
-  fileSize: number;
+  fileSize: number | null | undefined;
   isPublic: boolean;
-  createdAt: string | Date;
+  createdAt: string | Date | undefined;
   selected?: boolean;
   selectable?: boolean;
   /** When true, clicking the card triggers download instead of onClick */
@@ -28,7 +28,8 @@ export interface AssetCardProps {
   className?: string;
 }
 
-function formatFileSize(bytes: number): string {
+function formatFileSize(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || isNaN(bytes)) return '';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -37,6 +38,25 @@ function formatFileSize(bytes: number): string {
 function formatAssetType(type: string | undefined | null): string {
   if (!type) return 'Asset';
   return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatRelativeTime(date: string | Date | undefined | null): string {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (!d || isNaN(d.getTime())) return '';
+  
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export function AssetCard({
@@ -119,6 +139,7 @@ export function AssetCard({
     <div
       className={cn(
         'group relative rounded-xl border overflow-hidden transition-all cursor-pointer',
+        'shadow-sm hover:shadow-md', // Elevation 1 → 2 on hover
         selected
           ? 'border-interactive-600 ring-2 ring-interactive-600/20'
           : 'border-border-subtle hover:border-border-default',
@@ -226,23 +247,33 @@ export function AssetCard({
         )}
       </AnimatePresence>
 
-      {/* Info Footer */}
+      {/* Info Footer - Enterprise styling */}
       <div className="p-3 bg-background-surface border-t border-border-subtle">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-text-primary truncate">
-            {formatAssetType(assetType)}
-          </span>
-          <span className="text-xs text-text-muted">
-            {formatFileSize(fileSize)}
-          </span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold text-text-primary truncate">
+              {formatAssetType(assetType)}
+            </span>
+            {isPublic && (
+              <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-500 rounded">
+                Public
+              </span>
+            )}
+          </div>
+          {formatFileSize(fileSize) && (
+            <span className="flex-shrink-0 text-xs font-medium text-text-tertiary">
+              {formatFileSize(fileSize)}
+            </span>
+          )}
         </div>
-        <div className="flex items-center justify-between mt-1">
-          <span className="text-xs text-text-muted">
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className="text-xs text-text-muted font-mono">
             {width}×{height}
           </span>
-          {isPublic && (
-            <span className="text-xs text-emerald-500">Public</span>
-          )}
+          <span className="text-text-muted">·</span>
+          <span className="text-xs text-text-muted">
+            {formatRelativeTime(createdAt)}
+          </span>
         </div>
       </div>
 

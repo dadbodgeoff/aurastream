@@ -48,7 +48,7 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
     >
       {/* Slides */}
       <div
-        className="flex transition-transform duration-500 ease-out"
+        className="flex transition-transform duration-500 ease-standard"
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
         {banners.map((banner) => (
@@ -56,39 +56,41 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
             key={banner.id}
             className={cn(
               'flex-shrink-0 w-full min-h-[200px] md:min-h-[280px] p-6 md:p-10 flex flex-col justify-center relative overflow-hidden',
-              banner.bgGradient
+              banner.image ? 'bg-background-base' : banner.bgGradient
             )}
           >
             {/* Background Image */}
             {banner.image && (
-              <div className="absolute inset-0 opacity-30">
-                <img src={banner.image} alt="" className="w-full h-full object-cover" />
+              <div className="absolute inset-0">
+                <img src={banner.image} alt="" className="w-full h-full object-fill" />
               </div>
             )}
             
-            {/* Content */}
-            <div className="relative z-10 max-w-lg">
-              {banner.badge && (
-                <span className="inline-block px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm rounded-full mb-3">
-                  {banner.badge}
-                </span>
-              )}
-              <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight">
-                {banner.title}
-              </h2>
-              {banner.subtitle && (
-                <p className="text-white/80 text-sm md:text-base mb-4">{banner.subtitle}</p>
-              )}
-              <a
-                href={banner.ctaHref}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-gray-900 font-semibold rounded-lg hover:bg-white/90 transition-colors"
-              >
-                {banner.ctaText}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </a>
-            </div>
+            {/* Content - hide when image has baked-in content */}
+            {!banner.image && (
+              <div className="relative z-10 max-w-lg">
+                {banner.badge && (
+                  <span className="inline-block px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm rounded-full mb-3">
+                    {banner.badge}
+                  </span>
+                )}
+                <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight">
+                  {banner.title}
+                </h2>
+                {banner.subtitle && (
+                  <p className="text-white/80 text-sm md:text-base mb-4">{banner.subtitle}</p>
+                )}
+                <a
+                  href={banner.ctaHref}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-white/90 transition-colors"
+                >
+                  {banner.ctaText}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                </a>
+              </div>
+            )}
           </div>
         ))}
       </div>

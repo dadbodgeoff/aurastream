@@ -39,8 +39,11 @@ export interface ButtonGroupProps {
 }
 
 const sizeClasses: Record<ButtonGroupSize, string> = {
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-10 px-4 text-sm',
+  // sm: 32px height, but min-h-[44px] ensures touch target compliance on mobile
+  sm: 'h-8 min-h-[44px] px-3 text-sm',
+  // md: 40px height, but min-h-[44px] ensures touch target compliance on mobile
+  md: 'h-10 min-h-[44px] px-4 text-sm',
+  // lg: 48px height already meets 44px minimum touch target
   lg: 'h-12 px-6 text-base',
 };
 

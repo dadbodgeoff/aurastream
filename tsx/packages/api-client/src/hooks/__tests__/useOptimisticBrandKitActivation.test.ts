@@ -43,7 +43,7 @@ const mockBrandKits: BrandKit[] = [
     name: 'Chill Stream',
     is_active: false,
     primary_colors: ['#10b981'],
-    accent_colors: ['#3b82f6'],
+    accent_colors: ['#21808D'],
     fonts: { headline: 'Poppins', body: 'Inter' },
     logo_url: null,
     tone: 'casual',

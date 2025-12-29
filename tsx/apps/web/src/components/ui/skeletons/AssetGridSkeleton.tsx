@@ -21,7 +21,7 @@ export interface AssetGridSkeletonProps {
   count?: number;
   /** Number of columns on desktop (default: 3) */
   columns?: number;
-  /** Whether to use brand-colored shimmer (purple tint) */
+  /** Whether to use brand-colored shimmer (teal tint) */
   brandColored?: boolean;
   /** Additional CSS classes */
   className?: string;

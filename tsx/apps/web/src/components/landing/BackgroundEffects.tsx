@@ -87,7 +87,7 @@ export function BackgroundEffects({
           <div
             className="absolute w-[800px] h-[800px] rounded-full blur-[120px] will-change-transform"
             style={{
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(33, 128, 141, 0.15) 0%, transparent 70%)',
               top: '10%',
               right: '-10%',
               transform: `translate(${orb1X}px, ${orb1Y}px)`,
@@ -97,7 +97,7 @@ export function BackgroundEffects({
           <div
             className="absolute w-[600px] h-[600px] rounded-full blur-[100px] will-change-transform"
             style={{
-              background: 'radial-gradient(circle, rgba(139, 92, 246, 0.12) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(33, 128, 141, 0.12) 0%, transparent 70%)',
               bottom: '20%',
               left: '-5%',
               transform: `translate(${orb2X}px, ${orb2Y}px)`,

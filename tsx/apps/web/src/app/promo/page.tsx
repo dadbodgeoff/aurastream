@@ -108,7 +108,7 @@ function UserBadgeDisplay({ badges }: { badges: UserBadges }) {
         </span>
       )}
       {badges.tier === 'studio' && (
-        <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-400 text-[10px] font-bold rounded flex items-center gap-0.5">
+        <span className="px-1.5 py-0.5 bg-primary-500/20 text-primary-400 text-[10px] font-bold rounded flex items-center gap-0.5">
           <Star className="w-2.5 h-2.5" /> STUDIO
         </span>
       )}

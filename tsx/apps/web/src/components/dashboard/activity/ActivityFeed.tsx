@@ -26,7 +26,7 @@ export function ActivityFeed({
 
   return (
     <div className={cn('bg-background-surface/50 border border-border-subtle rounded-xl', className)}>
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-4 py-4 border-b border-border-subtle">
         <h3 className="font-medium text-text-primary">{title}</h3>
         {showViewAll && activities.length > maxItems && (
           <button
@@ -43,7 +43,7 @@ export function ActivityFeed({
             <ActivityItem key={activity.id || index} {...activity} />
           ))
         ) : (
-          <div className="px-5 py-8 text-center text-text-muted text-sm">
+          <div className="px-4 py-8 text-center text-text-muted text-sm">
             {emptyMessage}
           </div>
         )}

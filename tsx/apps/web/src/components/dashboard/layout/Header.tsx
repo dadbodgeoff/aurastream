@@ -63,7 +63,7 @@ export function Header({ user, onLogout, className }: HeaderProps) {
           </button>
 
           {isProfileOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 bg-background-surface border border-border-subtle rounded-xl shadow-lg z-50 py-2">
+            <div className="absolute right-0 top-full mt-2 w-60 bg-background-surface border border-border-subtle rounded-xl shadow-lg z-50 py-2">
               <div className="px-4 py-3 border-b border-border-subtle">
                 <p className="font-medium text-text-primary truncate">
                   {user?.displayName || 'User'}

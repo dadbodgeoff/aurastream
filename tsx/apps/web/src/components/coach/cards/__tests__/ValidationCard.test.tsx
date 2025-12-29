@@ -115,7 +115,7 @@ describe('ValidationCard', () => {
       const issues = [createIssue({ severity: 'info', code: 'info', message: 'Info message' })];
       render(<ValidationCard result={createResult({ issues })} />);
       const listItem = screen.getByRole('listitem');
-      expect(listItem.className).toContain('bg-blue-500/10');
+      expect(listItem.className).toContain('bg-primary-500/10');
     });
   });
 

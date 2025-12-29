@@ -163,38 +163,38 @@ function BillingTab({ user }: { user: any }) {
           <div
             key={plan.id}
             className={cn(
-              'relative p-6 rounded-xl border-2 transition-colors',
+              'relative p-4 rounded-xl border-2 transition-colors',
               plan.current
                 ? 'border-interactive-600 bg-interactive-600/5'
                 : 'border-border-subtle hover:border-border-default'
             )}
           >
             {plan.recommended && (
-              <span className="absolute -top-3 left-4 px-2 py-0.5 bg-interactive-600 text-white text-xs font-medium rounded-full">
+              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-interactive-600 text-white text-[10px] font-medium rounded-full">
                 Recommended
               </span>
             )}
-            <div className="mb-4">
-              <h4 className="text-lg font-semibold text-text-primary">{plan.name}</h4>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-3xl font-bold text-text-primary">{plan.price}</span>
-                <span className="text-text-muted">/{plan.period}</span>
+            <div className="mb-3">
+              <h4 className="text-sm font-semibold text-text-primary">{plan.name}</h4>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-2xl font-bold text-text-primary">{plan.price}</span>
+                <span className="text-text-muted text-xs">/{plan.period}</span>
               </div>
             </div>
-            <ul className="space-y-2 mb-6">
+            <ul className="space-y-1.5 mb-4">
               {plan.features.map((feature, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm text-text-secondary">
-                  <CheckIcon className="w-4 h-4 text-emerald-500" />
+                <li key={i} className="flex items-center gap-2 text-xs text-text-secondary">
+                  <CheckIcon className="w-3.5 h-3.5 text-emerald-500" />
                   {feature}
                 </li>
               ))}
             </ul>
             {plan.current ? (
-              <span className="block w-full text-center py-2 text-sm font-medium text-interactive-600">
+              <span className="block w-full text-center py-1.5 text-xs font-medium text-interactive-600">
                 Current Plan
               </span>
             ) : plan.id === 'free' ? (
-              <span className="block w-full text-center py-2 text-sm font-medium text-text-muted">
+              <span className="block w-full text-center py-1.5 text-xs font-medium text-text-muted">
                 —
               </span>
             ) : (

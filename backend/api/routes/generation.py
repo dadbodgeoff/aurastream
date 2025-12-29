@@ -81,7 +81,30 @@ async def create_generation_job(
     data: GenerateRequest,
     current_user: TokenPayload = Depends(get_current_user),
 ) -> JobResponse:
-    """Create a new asset generation job."""
+    """
+    Create a new asset generation job.
+    
+    **Tier Limits:**
+    - Free: 3 creations/month
+    - Pro: 50 creations/month
+    """
+    from backend.services.usage_limit_service import get_usage_limit_service
+    
+    # Check usage limits
+    usage_service = get_usage_limit_service()
+    usage = await usage_service.check_limit(current_user.sub, "creations")
+    if not usage.can_use:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "limit_exceeded",
+                "message": f"You've used all {usage.limit} asset creations this month. Upgrade to Pro for more!",
+                "used": usage.used,
+                "limit": usage.limit,
+                "resets_at": usage.resets_at.isoformat() if usage.resets_at else None,
+            },
+        )
+    
     service = get_generation_service()
     
     try:
@@ -124,6 +147,9 @@ async def create_generation_job(
             custom_prompt=data.custom_prompt,
             parameters=parameters if parameters else None,
         )
+        
+        # Increment usage counter
+        await usage_service.increment(current_user.sub, "creations")
         
         # Enqueue job for background processing
         enqueue_generation_job(job.id, current_user.sub)

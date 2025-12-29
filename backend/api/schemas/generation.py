@@ -39,7 +39,10 @@ AssetTypeEnum = Literal[
     # Other Twitch assets
     "twitch_badge",
     "twitch_panel",
-    "twitch_offline"
+    "twitch_offline",
+    # Profile Creator assets
+    "profile_picture",
+    "streamer_logo",
 ]
 JobStatusEnum = Literal["queued", "processing", "completed", "failed", "partial"]
 LogoPositionEnum = Literal["top-left", "top-right", "bottom-left", "bottom-right", "center"]

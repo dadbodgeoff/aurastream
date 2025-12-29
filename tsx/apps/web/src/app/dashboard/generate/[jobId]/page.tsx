@@ -306,7 +306,7 @@ export default function GenerationProgressPage() {
               <div className="pt-6 border-t border-border-subtle">
                 <Link
                   href="/dashboard/quick-create"
-                  className="block w-full px-6 py-4 bg-gradient-to-r from-interactive-600 to-purple-600 hover:from-interactive-500 hover:to-purple-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="block w-full px-6 py-4 bg-gradient-to-r from-interactive-600 to-primary-600 hover:from-interactive-500 hover:to-primary-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

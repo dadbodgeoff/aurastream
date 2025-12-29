@@ -16,16 +16,17 @@ interface PlatformFilterProps {
 
 export function PlatformFilter({ selected, onChange }: PlatformFilterProps) {
   return (
-    <div className="flex gap-2 flex-wrap">
+    <div className="inline-flex gap-2 p-1 bg-background-surface/50 rounded-xl border border-border-subtle">
       {PLATFORMS.map((platform) => (
         <button
           key={platform.id}
           onClick={() => onChange(platform.id)}
           className={cn(
-            "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+            "px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+            "active:scale-[0.98]",
             selected === platform.id
-              ? "bg-interactive-600 text-white shadow-sm"
-              : "bg-background-surface text-text-secondary hover:text-text-primary hover:bg-background-elevated"
+              ? "bg-interactive-600 text-white shadow-md shadow-interactive-600/20"
+              : "text-text-secondary hover:text-text-primary hover:bg-background-elevated"
           )}
         >
           <span className="mr-2">{platform.icon}</span>

@@ -56,7 +56,7 @@ const variantClasses: Record<GlassCardVariant, string> = {
  */
 const baseClasses = cn(
   'rounded-xl overflow-hidden relative',
-  'transition-all duration-300 ease-out',
+  'transition-all duration-300 ease-standard',
 );
 
 /**

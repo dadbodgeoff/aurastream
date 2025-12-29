@@ -93,7 +93,7 @@ export function OverviewPanel({
                     <div className="flex items-center gap-3">
                       <div
                         className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                        style={{ backgroundColor: colors[0] || '#3B82F6' }}
+                        style={{ backgroundColor: colors[0] || '#21808D' }}
                       >
                         {kit.name?.charAt(0)?.toUpperCase() || '?'}
                       </div>
@@ -147,8 +147,8 @@ export function OverviewPanel({
           <div 
             className="w-20 h-20 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg flex-shrink-0"
             style={{ 
-              background: identity.primaryColors[0] || '#3B82F6',
-              boxShadow: `0 8px 32px ${identity.primaryColors[0] || '#3B82F6'}40`
+              background: identity.primaryColors[0] || '#21808D',
+              boxShadow: `0 8px 32px ${identity.primaryColors[0] || '#21808D'}40`
             }}
           >
             {identity.name ? identity.name.charAt(0).toUpperCase() : '?'}

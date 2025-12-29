@@ -130,8 +130,8 @@ const IssueItem = memo(function IssueItem({ issue, onApplyFix, animate }: IssueI
     },
     info: {
       icon: <InfoIcon className="w-4 h-4" />,
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-500/10',
+      color: 'text-primary-400',
+      bgColor: 'bg-primary-500/10',
     },
   };
 

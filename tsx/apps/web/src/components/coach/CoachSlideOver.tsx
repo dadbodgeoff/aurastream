@@ -133,7 +133,7 @@ export function CoachSlideOver({
           'w-full sm:max-w-lg',
           'bg-background-base border-l border-border-subtle',
           'flex flex-col',
-          'transform transition-transform duration-300 ease-out',
+          'transform transition-transform duration-300 ease-standard',
           'motion-reduce:duration-0',
           isOpen ? 'translate-x-0' : 'translate-x-full'
         )}

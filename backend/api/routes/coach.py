@@ -66,7 +66,7 @@ router = APIRouter()
 # =============================================================================
 
 TIER_ACCESS = {
-    "free": {"coach_access": False, "feature": "tips_only", "grounding": False},
+    "free": {"coach_access": True, "feature": "full_coach", "grounding": False},  # Limited by monthly quota
     "pro": {"coach_access": True, "feature": "full_coach", "grounding": False},
     "studio": {"coach_access": True, "feature": "full_coach", "grounding": True},
 }
@@ -76,50 +76,49 @@ def check_premium_access(tier: str) -> bool:
     """
     Check if user has premium access for full coach.
     
+    All tiers now have coach access, limited by monthly quotas.
+    
     Args:
         tier: User's subscription tier
         
     Returns:
-        bool: True if user has premium access, False otherwise
+        bool: True if user has coach access
     """
     return TIER_ACCESS.get(tier, TIER_ACCESS["free"])["coach_access"]
 
 
-async def check_free_tier_eligibility(user_id: str, tier: str) -> dict:
+async def check_usage_eligibility(user_id: str, tier: str) -> dict:
     """
-    Check if free tier user can use coach (1 session per 28 days).
+    Check if user can use coach based on monthly usage limits.
     
     Args:
         user_id: User's ID
         tier: User's subscription tier
         
     Returns:
-        dict with can_use_coach, days_remaining, next_available
+        dict with can_use_coach, remaining, limit, resets_at
     """
-    from backend.services.free_tier_service import get_free_tier_service
+    from backend.services.usage_limit_service import get_usage_limit_service
     
-    # Pro/Studio users have full access
-    if check_premium_access(tier):
-        return {"can_use_coach": True, "is_free_use": False, "days_remaining": 0, "next_available": None}
-    
-    # Check free tier usage
-    service = get_free_tier_service()
-    usage = await service.check_usage(user_id, "coach")
+    service = get_usage_limit_service()
+    check = await service.check_limit(user_id, "coach")
     
     return {
-        "can_use_coach": usage.can_use,
-        "is_free_use": True,
-        "days_remaining": usage.days_remaining,
-        "next_available": usage.next_available.isoformat() if usage.next_available else None,
+        "can_use_coach": check.can_use,
+        "is_free_tier": tier == "free",
+        "used": check.used,
+        "limit": check.limit,
+        "remaining": check.remaining,
+        "resets_at": check.resets_at.isoformat() if check.resets_at else None,
     }
 
 
-async def mark_free_tier_used(user_id: str) -> None:
-    """Mark free tier coach usage."""
-    from backend.services.free_tier_service import get_free_tier_service
+async def increment_coach_usage(user_id: str) -> None:
+    """Increment coach usage counter."""
+    from backend.services.usage_limit_service import get_usage_limit_service
     
-    service = get_free_tier_service()
-    await service.mark_used(user_id, "coach")
+    service = get_usage_limit_service()
+    await service.increment(user_id, "coach")
 
 
 # =============================================================================
@@ -223,9 +222,8 @@ async def check_access(
     """
     Check what coach features the user can access.
     
-    Returns the user's access level based on their subscription tier,
-    including whether they have full coach access and grounding capabilities.
-    Free users get 1 session every 28 days.
+    Returns the user's access level based on their subscription tier
+    and monthly usage limits.
     
     Args:
         current_user: Authenticated user's token payload
@@ -236,31 +234,35 @@ async def check_access(
     tier = current_user.tier or "free"
     access = TIER_ACCESS.get(tier, TIER_ACCESS["free"])
     
-    # Check free tier eligibility
-    free_tier_info = await check_free_tier_eligibility(current_user.sub, tier)
+    # Check usage limits
+    usage_info = await check_usage_eligibility(current_user.sub, tier)
     
     # Get rate limit status for users who can use coach
     rate_limits = None
-    if access["coach_access"] or free_tier_info["can_use_coach"]:
+    if usage_info["can_use_coach"]:
         rate_limits = get_coach_rate_limit_status(current_user.sub)
     
     # Determine effective access
-    has_access = access["coach_access"] or free_tier_info["can_use_coach"]
+    has_access = usage_info["can_use_coach"]
     
     # Build upgrade message
     upgrade_message = None
-    if not access["coach_access"]:
-        if free_tier_info["can_use_coach"]:
+    if not has_access:
+        if usage_info["is_free_tier"]:
             upgrade_message = (
-                "You have 1 free Coach session available! "
-                "Upgrade to Pro for unlimited sessions."
+                f"You've used your {usage_info['limit']} Coach session this month. "
+                "Upgrade to Pro for 50 creations/month!"
             )
         else:
-            days = free_tier_info["days_remaining"]
             upgrade_message = (
-                f"Your next free session is available in {days} days. "
-                "Upgrade to Pro for unlimited access."
+                f"You've used all {usage_info['limit']} creations this month. "
+                "Usage resets at the start of next month."
             )
+    elif usage_info["is_free_tier"] and usage_info["remaining"] > 0:
+        upgrade_message = (
+            f"You have {usage_info['remaining']} Coach session remaining this month. "
+            "Upgrade to Pro for 50 creations/month!"
+        )
     
     return CoachAccessResponse(
         has_access=has_access,
@@ -268,8 +270,8 @@ async def check_access(
         grounding=access["grounding"],
         upgrade_message=upgrade_message,
         rate_limits=rate_limits,
-        trial_available=free_tier_info.get("is_free_use", False) and free_tier_info["can_use_coach"],
-        trial_used=not free_tier_info["can_use_coach"] if free_tier_info.get("is_free_use", False) else False,
+        trial_available=usage_info["is_free_tier"] and usage_info["can_use_coach"],
+        trial_used=usage_info["is_free_tier"] and not usage_info["can_use_coach"],
     )
 
 
@@ -328,8 +330,6 @@ async def start_coach_session(
     Returns a Server-Sent Events stream with the coach's initial response,
     including prompt suggestions and validation results.
     
-    Free users get 1 session every 28 days.
-    
     Args:
         request: FastAPI request object for audit logging
         data: StartCoachRequest with brand context and user input
@@ -344,29 +344,28 @@ async def start_coach_session(
     """
     tier = current_user.tier or "free"
     
-    # Check if user can use coach (premium or free tier allowance)
-    free_tier_info = await check_free_tier_eligibility(current_user.sub, tier)
+    # Check usage limits
+    usage_info = await check_usage_eligibility(current_user.sub, tier)
     
-    if not check_premium_access(tier) and not free_tier_info["can_use_coach"]:
-        days = free_tier_info["days_remaining"]
+    if not usage_info["can_use_coach"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
-                "error": "cooldown_active",
-                "message": f"Your next free session is available in {days} days. Upgrade to Pro for unlimited access.",
+                "error": "limit_exceeded",
+                "message": f"You've used all {usage_info['limit']} Coach sessions this month. Upgrade to Pro for more!",
                 "feature": "full_coach",
-                "days_remaining": days,
-                "next_available": free_tier_info["next_available"],
+                "used": usage_info["used"],
+                "limit": usage_info["limit"],
+                "resets_at": usage_info["resets_at"],
             },
         )
     
     # Check rate limit for session creation
     await check_coach_session_rate_limit(current_user.sub)
     
-    # Mark free tier usage (before starting session)
-    is_free_session = free_tier_info.get("is_free_use", False) and free_tier_info["can_use_coach"]
-    if is_free_session:
-        await mark_free_tier_used(current_user.sub)
+    # Increment usage counter
+    is_free_tier = usage_info["is_free_tier"]
+    await increment_coach_usage(current_user.sub)
     
     coach_service = get_coach_service()
     
@@ -382,14 +381,18 @@ async def start_coach_session(
     async def event_generator():
         """Generate SSE events from coach service."""
         try:
-            # Send free tier info at start for UI feedback
-            if is_free_session:
-                free_event = json.dumps({
-                    "type": "free_session_started",
-                    "content": "This is your free session! You get 1 session every 28 days. Upgrade for unlimited access.",
-                    "metadata": {"is_free_use": True, "cooldown_days": 28},
+            # Send usage info at start for UI feedback
+            if is_free_tier:
+                usage_event = json.dumps({
+                    "type": "usage_info",
+                    "content": f"Coach session started. {usage_info['remaining'] - 1} remaining this month.",
+                    "metadata": {
+                        "is_free_tier": True,
+                        "remaining": usage_info["remaining"] - 1,
+                        "limit": usage_info["limit"],
+                    },
                 })
-                yield f"data: {free_event}\n\n"
+                yield f"data: {usage_event}\n\n"
             
             async for chunk in coach_service.start_with_context(
                 user_id=current_user.sub,
@@ -400,7 +403,7 @@ async def start_coach_session(
                 custom_mood=data.custom_mood,
                 game_id=data.game_id,
                 game_name=data.game_name,
-                tier=tier if check_premium_access(tier) else "pro",  # Grant pro-level access for free sessions
+                tier="pro" if tier in ("free", "pro") else tier,  # All users get pro-level coach access
             ):
                 event_data = json.dumps({
                     "type": chunk.type,
@@ -426,7 +429,7 @@ async def start_coach_session(
         details={
             "asset_type": data.asset_type,
             "mood": data.mood,
-            "is_free_session": is_free_session,
+            "is_free_tier": is_free_tier,
         },
         ip_address=request.client.host if request.client else None,
     )
@@ -619,7 +622,7 @@ async def get_session_state(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "upgrade_required",
-                "message": "Prompt Coach requires Studio subscription",
+                "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
     
@@ -706,7 +709,7 @@ async def end_coach_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "upgrade_required",
-                "message": "Prompt Coach requires Studio subscription",
+                "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
     
@@ -798,7 +801,7 @@ async def generate_from_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "upgrade_required",
-                "message": "Prompt Coach requires Studio subscription",
+                "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
     
@@ -908,7 +911,7 @@ async def get_session_assets(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "upgrade_required",
-                "message": "Prompt Coach requires Studio subscription",
+                "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
     
@@ -974,7 +977,7 @@ async def list_sessions(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "upgrade_required",
-                "message": "Prompt Coach requires Studio subscription",
+                "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
     

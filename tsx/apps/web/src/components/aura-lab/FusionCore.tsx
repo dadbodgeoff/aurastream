@@ -77,7 +77,7 @@ export function FusionCore({
             <motion.div
               className="absolute inset-0 rounded-full"
               style={{
-                background: `conic-gradient(from 0deg, transparent, ${isFusing ? 'rgba(59, 130, 246, 0.8)' : 'rgba(59, 130, 246, 0.4)'}, transparent)`,
+                background: `conic-gradient(from 0deg, transparent, ${isFusing ? 'rgba(33, 128, 141, 0.8)' : 'rgba(33, 128, 141, 0.4)'}, transparent)`,
               }}
               animate={{ rotate: 360 }}
               transition={{

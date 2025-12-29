@@ -11,32 +11,34 @@ interface ToneSelectorProps {
 
 export function ToneSelector({ value, onChange }: ToneSelectorProps) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
       {ALL_TONE_OPTIONS.map((tone) => (
         <button
           key={tone.value}
           type="button"
           onClick={() => onChange(tone.value)}
           className={cn(
-            "relative p-4 rounded-xl border-2 text-left transition-all duration-200",
+            "relative p-3 rounded-lg border-2 text-left transition-all duration-200",
             value === tone.value
               ? "border-interactive-600 bg-interactive-600/10"
               : "border-border-subtle hover:border-border-default bg-background-elevated/30"
           )}
         >
-          <span className="text-2xl mb-2 block">{tone.emoji}</span>
-          <p className={cn(
-            "font-medium text-sm",
-            value === tone.value ? "text-interactive-600" : "text-text-primary"
-          )}>
-            {tone.label}
-          </p>
-          <p className="text-xs text-text-tertiary mt-0.5">{tone.description}</p>
           {value === tone.value && (
-            <div className="absolute top-2 right-2 w-5 h-5 bg-interactive-600 rounded-full flex items-center justify-center text-white">
+            <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-interactive-600 rounded-full flex items-center justify-center text-white">
               <CheckIcon />
             </div>
           )}
+          <div className="flex items-center gap-2">
+            <span className="text-base">{tone.emoji}</span>
+            <p className={cn(
+              "font-medium text-sm",
+              value === tone.value ? "text-interactive-600" : "text-text-primary"
+            )}>
+              {tone.label}
+            </p>
+          </div>
+          <p className="text-[11px] text-text-tertiary mt-1 line-clamp-1">{tone.description}</p>
         </button>
       ))}
     </div>

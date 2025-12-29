@@ -340,7 +340,7 @@ export const SkeletonBrandKit = memo(function SkeletonBrandKit({
     <div
       aria-hidden="true"
       className={cn(
-        'bg-background-surface/50 border border-border-subtle rounded-xl p-5',
+        'bg-background-surface/50 border border-border-subtle rounded-xl p-6',
         className
       )}
     >

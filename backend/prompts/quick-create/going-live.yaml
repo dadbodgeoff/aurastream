@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: going-live
-version: "1.0.0"
+version: "1.1.0"
 category: stream
 asset_type: story_graphic
 dimensions:
@@ -14,34 +14,99 @@ vibes:
   pro:
     name: "Pro Aesthetic"
     prompt: |
-      A vertical 9:16 high-end photography shot of a professional streamer's setup at night. Foreground: A high-detail blurred view of a mechanical keyboard and a high-end microphone. Center: A floating frosted-glass UI panel with sharp white text reading '{title}'. Below it, the game '{game}' is displayed in a minimalist tag. Lighting: Soft teal and pink 'Gamer-Glow' from Nanoleafs in the background. Cinematic bokeh, ray-traced reflections, 8k resolution.
+      A vertical 9:16 high-end photography shot of a professional streamer's setup at night. Foreground: A high-detail blurred view of a mechanical keyboard and a high-end microphone. Center: A floating frosted-glass UI panel with sharp white text reading '{title}'. Below it, the game '{game}' is displayed in a minimalist tag. Lighting: Soft {accent_color} 'Gamer-Glow' from Nanoleafs in the background. Cinematic bokeh, ray-traced reflections, 8k resolution.
   
   anime:
     name: "Anime Hype"
     prompt: |
-      A vertical 9:16 cinematic anime-style illustration. A stylized character representing the streamer in a dynamic heroic pose, surrounded by glowing energy auras matching the world of {game}. Massive, stylized block typography at the top reads '{title}'. A digital clock-font at the bottom reads '{time}'. Vibrant cel-shaded colors, dramatic speed lines, high-octane energy, Ufotable studio art style.
+      A vertical 9:16 cinematic anime-style illustration. {character_description} in a dynamic heroic pose, surrounded by glowing energy auras matching the world of {game}. Massive, stylized block typography at the top reads '{title}'. A digital clock-font at the bottom reads '{time}'. Vibrant cel-shaded colors, dramatic speed lines, high-octane energy, Ufotable studio art style. {accent_color} energy effects.
   
   playful:
     name: "3D Toy"
     prompt: |
-      A vertical 9:16 3D render of a custom designer vinyl toy figurine of a streamer holding a {game} weapon. The figurine is in a high-gloss finish. The background is a vibrant, solid color studio. Floating 3D bubble letters in the air spell out '{title}'. A small 3D 'LIVE' tag shows '{time}'. Soft studio lighting, clay-render aesthetic, playful and colorful, 8k textures.
+      A vertical 9:16 3D render of a custom designer vinyl toy figurine of {character_description} holding a {game} weapon or controller. The figurine is in a high-gloss finish with {accent_color} accents. The background is a vibrant, solid color studio. Floating 3D bubble letters in the air spell out '{title}'. A small 3D 'LIVE' tag shows '{time}'. Soft studio lighting, clay-render aesthetic, playful and colorful, 8k textures.
 
 placeholders:
   - name: title
     type: text
     required: true
+    label: "Stream Title"
+    description: "Main announcement text"
+    placeholder: "Going Live"
     max_length: 50
     default: "Going Live"
+  
   - name: game
     type: text
     required: false
+    label: "Game (optional)"
+    description: "What game you're playing"
+    placeholder: "Valorant"
     max_length: 30
     default: "gaming"
+  
   - name: time
     type: text
     required: false
+    label: "Time (optional)"
+    description: "When you're going live"
+    placeholder: "7 PM EST"
     max_length: 20
     default: "LIVE NOW"
+  
+  - name: character_description
+    type: select
+    required: false
+    label: "Character Style (optional)"
+    description: "Who appears in your announcement"
+    hint: "Optional - AI creates a streamer character if left blank"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Stylized Streamer"
+        value: "A stylized character representing the streamer"
+      - label: "Anime Character"
+        value: "A stylized anime character"
+      - label: "Chibi Character"
+        value: "A cute chibi character"
+      - label: "Gaming Mascot"
+        value: "A gaming mascot character"
+      - label: "Cool Avatar"
+        value: "A cool, confident avatar"
+      - label: "Energetic Host"
+        value: "An energetic host character"
+      - label: "No Character"
+        value: "the stream setup and text"
+    default: "A stylized character representing the streamer"
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main glow/accent color"
+    hint: "Optional - defaults to teal and pink gamer aesthetic"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Teal & Pink"
+        value: "teal and pink"
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Pink"
+        value: "pink"
+      - label: "Orange"
+        value: "orange"
+      - label: "Red"
+        value: "red"
+      - label: "Blue"
+        value: "blue"
+      - label: "Green"
+        value: "green"
+      - label: "Gold"
+        value: "gold"
+    default: ""
 
 quality_modifiers:
   - "high contrast"

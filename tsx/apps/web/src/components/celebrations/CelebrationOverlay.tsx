@@ -50,13 +50,13 @@ function getConfettiColors(rarity: RarityTier): string[] {
     case 'common':
       return ['#9CA3AF', '#6B7280', '#D1D5DB', '#E5E7EB'];
     case 'rare':
-      return ['#60A5FA', '#3B82F6', '#93C5FD', '#BFDBFE'];
+      return ['#32B8C6', '#21808D', '#66BDC3', '#99D3D7'];
     case 'epic':
-      return ['#A78BFA', '#8B5CF6', '#C4B5FD', '#DDD6FE'];
+      return ['#66BDC3', '#21808D', '#99D3D7', '#CCE9EB'];
     case 'legendary':
       return ['#FBBF24', '#F59E0B', '#FCD34D', '#FDE68A', '#FB923C'];
     case 'mythic':
-      return ['#EC4899', '#8B5CF6', '#06B6D4', '#F472B6', '#A855F7', '#22D3EE'];
+      return ['#EC4899', '#21808D', '#06B6D4', '#F472B6', '#32B8C6', '#22D3EE'];
     default:
       return [baseColor];
   }

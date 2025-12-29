@@ -85,7 +85,7 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     if (brandKit) {
       setIdentity({
         name: brandKit.name || '',
-        primaryColors: brandKit.primary_colors || ['#3B82F6'],
+        primaryColors: brandKit.primary_colors || ['#21808D'],
         accentColors: brandKit.accent_colors || [],
         headlineFont: brandKit.fonts?.headline || 'Montserrat',
         bodyFont: brandKit.fonts?.body || 'Inter',

@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: offline
-version: "1.0.0"
+version: "1.1.0"
 category: twitch
 asset_type: twitch_offline
 dimensions:
@@ -14,28 +14,85 @@ vibes:
   pro:
     name: "Technical Glitch"
     prompt: |
-      A 16:9 'Technical Difficulties' aesthetic but professional. A dark screen with a subtle scan-line texture. A central frosted-glass UI box reads '{message}'. Below it, a clean schedule reads 'Next Stream: {schedule}'. Subtle RGB glitch effects on the borders, very high-end and informative.
+      A 16:9 'Technical Difficulties' aesthetic but professional. A dark screen with a subtle scan-line texture. A central frosted-glass UI box reads '{message}'. Below it, a clean schedule reads 'Next Stream: {schedule}'. Subtle {accent_color} RGB glitch effects on the borders, very high-end and informative.
   
   anime:
     name: "Anime Away"
     prompt: |
-      A 16:9 anime-style offline screen. A cute chibi version of a streamer character sleeping or waving goodbye. Soft dreamy background with stars. Text '{message}' in stylized anime font. 'Returning: {schedule}' in smaller text. Warm, friendly, anime aesthetic.
+      A 16:9 anime-style offline screen. {character_description} sleeping or waving goodbye. Soft dreamy background with stars and {accent_color} accents. Text '{message}' in stylized anime font. 'Returning: {schedule}' in smaller text. Warm, friendly, anime aesthetic.
   
   playful:
     name: "Cozy Desk"
     prompt: |
-      A 16:9 wide-shot of an empty streamer's chair and a glowing desk at midnight. The monitors show a 'Goodbye' screen. A small sticky note on the monitor reads '{message}'. In the corner of the screen, the text 'Returning: {schedule}'. Soft moonlight coming through a window, peaceful, branded, and high-quality.
+      A 16:9 wide-shot of an empty streamer's chair and a glowing desk at midnight. The monitors show a 'Goodbye' screen with {accent_color} accents. A small sticky note on the monitor reads '{message}'. In the corner of the screen, the text 'Returning: {schedule}'. Soft moonlight coming through a window, peaceful, branded, and high-quality.
 
 placeholders:
   - name: message
     type: text
     required: false
+    label: "Message"
+    description: "Main offline message"
+    placeholder: "Currently Offline"
     max_length: 40
     default: "Currently Offline"
+  
   - name: schedule
     type: text
     required: false
+    label: "Next Stream (optional)"
+    description: "When you'll be back"
+    placeholder: "Back Monday 7PM"
     max_length: 40
+    default: ""
+  
+  - name: character_description
+    type: select
+    required: false
+    label: "Character Style (optional)"
+    description: "Who appears in your offline screen"
+    hint: "Optional - only used with Anime Away vibe"
+    show_for_vibes:
+      - anime
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Cute Chibi"
+        value: "A cute chibi version of a streamer character"
+      - label: "Anime Character"
+        value: "A stylized anime character"
+      - label: "Sleepy Mascot"
+        value: "A sleepy mascot character"
+      - label: "Waving Character"
+        value: "A friendly character waving goodbye"
+      - label: "Cat Mascot"
+        value: "A sleepy cat mascot"
+      - label: "Gaming Mascot"
+        value: "A gaming mascot taking a break"
+    default: "A cute chibi version of a streamer character"
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main accent/glow color"
+    hint: "Optional - AI picks calming colors if blank"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Pink"
+        value: "pink"
+      - label: "Blue"
+        value: "blue"
+      - label: "Teal"
+        value: "teal"
+      - label: "Warm White"
+        value: "warm white"
+      - label: "Moonlight Blue"
+        value: "soft moonlight blue"
     default: ""
 
 quality_modifiers:

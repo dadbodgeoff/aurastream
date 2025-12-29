@@ -64,7 +64,7 @@ export function ActivityItem({
     <Component
       onClick={onClick}
       className={cn(
-        'flex items-center gap-4 px-5 py-4 w-full text-left transition-colors',
+        'flex items-center gap-4 px-4 py-4 w-full text-left transition-colors',
         onClick && 'hover:bg-background-elevated cursor-pointer',
         className
       )}

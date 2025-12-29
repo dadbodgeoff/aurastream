@@ -52,9 +52,9 @@ export function CardSkeleton() {
 
 export function StatSkeleton() {
   return (
-    <div className="p-5 rounded-xl border border-border-subtle">
+    <div className="p-3 rounded-xl border border-border-subtle">
       <LoadingSkeleton className="h-3 w-20 mb-2" />
-      <LoadingSkeleton className="h-8 w-16" />
+      <LoadingSkeleton className="h-6 w-16" />
     </div>
   );
 }

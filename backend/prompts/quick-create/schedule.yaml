@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: schedule
-version: "1.0.0"
+version: "1.1.0"
 category: stream
 asset_type: banner
 dimensions:
@@ -14,29 +14,64 @@ vibes:
   pro:
     name: "Clean Minimalist"
     prompt: |
-      A 2.5:1 horizontal flat-lay banner. A professional studio desk view with a matte-black desk mat. Clean white glass cards are arranged horizontally, one card for each streaming day listed. The cards display the days '{days}' with the time '{times}' below each day in sharp sans-serif typography. A high-end camera lens and a controller are placed artistically in the margins. Soft global illumination, extremely organized and professional.
+      A 2.5:1 horizontal flat-lay banner. A professional studio desk view with a matte-black desk mat. Clean white glass cards are arranged horizontally, one card for each streaming day listed. The cards display the days '{days}' with the time '{times}' below each day in sharp sans-serif typography. A high-end camera lens and a controller are placed artistically in the margins. {accent_color} accent lighting. Soft global illumination, extremely organized and professional.
   
   anime:
     name: "Retro Arcade"
     prompt: |
-      A 2.5:1 horizontal neon arcade aesthetic. Glowing 80s-style CRT monitors arranged in a row, one monitor for each day listed. Each screen displays one day from '{days}' with the time '{times}' in pixel-art fonts. Neon pink and electric blue 'Glow-wire' connects the monitors. The background is a dark grid-pattern 'Synthwave' landscape. High-contrast, nostalgic, and high-energy.
+      A 2.5:1 horizontal neon arcade aesthetic. Glowing 80s-style CRT monitors arranged in a row, one monitor for each day listed. Each screen displays one day from '{days}' with the time '{times}' in pixel-art fonts. {accent_color} and electric-blue 'Glow-wire' connects the monitors. The background is a dark grid-pattern 'Synthwave' landscape. High-contrast, nostalgic, and high-energy.
   
   playful:
     name: "Colorful Calendar"
     prompt: |
-      A 2.5:1 horizontal 3D render of a playful calendar board. Colorful 3D day blocks arranged in a row, one block for each day in '{days}'. Each block has a cute clock icon displaying '{times}'. Soft pastel background with floating gaming icons. Clay-render aesthetic, cheerful and inviting, 8k textures.
+      A 2.5:1 horizontal 3D render of a playful calendar board. Colorful 3D day blocks arranged in a row, one block for each day in '{days}'. Each block has a cute clock icon displaying '{times}'. Soft {accent_color} pastel background with floating gaming icons. Clay-render aesthetic, cheerful and inviting, 8k textures.
 
 placeholders:
   - name: days
     type: text
     required: true
+    label: "Streaming Days"
+    description: "Your streaming schedule"
+    placeholder: "Mon, Wed, Fri"
+    hint: "Enter your streaming days separated by commas"
     max_length: 50
     default: "Mon, Wed, Fri"
+  
   - name: times
     type: text
     required: false
+    label: "Stream Time (optional)"
+    description: "Your typical stream time"
+    placeholder: "7 PM EST"
     max_length: 30
     default: "Check schedule"
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main accent color"
+    hint: "Optional - AI picks colors that match the vibe"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Pink"
+        value: "pink"
+      - label: "Blue"
+        value: "blue"
+      - label: "Green"
+        value: "green"
+      - label: "Orange"
+        value: "orange"
+      - label: "Teal"
+        value: "teal"
+      - label: "Gold"
+        value: "gold"
+    default: ""
 
 quality_modifiers:
   - "clean layout"

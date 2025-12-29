@@ -143,11 +143,29 @@ export function CustomizeForm(props: CustomizeFormProps) {
               options = field.optionsMap[parentValue] || [];
             }
             
+            // Check if this is an optional customization field
+            const isOptionalCustomization = !field.required && (
+              field.id.includes('character') || 
+              field.id.includes('color') || 
+              field.id.includes('accent')
+            );
+            
             return (
-            <div key={field.id}>
+            <div key={field.id} className={isOptionalCustomization ? 'pt-2 border-t border-border-subtle/50' : ''}>
+              {isOptionalCustomization && field === template.fields.filter(f => !f.required && (f.id.includes('character') || f.id.includes('color') || f.id.includes('accent')))[0] && (
+                <p className="text-xs text-text-tertiary mb-4 flex items-center gap-1.5">
+                  <span className="text-interactive-500">✨</span>
+                  Optional customization - leave blank for AI to decide
+                </p>
+              )}
               <label className="block text-sm font-medium text-text-secondary mb-2">
-                {field.label}{field.required && <span className="text-error-light ml-1">*</span>}
+                {field.label}
+                {field.required && <span className="text-error-light ml-1">*</span>}
+                {!field.required && <span className="text-text-muted ml-1 text-xs font-normal">(optional)</span>}
               </label>
+              {field.description && (
+                <p className="text-xs text-text-tertiary mb-2">{field.description}</p>
+              )}
               {(field.type === 'select' || field.type === 'dynamic_select') ? (
                 <select
                   value={formValues[field.id] || ''}
@@ -163,7 +181,7 @@ export function CustomizeForm(props: CustomizeFormProps) {
                   disabled={field.type === 'dynamic_select' && field.dependsOn ? !formValues[field.dependsOn] : false}
                   className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary focus:outline-none focus:border-interactive-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <option value="">Select...</option>
+                  <option value="">{field.required ? 'Select...' : 'AI Decides (Recommended)'}</option>
                   {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               ) : (

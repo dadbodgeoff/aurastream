@@ -153,6 +153,7 @@ export function ShareAssetModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Form spacing: space-y-5 (20px) for consistent vertical rhythm */}
           {/* Asset Preview */}
           <div className="flex justify-center">
             <div className="relative w-32 h-32 rounded-xl overflow-hidden bg-background-elevated border border-border-subtle">

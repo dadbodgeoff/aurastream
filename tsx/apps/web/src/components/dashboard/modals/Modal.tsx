@@ -10,18 +10,28 @@ export interface ModalProps {
   onClose: () => void;
   title?: string;
   description?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
 }
 
+/**
+ * Modal size options with consistent max-widths:
+ * - sm: 24rem (384px) - Small dialogs, confirmations
+ * - md: 28rem (448px) - Default, standard forms
+ * - lg: 32rem (512px) - Larger forms, content-heavy modals
+ * - xl: 36rem (576px) - Feature modals with more content
+ * - 2xl: 42rem (672px) - Large feature modals (e.g., Vibe Branding)
+ * - full: 56rem (896px) - Full-width modals for complex content
+ */
 const sizeStyles = {
-  sm: 'max-w-sm',
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  full: 'max-w-4xl',
+  sm: 'max-w-sm',    // 384px
+  md: 'max-w-md',    // 448px
+  lg: 'max-w-lg',    // 512px
+  xl: 'max-w-xl',    // 576px
+  '2xl': 'max-w-2xl', // 672px
+  full: 'max-w-4xl', // 896px
 };
 
 export function Modal({

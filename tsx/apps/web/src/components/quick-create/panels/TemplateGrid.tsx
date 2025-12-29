@@ -38,37 +38,33 @@ export function TemplateGrid({ category, onCategoryChange, onSelect }: TemplateG
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {filtered.map(template => (
           <button
             key={template.id}
             onClick={() => onSelect(template)}
-            className="group relative p-5 rounded-2xl border-2 border-border-subtle bg-background-surface/50 hover:border-interactive-600 hover:shadow-lg text-left transition-all"
+            className="group relative p-4 rounded-xl border-2 border-border-subtle bg-background-surface/50 hover:border-interactive-600 text-left transition-all"
           >
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-3xl">{template.emoji}</span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xl">{template.emoji}</span>
               <span className={cn(
-                "px-2 py-1 rounded-lg text-xs font-medium",
+                "px-1.5 py-0.5 rounded text-[10px] font-medium",
                 template.category === 'stream' && "bg-green-500/10 text-green-400",
-                template.category === 'social' && "bg-blue-500/10 text-blue-400",
-                template.category === 'twitch' && "bg-purple-500/10 text-purple-400",
+                template.category === 'social' && "bg-primary-500/10 text-primary-400",
+                template.category === 'twitch' && "bg-primary-500/10 text-primary-400",
               )}>
                 {template.dimensions}
               </span>
             </div>
             
-            <h3 className="text-lg font-semibold text-text-primary group-hover:text-interactive-600 transition-colors">
+            <h3 className="text-sm font-semibold text-text-primary group-hover:text-interactive-600 transition-colors">
               {template.name}
             </h3>
-            <p className="text-sm text-text-secondary mt-1">{template.tagline}</p>
+            <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{template.tagline}</p>
             
-            <p className="text-xs text-text-tertiary mt-4 pt-4 border-t border-border-subtle line-clamp-2">
+            <p className="text-[10px] text-text-tertiary mt-2 pt-2 border-t border-border-subtle line-clamp-1">
               {template.previewStyle}
             </p>
-
-            <div className="absolute bottom-5 right-5 w-8 h-8 rounded-full bg-interactive-600/10 text-interactive-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <ChevronRightIcon />
-            </div>
           </button>
         ))}
       </div>

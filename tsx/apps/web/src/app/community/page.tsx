@@ -36,8 +36,9 @@ const HERO_BANNERS: HeroBanner[] = [
     subtitle: 'AI-powered graphics for Twitch, YouTube, and more. Join thousands of creators.',
     ctaText: 'Start Creating',
     ctaHref: '/dashboard/create',
-    bgGradient: 'bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400',
+    bgGradient: 'bg-gradient-to-br from-primary-600 via-primary-500 to-accent-400',
     badge: '✨ New',
+    image: 'https://qgyvdadgdomnubngfpun.supabase.co/storage/v1/object/public/banners/twitch-slide.jpg',
   },
   {
     id: 'vibe',
@@ -47,6 +48,7 @@ const HERO_BANNERS: HeroBanner[] = [
     ctaHref: '/dashboard/vibe-branding',
     bgGradient: 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500',
     badge: '🎨 Popular',
+    image: 'https://qgyvdadgdomnubngfpun.supabase.co/storage/v1/object/public/banners/vibe-branding-slide.jpg',
   },
   {
     id: 'community',
@@ -54,7 +56,8 @@ const HERO_BANNERS: HeroBanner[] = [
     subtitle: 'Join our community of creators. Share, discover, and get inspired.',
     ctaText: 'Explore Gallery',
     ctaHref: '#gallery',
-    bgGradient: 'bg-gradient-to-br from-blue-600 via-indigo-500 to-purple-500',
+    bgGradient: 'bg-gradient-to-br from-primary-600 via-primary-500 to-interactive-500',
+    image: 'https://qgyvdadgdomnubngfpun.supabase.co/storage/v1/object/public/banners/community-slide.jpg',
   },
 ];
 

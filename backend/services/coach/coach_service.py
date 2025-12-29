@@ -207,9 +207,9 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         Yields:
             StreamChunk objects with tokens, intent_ready status, etc.
         """
-        # Studio tier only
-        if tier != "studio":
-            yield StreamChunk(type="error", content="Creative Director requires Studio subscription")
+        # Pro and Studio tiers have access (usage limits checked at route level)
+        if tier not in ("pro", "studio"):
+            yield StreamChunk(type="error", content="Coach requires Pro or Studio subscription")
             return
         
         # Check if game needs current context (web search)

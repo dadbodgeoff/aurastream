@@ -141,7 +141,7 @@ export default function DashboardPage() {
         </div>
         <Link
           href="/dashboard/create"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-xl shadow-lg shadow-interactive-600/20 transition-colors"
+          className="inline-flex items-center gap-2 px-6 py-3 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-xl shadow-lg shadow-interactive-600/20 transition-colors"
         >
           <CreateIcon className="w-5 h-5" />
           Create Asset
@@ -150,22 +150,22 @@ export default function DashboardPage() {
 
       {/* Getting Started Banner */}
       {hasNoBrandKits && (
-        <div className="p-6 bg-gradient-to-r from-interactive-600/10 via-interactive-600/5 to-transparent border border-interactive-600/20 rounded-2xl">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-interactive-600 flex items-center justify-center text-white flex-shrink-0">
-              <BrandIcon className="w-6 h-6" />
+        <div className="p-4 bg-gradient-to-r from-interactive-600/10 via-interactive-600/5 to-transparent border border-interactive-600/20 rounded-xl">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-interactive-600 flex items-center justify-center text-white flex-shrink-0">
+              <BrandIcon className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <h2 className="font-semibold text-text-primary mb-1">Get started with your brand</h2>
-              <p className="text-sm text-text-secondary mb-4">
-                Create a brand kit to ensure all your assets match your style — colors, fonts, logos, and voice.
+              <h2 className="font-semibold text-sm text-text-primary mb-0.5">Get started with your brand</h2>
+              <p className="text-xs text-text-secondary mb-3">
+                Create a brand kit to ensure all your assets match your style.
               </p>
               <Link
                 href="/dashboard/brand-kits"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-interactive-600 hover:bg-interactive-500 text-white text-xs font-medium rounded-lg transition-colors"
               >
                 Create Brand Kit
-                <ArrowRightIcon className="w-4 h-4" />
+                <ArrowRightIcon className="w-3 h-3" />
               </Link>
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
 
         {/* Recent Assets */}
         <div className="bg-background-surface/50 border border-border-subtle rounded-xl">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
             <h3 className="font-medium text-text-primary">Recent Assets</h3>
             <Link
               href="/dashboard/assets"

@@ -509,3 +509,40 @@ export {
   useAnalyzeUrl,
   useVibeBrandingUsage,
 } from './hooks/useVibeBranding';
+
+// Usage Limits type exports
+export type {
+  SubscriptionTier as UsageLimitsTier,
+  FeatureUsage,
+  UsageStatus,
+  UsageCheckResponse,
+  FeatureType,
+} from './types/usageLimits';
+
+export {
+  TIER_LIMITS,
+  FEATURE_CONFIG,
+} from './types/usageLimits';
+
+// Usage Limits hooks exports
+export {
+  usageLimitsKeys,
+  useUsageStatus,
+  useUsageCheck,
+  useInvalidateUsage,
+  useUsageLimits,
+} from './hooks/useUsageLimits';
+
+// Templates type exports
+export type {
+  FieldOption,
+  TemplateField,
+  VibeOption as TemplateVibeOption,
+  TemplateMeta,
+} from './hooks/useTemplates';
+
+// Templates hooks exports
+export {
+  useTemplates,
+  useTemplate,
+} from './hooks/useTemplates';

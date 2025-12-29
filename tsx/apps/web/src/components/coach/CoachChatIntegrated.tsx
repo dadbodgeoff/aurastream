@@ -332,7 +332,7 @@ const EnhancedCoachMessage = memo(function EnhancedCoachMessage({
         <div className="inline-block rounded-2xl rounded-tl-sm px-4 py-3 bg-background-surface border border-border-default text-text-primary text-sm leading-relaxed">
           {/* Grounding indicator */}
           {groundingUsed && (
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 text-blue-400 text-xs mb-2">
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary-500/10 text-primary-400 text-xs mb-2">
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <circle cx="12" cy="12" r="10" />
                 <path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
@@ -771,7 +771,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
       {/* Grounding Status */}
       {isGrounding && (
         <div
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500/10 border-t border-blue-500/20 text-blue-400 text-sm"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-500/10 border-t border-primary-500/20 text-primary-400 text-sm"
           role="status"
           aria-live="polite"
         >

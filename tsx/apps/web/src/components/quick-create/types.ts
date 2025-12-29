@@ -11,13 +11,17 @@ export type VibePreset = string;
 export interface TemplateField {
   id: string;
   label: string;
-  type: 'text' | 'select' | 'time' | 'dynamic_select';
+  type: 'text' | 'select' | 'time' | 'dynamic_select' | 'color';
   placeholder?: string;
   options?: { value: string; label: string }[];
   required?: boolean;
   maxLength?: number;
   /** Helper text shown below the field */
   hint?: string;
+  /** Description shown as tooltip or secondary text */
+  description?: string;
+  /** Default value for the field */
+  default?: string;
   /** For dynamic_select: which field this depends on */
   dependsOn?: string;
   /** For dynamic_select: map of parent value -> options */

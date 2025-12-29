@@ -44,48 +44,49 @@ export function StatCard({
 }: StatCardProps) {
   const sizeStyles = {
     sm: 'p-3',
-    md: 'p-5',
-    lg: 'p-6',
+    md: 'p-3',
+    lg: 'p-4',
   };
 
   const valueStyles = {
     sm: 'text-lg',
-    md: 'text-2xl',
-    lg: 'text-3xl',
+    md: 'text-xl',
+    lg: 'text-2xl',
   };
 
   return (
     <div className={cn(
-      'rounded-xl border transition-colors',
+      'rounded-xl border transition-all',
+      'shadow-sm hover:shadow-md',
       variantStyles[variant],
       sizeStyles[size],
       className
     )}>
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm text-text-tertiary mb-1">{label}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-text-tertiary mb-0.5">{label}</p>
           <p className={cn('font-semibold text-text-primary', valueStyles[size])}>
             {value}
           </p>
         </div>
         {icon && (
-          <div className="w-10 h-10 rounded-lg bg-background-elevated flex items-center justify-center text-text-secondary">
+          <div className="w-8 h-8 rounded-lg bg-background-elevated flex items-center justify-center text-text-secondary flex-shrink-0">
             {icon}
           </div>
         )}
       </div>
 
       {(sublabel || trend) && (
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-2 mt-1.5">
           {trend && (
-            <span className={cn('flex items-center gap-0.5 text-xs font-medium', trendColors[trend.direction])}>
+            <span className={cn('flex items-center gap-0.5 text-[11px] font-medium', trendColors[trend.direction])}>
               {trend.direction === 'up' && <ArrowUpIcon size="sm" />}
               {trend.direction === 'down' && <ArrowDownIcon size="sm" />}
               {trend.value > 0 ? '+' : ''}{trend.value}%
               {trend.label && <span className="text-text-muted ml-1">{trend.label}</span>}
             </span>
           )}
-          {sublabel && <p className="text-xs text-text-muted">{sublabel}</p>}
+          {sublabel && <p className="text-[11px] text-text-muted">{sublabel}</p>}
         </div>
       )}
     </div>

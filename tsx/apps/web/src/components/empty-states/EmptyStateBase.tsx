@@ -145,7 +145,7 @@ export function EmptyStateBase({
                 className={cn(
                   // Base styles
                   'inline-flex items-center justify-center gap-2',
-                  'px-5 py-2.5 rounded-lg font-medium text-sm',
+                  'px-6 py-3 rounded-lg font-medium text-sm',
                   // Colors
                   'bg-interactive-600 text-white',
                   'hover:bg-interactive-500',

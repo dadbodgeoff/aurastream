@@ -306,8 +306,11 @@ export default function AssetsPage() {
 
       {/* Recent Jobs Section */}
       {!jobIdParam && jobs.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-sm font-medium text-text-tertiary uppercase tracking-wider mb-4">Recent Jobs</h2>
+        <div className="mt-10 pt-8 border-t border-border-subtle">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-base font-semibold text-text-primary">Recent Jobs</h2>
+            <span className="text-xs text-text-muted">{jobs.length} total</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {jobs.slice(0, 6).map((job: any) => (
               <JobCard

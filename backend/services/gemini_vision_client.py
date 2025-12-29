@@ -69,10 +69,10 @@ class GeminiVisionClient:
     """
     
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-    MODEL = "gemini-3-flash-preview"  # Vision-capable model for image parsing
+    MODEL = "gemini-2.5-flash-preview-05-20"  # Vision-capable model for image parsing
     
-    # Exponential backoff delays in seconds
-    RETRY_DELAYS = [1, 2, 4]
+    # Exponential backoff delays in seconds (longer delays for rate limits)
+    RETRY_DELAYS = [2, 5, 10, 20, 30]
     
     SAFETY_SETTINGS = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
@@ -84,16 +84,16 @@ class GeminiVisionClient:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        timeout: int = 30,
-        max_retries: int = 3
+        timeout: int = 60,
+        max_retries: int = 5
     ):
         """
         Initialize the Gemini Vision client.
         
         Args:
             api_key: Google API key (defaults to GOOGLE_API_KEY env var)
-            timeout: Request timeout in seconds (default: 30)
-            max_retries: Maximum number of retry attempts (default: 3)
+            timeout: Request timeout in seconds (default: 60)
+            max_retries: Maximum number of retry attempts (default: 5)
         
         Raises:
             ValueError: If no API key is provided or found in environment
@@ -144,6 +144,8 @@ class GeminiVisionClient:
         request: VisionAnalysisRequest
     ) -> VisionAnalysisResponse:
         """Execute analysis request with exponential backoff retry."""
+        import random
+        
         last_exception: Optional[Exception] = None
         
         for attempt in range(self.max_retries):
@@ -156,7 +158,11 @@ class GeminiVisionClient:
             
             except RateLimitError as e:
                 last_exception = e
-                delay = e.retry_after if e.retry_after else self.RETRY_DELAYS[attempt]
+                # Use Retry-After header if provided, otherwise use backoff delay
+                base_delay = e.retry_after if e.retry_after else self.RETRY_DELAYS[attempt]
+                # Add jitter (10-30% random variation) to prevent thundering herd
+                jitter = base_delay * random.uniform(0.1, 0.3)
+                delay = base_delay + jitter
                 
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(delay)
@@ -310,8 +316,8 @@ class GeminiVisionClient:
 
 # Factory function for creating client from environment
 def create_gemini_vision_client(
-    timeout: int = 30,
-    max_retries: int = 3
+    timeout: int = 60,
+    max_retries: int = 5
 ) -> GeminiVisionClient:
     """Create a GeminiVisionClient using environment variables."""
     return GeminiVisionClient(

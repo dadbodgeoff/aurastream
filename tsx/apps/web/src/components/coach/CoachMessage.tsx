@@ -118,7 +118,7 @@ function GroundingIndicator({ className }: GroundingIndicatorProps) {
     <div
       className={cn(
         'inline-flex items-center gap-1.5 px-2 py-1 rounded-md',
-        'bg-blue-500/10 text-blue-400 text-xs',
+        'bg-primary-500/10 text-primary-400 text-xs',
         className
       )}
     >

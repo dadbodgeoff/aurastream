@@ -205,10 +205,10 @@ export const RARITY_COLORS: Record<RarityType, {
     glow: '',
   },
   rare: {
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    border: 'border-blue-400 dark:border-blue-500',
-    text: 'text-blue-600 dark:text-blue-400',
-    glow: 'shadow-blue-500/25',
+    bg: 'bg-primary-50 dark:bg-primary-900/20',
+    border: 'border-primary-400 dark:border-primary-500',
+    text: 'text-primary-600 dark:text-primary-400',
+    glow: 'shadow-primary-500/25',
   },
   mythic: {
     bg: 'bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-900/20 dark:via-yellow-900/20 dark:to-orange-900/20',
@@ -226,7 +226,7 @@ export const RARITY_LABELS: Record<RarityType, string> = {
 
 export const RARITY_BADGE_STYLES: Record<RarityType, string> = {
   common: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
-  rare: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+  rare: 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300',
   mythic: 'bg-gradient-to-r from-amber-200 via-yellow-200 to-orange-200 text-amber-800 dark:from-amber-800/50 dark:via-yellow-800/50 dark:to-orange-800/50 dark:text-amber-200 animate-shimmer',
 };
 

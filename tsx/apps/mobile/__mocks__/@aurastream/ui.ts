@@ -4,31 +4,31 @@
  */
 
 export const colors = {
-  // Primary (Navy)
+  // Primary (Teal)
   primary: {
-    50: '#EBF2F8',
-    100: '#D4E2F0',
-    200: '#A8C4E0',
-    300: '#7A9FCC',
-    400: '#4A7AB8',
-    500: '#2E5A95',
-    600: '#264A7A',
-    700: '#1E3A5F',
-    800: '#152A42',
-    900: '#0F1D2F',
+    50: '#E6F5F6',
+    100: '#CCE9EB',
+    200: '#99D3D7',
+    300: '#66BDC3',
+    400: '#32B8C6',
+    500: '#21808D',
+    600: '#247380',
+    700: '#1A7373',
+    800: '#155A5A',
+    900: '#0F4040',
   },
-  // Interactive (Blue)
+  // Interactive (Teal)
   interactive: {
-    50: '#EFF6FF',
-    100: '#DBEAFE',
-    200: '#BFDBFE',
-    300: '#93C5FD',
-    400: '#60A5FA',
-    500: '#3B82F6',
-    600: '#2563EB',
-    700: '#1D4ED8',
-    800: '#1E40AF',
-    900: '#1E3A8A',
+    50: '#E6F5F6',
+    100: '#CCE9EB',
+    200: '#99D3D7',
+    300: '#66BDC3',
+    400: '#32B8C6',
+    500: '#21808D',
+    600: '#247380',
+    700: '#1A7373',
+    800: '#155A5A',
+    900: '#0F4040',
   },
   // Accent (Amber)
   accent: {
@@ -74,9 +74,9 @@ export const colors = {
     dark: '#dc2626',
   },
   info: {
-    light: '#93C5FD',
-    main: '#3B82F6',
-    dark: '#1D4ED8',
+    light: '#66BDC3',
+    main: '#21808D',
+    dark: '#1A7373',
   },
   // Background
   background: {
@@ -98,7 +98,7 @@ export const colors = {
     default: '#334155',
     subtle: '#1E293B',
     strong: '#475569',
-    focus: '#2563EB',
+    focus: '#21808D',
   },
 };
 
@@ -129,8 +129,8 @@ export const shadows = {
   lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
   xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
   ring: {
-    default: '0 0 0 2px #2563EB',
-    offset: '0 0 0 2px #0F172A, 0 0 0 4px #2563EB',
+    default: '0 0 0 2px #21808D',
+    offset: '0 0 0 2px #0F172A, 0 0 0 4px #21808D',
   },
 };
 

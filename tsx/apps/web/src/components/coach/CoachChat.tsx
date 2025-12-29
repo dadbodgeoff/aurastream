@@ -107,8 +107,8 @@ function GroundingStatus({ query }: GroundingStatusProps) {
     <div
       className={cn(
         'flex items-center gap-2 px-4 py-2',
-        'bg-blue-500/10 border-t border-blue-500/20',
-        'text-blue-400 text-sm'
+        'bg-primary-500/10 border-t border-primary-500/20',
+        'text-primary-400 text-sm'
       )}
       role="status"
       aria-live="polite"

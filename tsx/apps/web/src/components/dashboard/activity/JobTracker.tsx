@@ -50,7 +50,7 @@ export function JobTracker({
 
   return (
     <div className={cn('bg-background-surface/50 border border-border-subtle rounded-xl', className)}>
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
         <h3 className="font-medium text-text-primary">{title}</h3>
         {activeJobs.length > maxItems && onViewAll && (
           <button onClick={onViewAll} className="text-sm text-interactive-600 hover:text-interactive-500 font-medium">
@@ -66,7 +66,7 @@ export function JobTracker({
             <button
               key={job.id}
               onClick={() => onJobClick?.(job.id)}
-              className="flex items-center gap-4 px-5 py-4 w-full text-left hover:bg-background-elevated transition-colors"
+              className="flex items-center gap-4 px-6 py-4 w-full text-left hover:bg-background-elevated transition-colors"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

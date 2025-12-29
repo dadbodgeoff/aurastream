@@ -88,23 +88,23 @@ describe('Color Tokens', () => {
 
   describe('Unit Tests', () => {
     it('should have primary-700 as the main brand color', () => {
-      expect(colors.primary[700]).toBe('#1E3A5F');
+      expect(colors.primary[700]).toBe('#15545D');
     });
 
     it('should have interactive-600 as the main interactive color', () => {
-      expect(colors.interactive[600]).toBe('#2563EB');
+      expect(colors.interactive[600]).toBe('#247380');
     });
 
     it('should have accent-600 as the main accent color', () => {
-      expect(colors.accent[600]).toBe('#D97706');
+      expect(colors.accent[600]).toBe('#8A4127');
     });
 
     it('should have dark background base', () => {
-      expect(colors.background.base).toBe('#0F172A');
+      expect(colors.background.base).toBe('#1F2121');
     });
 
     it('should have info semantic color', () => {
-      expect(colors.info.main).toBe('#3B82F6');
+      expect(colors.info.main).toBe('#62756E');
     });
   });
 });

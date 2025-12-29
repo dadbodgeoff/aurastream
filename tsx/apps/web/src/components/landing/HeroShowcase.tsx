@@ -94,7 +94,7 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
         </div>
         
         {/* App content */}
-        <div className="p-5 space-y-4">
+        <div className="p-6 space-y-4">
           {/* Prompt input mockup */}
           <div className="space-y-2">
             <label className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider">

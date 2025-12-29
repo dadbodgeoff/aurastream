@@ -200,10 +200,16 @@ async def get_spotlight_creators(
     Get spotlight creators - users with the most engagement.
     Returns creators with their recent assets and follow status.
     """
-    service = get_community_feed_service()
-    viewer_id = current_user.sub if current_user else None
-    creators = await service.get_spotlight_creators(limit=limit, viewer_id=viewer_id)
-    return {"items": creators}
+    try:
+        service = get_community_feed_service()
+        viewer_id = current_user.sub if current_user else None
+        creators = await service.get_spotlight_creators(limit=limit, viewer_id=viewer_id)
+        return {"items": creators}
+    except Exception as e:
+        # Log the error but return empty list to avoid breaking the UI
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to get spotlight creators: {e}")
+        return {"items": []}
 
 
 @router.get("/users/{user_id}")

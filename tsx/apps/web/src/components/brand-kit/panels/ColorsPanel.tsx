@@ -182,7 +182,7 @@ export function ColorsPanel({ brandKitId, colors, onChange, onSave, isSaving, is
   const addColor = (category: 'primary' | 'secondary' | 'accent' | 'neutral') => {
     const maxCounts = BRAND_KIT_LIMITS.colors;
     if (colors[category].length < maxCounts[category]) {
-      onChange({ ...colors, [category]: [...colors[category], { hex: '#3B82F6', name: '', usage: '' }] });
+      onChange({ ...colors, [category]: [...colors[category], { hex: '#21808D', name: '', usage: '' }] });
     }
   };
 
@@ -190,7 +190,7 @@ export function ColorsPanel({ brandKitId, colors, onChange, onSave, isSaving, is
     if (colors.gradients.length < BRAND_KIT_LIMITS.colors.gradients) {
       onChange({
         ...colors,
-        gradients: [...colors.gradients, { name: 'New Gradient', type: 'linear', angle: 135, stops: [{ color: '#3B82F6', position: 0 }, { color: '#F59E0B', position: 100 }] }]
+        gradients: [...colors.gradients, { name: 'New Gradient', type: 'linear', angle: 135, stops: [{ color: '#21808D', position: 0 }, { color: '#F59E0B', position: 100 }] }]
       });
     }
   };

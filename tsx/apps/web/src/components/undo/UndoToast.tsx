@@ -149,7 +149,7 @@ export function UndoToastItem({
   const animationClasses = prefersReducedMotion
     ? ''
     : cn(
-        'transition-all duration-300 ease-out',
+        'transition-all duration-300 ease-standard',
         isExiting
           ? 'opacity-0 translate-x-full'
           : 'opacity-100 translate-x-0 animate-slide-in-right'

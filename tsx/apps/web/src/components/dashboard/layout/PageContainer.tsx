@@ -28,7 +28,7 @@ export function PageContainer({
   stickyHeader = false,
 }: PageContainerProps) {
   return (
-    <div className={cn('space-y-6', className)}>
+    <div className={cn('max-w-7xl mx-auto space-y-6', className)}>
       {(title || description || actions) && (
         <PageHeader
           title={title}

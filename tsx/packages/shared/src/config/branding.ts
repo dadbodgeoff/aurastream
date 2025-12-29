@@ -53,9 +53,9 @@ export const AURASTREAM_BRANDING = {
    * Brand colors (for fallback/reference)
    */
   colors: {
-    primary: '#7C3AED', // Purple
-    secondary: '#06B6D4', // Cyan
-    accent: '#F59E0B', // Amber
+    primary: '#21808D', // Teal (Premium spec)
+    secondary: '#32B8C6', // Light Teal
+    accent: '#A84F2F', // Warm Coral (Premium spec)
   },
 } as const;
 

@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: starting-soon
-version: "1.0.0"
+version: "1.1.0"
 category: stream
 asset_type: overlay
 dimensions:
@@ -14,24 +14,58 @@ vibes:
   pro:
     name: "High-Tech Command"
     prompt: |
-      A 16:9 professional broadcast 'Command Center' aesthetic. A futuristic 3D UI interface with rotating data rings and pulse waves. In the center, a bold digital display reads '{message}' in a high-contrast 'Ink-Trap' font. Background features a dark tech-brushed metal texture with pulsing RGB strips. Clean, sharp, and high-production value.
+      A 16:9 professional broadcast 'Command Center' aesthetic. A futuristic 3D UI interface with rotating data rings and pulse waves. In the center, a bold digital display reads '{message}' in a high-contrast 'Ink-Trap' font. Background features a dark tech-brushed metal texture with pulsing {accent_color} RGB strips. Clean, sharp, and high-production value.
   
   anime:
     name: "Energy Burst"
     prompt: |
-      A 16:9 anime-style energy burst composition. Dramatic speed lines radiating from center. Bold stylized text '{message}' with glowing outline effect. Vibrant color gradients, particle effects, and dynamic motion blur. High-energy anticipation aesthetic, anime broadcast quality.
+      A 16:9 anime-style energy burst composition. Dramatic speed lines radiating from center. Bold stylized text '{message}' with glowing {accent_color} outline effect. Vibrant color gradients, particle effects, and dynamic motion blur. High-energy anticipation aesthetic, anime broadcast quality.
   
   playful:
     name: "Cozy Lofi"
     prompt: |
-      A 16:9 cinematic shot of a cozy gaming room during a rainy night. View from behind a dual-monitor setup showing a blurred game menu. Soft fairy lights and a steaming mug of coffee on the desk. In the center of the air, a soft glowing text overlay reads '{message}'. Warm atmospheric lighting, floating dust motes, lofi-aesthetic, extremely relaxing broadcast quality.
+      A 16:9 cinematic shot of a cozy gaming room during a rainy night. View from behind a dual-monitor setup showing a blurred game menu. Soft {accent_color} fairy lights and a steaming mug of coffee on the desk. In the center of the air, a soft glowing text overlay reads '{message}'. Warm atmospheric lighting, floating dust motes, lofi-aesthetic, extremely relaxing broadcast quality.
 
 placeholders:
   - name: message
     type: text
     required: false
+    label: "Message"
+    description: "Text to display on screen"
+    placeholder: "Starting in 5 min!"
     max_length: 40
     default: "Starting Soon"
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main accent/glow color"
+    hint: "Optional - AI picks colors that match the vibe"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Pink"
+        value: "pink"
+      - label: "Orange"
+        value: "orange"
+      - label: "Red"
+        value: "red"
+      - label: "Blue"
+        value: "blue"
+      - label: "Green"
+        value: "green"
+      - label: "Warm White"
+        value: "warm white"
+      - label: "Gold"
+        value: "gold"
+      - label: "Teal"
+        value: "teal"
+    default: ""
 
 quality_modifiers:
   - "dynamic composition"

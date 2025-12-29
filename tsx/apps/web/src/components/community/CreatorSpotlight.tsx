@@ -25,7 +25,7 @@ function CreatorCard({ creator, onFollow, onUnfollow }: CreatorCardProps) {
   const displayAssets = creator.recentAssets.slice(0, 4);
   
   return (
-    <div className="flex-shrink-0 w-[180px] md:w-[200px] rounded-xl border border-border-subtle bg-background-surface overflow-hidden">
+    <div className="flex-shrink-0 w-[180px] md:w-[200px] rounded-xl border border-border-subtle bg-background-surface overflow-hidden shadow-sm hover:shadow-md hover:border-border-default transition-all">
       {/* Header with Avatar */}
       <Link href={`/community/creators/${creator.id}`} className="block p-4 pb-2">
         <div className="flex flex-col items-center text-center">

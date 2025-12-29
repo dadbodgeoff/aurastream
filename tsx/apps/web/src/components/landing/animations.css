@@ -81,13 +81,13 @@
   }
 }
 
-/* Glow pulse */
+/* Glow pulse - Premium Teal */
 @keyframes glow-pulse {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 20px rgba(33, 128, 141, 0.3);
   }
   50% {
-    box-shadow: 0 0 40px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 40px rgba(33, 128, 141, 0.5);
   }
 }
 

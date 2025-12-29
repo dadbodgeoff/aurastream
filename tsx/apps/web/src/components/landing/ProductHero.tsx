@@ -82,7 +82,7 @@ export function ProductHero() {
           <div 
             className="absolute w-[300px] h-[300px] sm:w-[600px] sm:h-[600px] rounded-full blur-[60px] sm:blur-[100px] opacity-30 pointer-events-none will-change-transform"
             style={{
-              background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(33, 128, 141, 0.3) 0%, transparent 70%)',
               top: '20%',
               right: '10%',
               transform: isTouch || isMobile 
@@ -214,13 +214,13 @@ export function ProductHero() {
               {/* Platform logos */}
               <div 
                 className={cn(
-                  "flex items-center justify-center lg:justify-start gap-5",
+                  "flex items-center justify-center lg:justify-start gap-6",
                   "transition-all duration-700 ease-out delay-500",
                   isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
                 )}
               >
                 <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Works with</span>
-                <div className="flex items-center gap-5 scroll-reveal-stagger">
+                <div className="flex items-center gap-6 scroll-reveal-stagger">
                   {PLATFORMS.map(({ name, icon: Icon }) => (
                     <Icon 
                       key={name} 

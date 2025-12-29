@@ -75,7 +75,7 @@ export function LandingNav() {
               <Link
                 href="/signup"
                 className={cn(
-                  'text-sm font-semibold px-5 py-2.5 rounded-lg transition-all duration-300',
+                  'text-sm font-semibold px-6 py-3 rounded-lg transition-all duration-300',
                   'bg-interactive-600 text-white',
                   'hover:bg-interactive-500 hover:scale-[1.02] active:scale-[0.98]',
                   'shadow-lg shadow-interactive-600/25 hover:shadow-xl hover:shadow-interactive-600/35'

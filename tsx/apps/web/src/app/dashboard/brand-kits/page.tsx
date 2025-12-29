@@ -42,8 +42,8 @@ interface BrandKitFormProps {
 function BrandKitForm({ isOpen, onClose, brandKit, onSave }: BrandKitFormProps) {
   const [name, setName] = useState(brandKit?.name || '');
   const [tone, setTone] = useState(brandKit?.tone || 'professional');
-  const [primaryColors, setPrimaryColors] = useState<string[]>(brandKit?.primary_colors || ['#6366f1']);
-  const [accentColors, setAccentColors] = useState<string[]>(brandKit?.accent_colors || ['#f59e0b']);
+  const [primaryColors, setPrimaryColors] = useState<string[]>(brandKit?.primary_colors || ['#21808D']);
+  const [accentColors, setAccentColors] = useState<string[]>(brandKit?.accent_colors || ['#A84F2F']);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async () => {
@@ -152,7 +152,7 @@ function BrandKitForm({ isOpen, onClose, brandKit, onSave }: BrandKitFormProps) 
             ))}
             {primaryColors.length < 3 && (
               <button
-                onClick={() => setPrimaryColors([...primaryColors, '#000000'])}
+                onClick={() => setPrimaryColors([...primaryColors, '#21808D'])}
                 className="w-12 h-12 rounded-lg border-2 border-dashed border-border-subtle flex items-center justify-center text-text-muted hover:border-interactive-600 hover:text-interactive-600 transition-colors"
               >
                 <PlusIcon className="w-5 h-5" />
@@ -181,7 +181,7 @@ function BrandKitForm({ isOpen, onClose, brandKit, onSave }: BrandKitFormProps) 
             ))}
             {accentColors.length < 3 && (
               <button
-                onClick={() => setAccentColors([...accentColors, '#000000'])}
+                onClick={() => setAccentColors([...accentColors, '#32B8C6'])}
                 className="w-12 h-12 rounded-lg border-2 border-dashed border-border-subtle flex items-center justify-center text-text-muted hover:border-interactive-600 hover:text-interactive-600 transition-colors"
               >
                 <PlusIcon className="w-5 h-5" />
@@ -304,7 +304,7 @@ export default function BrandKitsPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowVibeBranding(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
             <Sparkles className="w-4 h-4" />
             Import from Image

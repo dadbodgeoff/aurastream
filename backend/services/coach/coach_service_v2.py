@@ -171,11 +171,11 @@ class CreativeDirectorServiceV2:
         Yields:
             StreamChunk objects with tokens, intent status, etc.
         """
-        # Tier check
-        if tier != "studio":
+        # Tier check - Pro and Studio have access
+        if tier not in ("pro", "studio"):
             yield StreamChunk(
                 type="error",
-                content="Creative Director requires Studio subscription",
+                content="Creative Director requires Pro or Studio subscription",
             )
             return
         

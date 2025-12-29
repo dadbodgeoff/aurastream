@@ -15,7 +15,7 @@ export function IdentityPanel({
 }: IdentityPanelProps) {
   const addPrimaryColor = () => {
     if (identity.primaryColors.length < 5) {
-      onChange({ ...identity, primaryColors: [...identity.primaryColors, '#3B82F6'] });
+      onChange({ ...identity, primaryColors: [...identity.primaryColors, '#21808D'] });
     }
   };
 

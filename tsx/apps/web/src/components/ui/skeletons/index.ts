@@ -6,7 +6,7 @@
  * 
  * Features:
  * - Shimmer animation with reduced motion support
- * - Brand-colored shimmer option (purple tint)
+ * - Brand-colored shimmer option (teal tint)
  * - Dark mode support
  * - Responsive layouts
  * - Contextual loading messages for accessibility

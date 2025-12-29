@@ -133,9 +133,9 @@ const VARIANT_CONFIG: Record<ToastVariant, {
   },
   info: {
     icon: 'ℹ',
-    borderColor: 'border-l-blue-500',
-    iconColor: 'text-blue-500',
-    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-l-primary-500',
+    iconColor: 'text-primary-500',
+    bgColor: 'bg-primary-500/10',
   },
 };
 
@@ -465,7 +465,7 @@ export function Toast({ toast: toastData, onDismiss }: ToastProps): JSX.Element 
         // Base styles
         'relative flex items-start gap-3 p-4 rounded-lg cursor-pointer',
         'bg-background-surface/95 backdrop-blur-sm',
-        'shadow-lg',
+        'shadow-xl', // Elevation 4 per premium spec (toasts/floating actions)
         borderStyles,
         // Animation
         animationClasses,

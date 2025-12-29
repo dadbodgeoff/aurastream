@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useBrandKits, useLogos, useGenerateAsset } from '@aurastream/api-client';
+import { useBrandKits, useLogos, useGenerateAsset, useTemplate } from '@aurastream/api-client';
 import type { LogoPosition, LogoSize } from '@aurastream/api-client';
 
 import { StepIndicator } from './shared';
 import { BoltIcon } from './icons';
 import { TemplateGrid, CustomizeForm, ReviewPanel } from './panels';
-import type { QuickTemplate, TemplateCategory, WizardStep } from './types';
+import { getVibeUIMeta } from './constants';
+import type { QuickTemplate, TemplateCategory, WizardStep, TemplateField } from './types';
 
 const STEPS = ['Choose Template', 'Customize', 'Review'];
 
@@ -28,9 +29,58 @@ export function QuickCreateWizard() {
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('bottom-right');
   const [logoSize, setLogoSize] = useState<LogoSize>('medium');
 
+  // Fetch dynamic fields from backend when template is selected
+  const { data: backendTemplate } = useTemplate(template?.id ?? null);
+
   const brandKits = brandKitsData?.brandKits ?? [];
   const { data: logosData } = useLogos(brandKitId || undefined);
   const hasLogo = logosData?.logos?.primary != null;
+
+  // Merge backend fields with frontend template
+  // Backend fields take precedence (they have the latest placeholders)
+  const mergedTemplate = useMemo(() => {
+    if (!template) return null;
+    if (!backendTemplate) return template;
+
+    // Merge fields: use backend fields, but keep frontend-only fields (like dynamic_select)
+    const backendFieldIds = new Set(backendTemplate.fields.map(f => f.id));
+    const frontendOnlyFields = template.fields.filter(f => 
+      !backendFieldIds.has(f.id) && (f.type === 'dynamic_select' || f.dependsOn)
+    );
+
+    // Convert backend fields to frontend format
+    const convertedBackendFields: TemplateField[] = backendTemplate.fields.map(f => ({
+      id: f.id,
+      label: f.label,
+      type: f.type as any,
+      required: f.required,
+      placeholder: f.placeholder,
+      hint: f.hint,
+      description: f.description,
+      maxLength: f.maxLength,
+      options: f.options,
+      default: f.default,
+      showForVibes: f.showForVibes,
+    }));
+
+    // Merge vibes: use backend vibes but add UI metadata from frontend
+    const mergedVibes = backendTemplate.vibes.map(bv => {
+      const uiMeta = getVibeUIMeta(template.id, bv.id);
+      return {
+        id: bv.id,
+        name: bv.name,
+        tagline: uiMeta.tagline || bv.description || '',
+        icon: uiMeta.icon || '✨',
+        gradient: uiMeta.gradient || 'from-primary-600 to-primary-800',
+      };
+    });
+
+    return {
+      ...template,
+      fields: [...convertedBackendFields, ...frontendOnlyFields],
+      vibes: mergedVibes.length > 0 ? mergedVibes : template.vibes,
+    };
+  }, [template, backendTemplate]);
 
   // Auto-select active brand kit
   useMemo(() => {
@@ -40,17 +90,33 @@ export function QuickCreateWizard() {
     }
   }, [brandKits, brandKitId]);
 
+  // Initialize form values with defaults when template changes
+  useEffect(() => {
+    if (mergedTemplate && Object.keys(formValues).length === 0) {
+      const defaults: Record<string, string> = {};
+      mergedTemplate.fields.forEach(f => {
+        if (f.default && !f.required) {
+          // Only set defaults for optional fields
+          defaults[f.id] = f.default;
+        }
+      });
+      if (Object.keys(defaults).length > 0) {
+        setFormValues(prev => ({ ...defaults, ...prev }));
+      }
+    }
+  }, [mergedTemplate, formValues]);
+
   const stepIndex = step === 'select' ? 0 : step === 'customize' ? 1 : 2;
 
   const isFormValid = useMemo(() => {
-    if (!template) return false;
-    return template.fields.filter(f => f.required).every(f => formValues[f.id]?.trim());
-  }, [template, formValues]);
+    if (!mergedTemplate) return false;
+    return mergedTemplate.fields.filter(f => f.required).every(f => formValues[f.id]?.trim());
+  }, [mergedTemplate, formValues]);
 
   const selectedVibeOption = useMemo(() => {
-    if (!template || !selectedVibe) return null;
-    return template.vibes.find(v => v.id === selectedVibe) || null;
-  }, [template, selectedVibe]);
+    if (!mergedTemplate || !selectedVibe) return null;
+    return mergedTemplate.vibes.find(v => v.id === selectedVibe) || null;
+  }, [mergedTemplate, selectedVibe]);
 
   const handleSelectTemplate = useCallback((t: QuickTemplate) => {
     setTemplate(t);
@@ -72,28 +138,28 @@ export function QuickCreateWizard() {
    * proprietary prompt from YAML files.
    */
   const buildPrompt = useCallback(() => {
-    if (!template || !selectedVibe) return '';
+    if (!mergedTemplate || !selectedVibe) return '';
     
     const parts: string[] = [];
     
     // Template and vibe identifier (backend uses this to load YAML prompt)
-    parts.push(`__quick_create__:${template.id}:${selectedVibe}`);
+    parts.push(`__quick_create__:${mergedTemplate.id}:${selectedVibe}`);
     
     // User field values (these get injected into placeholders)
-    template.fields.forEach(f => {
+    mergedTemplate.fields.forEach(f => {
       const v = formValues[f.id];
       if (v) parts.push(`${f.id}:${v}`);
     });
     
     return parts.join(' | ');
-  }, [template, formValues, selectedVibe]);
+  }, [mergedTemplate, formValues, selectedVibe]);
 
   const handleGenerate = async () => {
-    if (!template || !selectedVibe) return;
+    if (!mergedTemplate || !selectedVibe) return;
     try {
       // Determine the asset type - for emotes, use platform + size-specific type
-      let assetType = template.assetType;
-      if (template.id === 'emote' && formValues.size && formValues.platform) {
+      let assetType = mergedTemplate.assetType;
+      if (mergedTemplate.id === 'emote' && formValues.size && formValues.platform) {
         // Build platform-specific emote type: twitch_emote_112, tiktok_emote_300, etc.
         assetType = `${formValues.platform}_emote_${formValues.size}`;
       }
@@ -120,13 +186,13 @@ export function QuickCreateWizard() {
   return (
     <div className="max-w-4xl mx-auto pb-12">
       {/* Header */}
-      <div className="mb-8 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-interactive-600 to-interactive-500 flex items-center justify-center shadow-lg shadow-interactive-600/25">
+      <div className="mb-6 flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-interactive-600 to-interactive-500 flex items-center justify-center shadow-md shadow-interactive-600/25">
           <BoltIcon />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Quick Create</h1>
-          <p className="text-text-secondary">Professional templates, instant results</p>
+          <h1 className="text-xl font-bold text-text-primary">Quick Create</h1>
+          <p className="text-sm text-text-secondary">Professional templates, instant results</p>
         </div>
       </div>
 
@@ -140,9 +206,9 @@ export function QuickCreateWizard() {
         />
       )}
 
-      {step === 'customize' && template && (
+      {step === 'customize' && mergedTemplate && (
         <CustomizeForm
-          template={template}
+          template={mergedTemplate}
           formValues={formValues}
           onFieldChange={handleFieldChange}
           selectedVibe={selectedVibe}
@@ -164,9 +230,9 @@ export function QuickCreateWizard() {
         />
       )}
 
-      {step === 'review' && template && (
+      {step === 'review' && mergedTemplate && (
         <ReviewPanel
-          template={template}
+          template={mergedTemplate}
           formValues={formValues}
           selectedVibe={selectedVibeOption}
           brandKitName={brandKits.find(k => k.id === brandKitId)?.name || null}

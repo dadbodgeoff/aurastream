@@ -206,7 +206,7 @@ export function FusionResultCard({
               initial={{ scale: 0, x: -20 }}
               animate={{ scale: 1, x: 0 }}
               transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/90 text-white text-xs font-bold shadow-lg"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-500/90 text-white text-xs font-bold shadow-lg"
             >
               <Star className="w-3.5 h-3.5" />
               NEW RECIPE DISCOVERED

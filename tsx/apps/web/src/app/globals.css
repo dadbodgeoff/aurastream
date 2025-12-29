@@ -3,8 +3,35 @@
 @tailwind utilities;
 
 :root {
-  --background: #0F172A;
-  --foreground: #F8FAFC;
+  /* Premium UI Spec - Teal Primary Palette */
+  --background: #1F2121;
+  --foreground: #FCFCF9;
+  
+  /* Primary Colors */
+  --color-primary-500: #21808D;
+  --color-primary-600: #247380;
+  --color-primary-700: #1A7373;
+  --color-primary-300: #32B8C6;
+  
+  /* Neutral Colors */
+  --color-gray-900: #131B3B;
+  --color-gray-800: #262828;
+  --color-gray-700: #1F2121;
+  --color-gray-400: #777C7C;
+  --color-gray-300: #A7A9A9;
+  --color-gray-100: #F5F5F5;
+  --color-gray-50: #FCFCF9;
+  
+  /* Semantic Colors */
+  --color-success: #218081;
+  --color-warning: #A84F2F;
+  --color-error: #C0152F;
+  --color-info: #62756E;
+  
+  /* Opacity Scale */
+  --opacity-disabled: 0.40;
+  --opacity-hover: 0.85;
+  --opacity-focus-ring: 0.40;
 }
 
 html {
@@ -17,23 +44,23 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Custom scrollbar for dark theme */
+/* Custom scrollbar for dark theme - Premium Teal */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1E293B;
+  background: #262828;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #777C7C;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748B;
+  background: #A7A9A9;
 }
 
 /* Hide scrollbar utility */
@@ -102,10 +129,10 @@ body {
 
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+    box-shadow: 0 0 20px rgba(33, 128, 141, 0.3);
   }
   50% {
-    box-shadow: 0 0 40px rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 40px rgba(33, 128, 141, 0.5);
   }
 }
 
@@ -200,12 +227,12 @@ body {
    SKELETON SHIMMER UTILITIES
    ============================================ */
 
-/* CSS Variables for skeleton theming */
+/* CSS Variables for skeleton theming - Premium Teal */
 :root {
   --skeleton-base: rgba(255, 255, 255, 0.05);
   --skeleton-highlight: rgba(255, 255, 255, 0.1);
-  --skeleton-brand-base: rgba(139, 92, 246, 0.1);
-  --skeleton-brand-highlight: rgba(139, 92, 246, 0.2);
+  --skeleton-brand-base: rgba(33, 128, 141, 0.1);
+  --skeleton-brand-highlight: rgba(33, 128, 141, 0.2);
 }
 
 /* Standard skeleton shimmer */
@@ -293,9 +320,9 @@ body {
   }
 }
 
-/* Gradient text */
+/* Gradient text - Premium Teal */
 .gradient-text {
-  background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 50%, #EC4899 100%);
+  background: linear-gradient(135deg, #21808D 0%, #32B8C6 50%, #247380 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -308,13 +335,22 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Glow effects */
+/* Glow effects - Premium Teal */
+.glow-primary {
+  box-shadow: 0 0 40px rgba(33, 128, 141, 0.3);
+}
+
+.glow-teal {
+  box-shadow: 0 0 40px rgba(50, 184, 198, 0.3);
+}
+
+/* Legacy aliases */
 .glow-violet {
-  box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
+  box-shadow: 0 0 40px rgba(33, 128, 141, 0.3);
 }
 
 .glow-purple {
-  box-shadow: 0 0 40px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 40px rgba(33, 128, 141, 0.3);
 }
 
 /* ============================================

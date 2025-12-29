@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: milestone
-version: "1.0.0"
+version: "1.1.0"
 category: social
 asset_type: story_graphic
 dimensions:
@@ -14,32 +14,92 @@ vibes:
   pro:
     name: "Golden Trophy"
     prompt: |
-      A vertical 9:16 3D render of a massive, polished gold trophy shaped like the number '{count}'. The trophy is sitting on a high-gloss stage reflecting 'Gamer-Blue' stage lights. Floating 3D text above reads 'NEW {type} ACHIEVED'. Falling 3D metallic confetti and volumetric spotlights. Triumphant, luxury esports aesthetic.
+      A vertical 9:16 3D render of a massive, polished gold trophy shaped like the number '{count}'. The trophy is sitting on a high-gloss stage reflecting {accent_color} stage lights. Floating 3D text above reads 'NEW {type} ACHIEVED'. Falling 3D metallic confetti and volumetric spotlights. Triumphant, luxury esports aesthetic.
   
   anime:
     name: "Level Up"
     prompt: |
-      A vertical 9:16 anime-style level-up celebration. Dramatic golden light rays bursting from center. The number '{count}' rendered in massive metallic 3D with energy aura. Floating icons representing {type} swirling around. Vibrant cel-shaded style, epic achievement moment, anime game aesthetic.
+      A vertical 9:16 anime-style level-up celebration. Dramatic {accent_color} light rays bursting from center. The number '{count}' rendered in massive metallic 3D with energy aura. {character_description} celebrating nearby. Floating icons representing {type} swirling around. Vibrant cel-shaded style, epic achievement moment, anime game aesthetic.
   
   playful:
     name: "Pop-Art Celebration"
     prompt: |
-      A vertical 9:16 vibrant pop-art illustration. A large, comic-book style speech bubble contains the number '{count}'. Surrounding the number are 3D icons of {type} (hearts for followers, stars for subs). Bright 'Halftone' patterns in the background, neon colors, 'Level Up' energy, very high energy.
+      A vertical 9:16 vibrant pop-art illustration. A large, comic-book style speech bubble contains the number '{count}'. Surrounding the number are 3D icons of {type} (hearts for followers, stars for subs). {character_description} celebrating in the corner. Bright 'Halftone' patterns in the background, {accent_color} neon colors, 'Level Up' energy, very high energy.
 
 placeholders:
   - name: type
     type: select
     required: true
+    label: "Milestone Type"
+    description: "What you're celebrating"
     options:
-      - followers
-      - subs
-      - viewers
+      - label: "Followers"
+        value: "followers"
+      - label: "Subscribers"
+        value: "subs"
+      - label: "Peak Viewers"
+        value: "viewers"
     default: "followers"
+  
   - name: count
     type: text
     required: true
+    label: "Number"
+    description: "The milestone number"
+    placeholder: "10,000"
     max_length: 20
     default: "1,000"
+  
+  - name: character_description
+    type: select
+    required: false
+    label: "Character Style (optional)"
+    description: "Who celebrates with you"
+    hint: "Optional - only used with Anime and Pop-Art vibes"
+    show_for_vibes:
+      - anime
+      - playful
+    options:
+      - label: "No Character"
+        value: ""
+      - label: "Celebrating Character"
+        value: "A celebrating character"
+      - label: "Chibi Character"
+        value: "A cute chibi character"
+      - label: "Anime Character"
+        value: "An excited anime character"
+      - label: "Gaming Mascot"
+        value: "A gaming mascot"
+      - label: "Streamer Avatar"
+        value: "A streamer avatar"
+    default: ""
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main celebration color"
+    hint: "Optional - defaults to gold/celebratory colors"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Gold"
+        value: "gold"
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Pink"
+        value: "pink"
+      - label: "Orange"
+        value: "orange"
+      - label: "Blue"
+        value: "blue"
+      - label: "Green"
+        value: "green"
+      - label: "Rainbow"
+        value: "rainbow"
+    default: ""
 
 quality_modifiers:
   - "celebratory"

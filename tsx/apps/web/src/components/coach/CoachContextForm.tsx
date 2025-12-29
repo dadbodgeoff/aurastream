@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { useBrandKits } from '@aurastream/api-client';
 import type { BrandKit } from '@aurastream/api-client';
@@ -126,7 +126,7 @@ interface TrialBannerProps {
 function TrialBanner({ trialAvailable, trialUsed, upgradeMessage }: TrialBannerProps) {
   if (trialAvailable) {
     return (
-      <div className="mb-6 p-4 bg-gradient-to-r from-accent-600/10 to-purple-600/10 border border-accent-600/20 rounded-lg">
+      <div className="mb-6 p-4 bg-gradient-to-r from-accent-600/10 to-primary-600/10 border border-accent-600/20 rounded-lg">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-accent-600/20 flex items-center justify-center text-accent-500 flex-shrink-0">
             <GiftIcon />
@@ -178,100 +178,179 @@ interface BrandKitSelectorProps {
   brandKits: BrandKit[];
   selectedKit: BrandKit | null;
   onSelect: (kit: BrandKit) => void;
+  onClear: () => void;
   isLoading: boolean;
 }
 
-function BrandKitSelector({ brandKits, selectedKit, onSelect, isLoading }: BrandKitSelectorProps) {
+// Default teal gradient when no colors
+const DEFAULT_GRADIENT = 'linear-gradient(135deg, #21808D 0%, #32B8C6 100%)';
+
+function BrandKitSelector({ brandKits, selectedKit, onSelect, onClear, isLoading }: BrandKitSelectorProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (isLoading) {
     return (
-      <div className="p-6 bg-background-surface border border-border-default rounded-lg text-center">
+      <div className="h-11 bg-background-surface border border-border-default rounded-lg flex items-center justify-center">
         <LoadingSpinner />
-        <p className="text-text-secondary mt-2">Loading brand kits...</p>
       </div>
     );
   }
 
-  if (brandKits.length === 0) {
-    return (
-      <div className="p-6 bg-background-surface border border-border-default rounded-lg">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <p className="text-text-primary font-medium mb-1">No brand kits yet</p>
-            <p className="text-text-secondary text-sm mb-3">
-              You can still use Prompt Coach without a brand kit. For best results, create one to get personalized suggestions.
-            </p>
-            <Link
-              href="/dashboard/brand-kits"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-accent-600 text-white text-sm rounded-lg hover:bg-accent-500 transition-colors"
-            >
-              Create Brand Kit
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const selectedColors = selectedKit 
+    ? [...(selectedKit.primary_colors || []), ...(selectedKit.accent_colors || [])]
+    : [];
 
   return (
-    <div 
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-      role="radiogroup"
-      aria-label="Select a brand kit"
-    >
-      {brandKits.map((kit) => {
-        const isSelected = selectedKit?.id === kit.id;
-        const allColors = [...(kit.primary_colors || []), ...(kit.accent_colors || [])];
+    <div ref={dropdownRef} className="relative">
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full h-11 px-3 rounded-lg border text-left transition-all flex items-center gap-3 ${
+          isOpen 
+            ? 'border-accent-600 ring-2 ring-accent-600/20 bg-background-surface' 
+            : 'border-border-default bg-background-surface hover:border-border-hover'
+        }`}
+      >
+        {/* Color indicator */}
+        {selectedKit ? (
+          <div 
+            className="w-5 h-5 rounded flex-shrink-0"
+            style={{ 
+              background: selectedColors.length > 0 
+                ? `linear-gradient(135deg, ${selectedColors[0]} 0%, ${selectedColors[1] || selectedColors[0]} 100%)`
+                : DEFAULT_GRADIENT 
+            }}
+          />
+        ) : (
+          <div className="w-5 h-5 rounded bg-background-elevated flex items-center justify-center flex-shrink-0">
+            <svg className="w-3 h-3 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+          </div>
+        )}
         
-        return (
+        <span className={`flex-1 text-sm truncate ${selectedKit ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>
+          {selectedKit?.name || 'No brand kit selected'}
+        </span>
+
+        {selectedKit?.is_active && (
+          <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase">
+            Active
+          </span>
+        )}
+        
+        <svg 
+          className={`w-4 h-4 text-text-tertiary transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu */}
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 py-1 rounded-lg border border-border-default bg-background-surface shadow-lg max-h-56 overflow-y-auto">
+          {/* None option */}
           <button
-            key={kit.id}
             type="button"
-            role="radio"
-            aria-checked={isSelected}
-            onClick={() => onSelect(kit)}
-            className={`p-4 rounded-lg border text-left transition-all ${
-              isSelected
-                ? 'border-accent-600 bg-accent-600/5 ring-2 ring-accent-600/20'
-                : 'border-border-default bg-background-surface hover:border-border-hover'
+            onClick={() => { onClear(); setIsOpen(false); }}
+            className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors hover:bg-background-elevated ${
+              !selectedKit ? 'bg-accent-600/5' : ''
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-text-primary truncate">{kit.name}</h3>
-                <p className="text-xs text-text-tertiary mt-1 capitalize">{kit.tone}</p>
-                <div className="flex gap-1 mt-2 flex-wrap" aria-label="Brand colors">
-                  {allColors.slice(0, 5).map((color, i) => (
-                    <div
-                      key={i}
-                      className="w-5 h-5 rounded-full border border-border-default"
-                      style={{ backgroundColor: color }}
-                      title={color}
-                    />
-                  ))}
-                  {allColors.length > 5 && (
-                    <span className="text-xs text-text-tertiary self-center ml-1">
-                      +{allColors.length - 5}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {isSelected && (
-                <div className="text-accent-600 ml-2 flex-shrink-0">
-                  <CheckIcon />
-                </div>
-              )}
+            <div className="w-5 h-5 rounded bg-background-elevated flex items-center justify-center flex-shrink-0">
+              <svg className="w-3 h-3 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
             </div>
+            <span className={`flex-1 text-sm ${!selectedKit ? 'text-accent-600 font-medium' : 'text-text-primary'}`}>
+              No brand kit
+            </span>
+            {!selectedKit && <CheckIcon />}
           </button>
-        );
-      })}
+
+          {brandKits.length > 0 && <div className="h-px bg-border-default mx-2 my-1" />}
+
+          {/* Brand kit options */}
+          {brandKits.map((kit) => {
+            const colors = [...(kit.primary_colors || []), ...(kit.accent_colors || [])];
+            const isSelected = selectedKit?.id === kit.id;
+            
+            return (
+              <button
+                key={kit.id}
+                type="button"
+                onClick={() => { onSelect(kit); setIsOpen(false); }}
+                className={`w-full px-3 py-2 flex items-center gap-3 text-left transition-colors hover:bg-background-elevated ${
+                  isSelected ? 'bg-accent-600/5' : ''
+                }`}
+              >
+                <div 
+                  className="w-5 h-5 rounded flex-shrink-0"
+                  style={{ 
+                    background: colors.length > 0 
+                      ? `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1] || colors[0]} 100%)`
+                      : DEFAULT_GRADIENT 
+                  }}
+                />
+                <span className={`flex-1 text-sm truncate ${isSelected ? 'text-accent-600 font-medium' : 'text-text-primary'}`}>
+                  {kit.name}
+                </span>
+                {kit.is_active && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase">
+                    Active
+                  </span>
+                )}
+                {isSelected && <CheckIcon />}
+              </button>
+            );
+          })}
+
+          {/* Create new link */}
+          {brandKits.length === 0 && (
+            <div className="px-3 py-2 border-t border-border-default">
+              <Link
+                href="/dashboard/brand-kits"
+                className="inline-flex items-center gap-1 text-sm text-accent-600 hover:text-accent-500 font-medium"
+                onClick={() => setIsOpen(false)}
+              >
+                Create a brand kit
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+// Asset type icons
+const ASSET_TYPE_ICONS: Record<string, string> = {
+  twitch_emote: '😎',
+  youtube_thumbnail: '🖼️',
+  twitch_banner: '🎨',
+  twitch_badge: '🏅',
+  overlay: '✨',
+  story_graphic: '📱',
+};
 
 interface AssetTypeSelectorProps {
   selectedType: AssetType | null;
@@ -281,12 +360,13 @@ interface AssetTypeSelectorProps {
 function AssetTypeSelector({ selectedType, onSelect }: AssetTypeSelectorProps) {
   return (
     <div 
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+      className="grid grid-cols-2 sm:grid-cols-3 gap-2"
       role="radiogroup"
       aria-label="Select an asset type"
     >
       {ASSET_TYPES.map((type) => {
         const isSelected = selectedType === type.id;
+        const icon = ASSET_TYPE_ICONS[type.id] || '🎯';
         
         return (
           <button
@@ -295,22 +375,25 @@ function AssetTypeSelector({ selectedType, onSelect }: AssetTypeSelectorProps) {
             role="radio"
             aria-checked={isSelected}
             onClick={() => onSelect(type.id)}
-            className={`p-4 rounded-lg border text-left transition-all ${
+            className={`relative p-3 rounded-lg border text-left transition-all ${
               isSelected
-                ? 'border-accent-600 bg-accent-600/5 ring-2 ring-accent-600/20'
+                ? 'border-accent-600 bg-accent-600/5 ring-1 ring-accent-600/20'
                 : 'border-border-default bg-background-surface hover:border-border-hover'
             }`}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-medium text-text-primary">{type.label}</h3>
-                <p className="text-sm text-text-secondary mt-1">{type.description}</p>
+            {isSelected && (
+              <div className="absolute top-2 right-2 w-4 h-4 bg-accent-600 rounded-full flex items-center justify-center text-white">
+                <CheckIcon />
               </div>
-              {isSelected && (
-                <div className="text-accent-600 ml-2 flex-shrink-0">
-                  <CheckIcon />
-                </div>
-              )}
+            )}
+            <div className="flex items-start gap-2">
+              <span className="text-base flex-shrink-0">{icon}</span>
+              <div className="min-w-0">
+                <h3 className={`font-medium text-sm leading-tight ${isSelected ? 'text-accent-600' : 'text-text-primary'}`}>
+                  {type.label}
+                </h3>
+                <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{type.description}</p>
+              </div>
             </div>
           </button>
         );
@@ -579,6 +662,7 @@ export function CoachContextForm({ onStartChat, isLoading = false }: CoachContex
           brandKits={brandKits}
           selectedKit={state.selectedBrandKit}
           onSelect={setSelectedBrandKit}
+          onClear={() => setSelectedBrandKit(null as unknown as BrandKit)}
           isLoading={isBrandKitsLoading}
         />
       </section>

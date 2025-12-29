@@ -26,7 +26,7 @@ const QUICK_ACTIONS: QuickAction[] = [
       </svg>
     ),
     href: '/dashboard/create?type=twitch_emote',
-    gradient: 'from-purple-500/20 to-pink-500/20',
+    gradient: 'from-primary-500/20 to-interactive-500/20',
   },
   {
     id: 'thumbnails',
@@ -54,7 +54,7 @@ const QUICK_ACTIONS: QuickAction[] = [
       </svg>
     ),
     href: '/dashboard/create?type=overlay',
-    gradient: 'from-blue-500/20 to-cyan-500/20',
+    gradient: 'from-primary-500/20 to-cyan-500/20',
   },
   {
     id: 'vibe',
@@ -84,7 +84,7 @@ export function QuickActionCards({ className }: QuickActionCardsProps) {
           key={action.id}
           href={action.href}
           className={cn(
-            'group relative p-4 md:p-5 rounded-xl border border-border-subtle bg-background-surface overflow-hidden',
+            'group relative p-4 md:p-6 rounded-xl border border-border-subtle bg-background-surface overflow-hidden',
             'hover:border-interactive-500/50 hover:shadow-lg transition-all duration-200'
           )}
         >

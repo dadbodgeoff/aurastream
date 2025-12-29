@@ -19,7 +19,7 @@ import { useReducedMotion } from '@aurastream/shared';
 export interface CoachMessageSkeletonProps {
   /** Number of message skeletons to render (default: 3) */
   count?: number;
-  /** Whether to use brand-colored shimmer (purple tint) */
+  /** Whether to use brand-colored shimmer (teal tint) */
   brandColored?: boolean;
   /** Additional CSS classes */
   className?: string;

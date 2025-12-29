@@ -19,7 +19,7 @@ import { useReducedMotion } from '@aurastream/shared';
 export interface BrandKitCardSkeletonProps {
   /** Number of skeleton cards to render (default: 3) */
   count?: number;
-  /** Whether to use brand-colored shimmer (purple tint) */
+  /** Whether to use brand-colored shimmer (teal tint) */
   brandColored?: boolean;
   /** Additional CSS classes */
   className?: string;
@@ -46,7 +46,7 @@ const BrandKitCardSkeletonItem = memo(function BrandKitCardSkeletonItem({
   return (
     <div
       aria-hidden="true"
-      className="bg-background-surface/50 border border-border-subtle rounded-xl p-5"
+      className="bg-background-surface/50 border border-border-subtle rounded-xl p-6"
     >
       {/* Header with logo and name */}
       <div className="flex items-start gap-4 mb-4">

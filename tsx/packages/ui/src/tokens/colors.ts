@@ -1,114 +1,126 @@
 /**
- * Streamer Studio Color Tokens
- * Enterprise Design System
+ * AuraStream Color Tokens
+ * Premium Enterprise Design System
  * 
- * Color Palette - Professional enterprise palette with navy primary,
- * blue interactive, amber accent, and slate neutrals
+ * Based on Premium UI Spec - Teal primary, professional neutrals
+ * Updated: December 2025
  */
 
 export const colors = {
-  // Primary - Navy Blue (Brand identity)
+  // Primary - Teal (Brand identity) - Premium spec primary
   primary: {
-    50: '#EBF2F8',
-    100: '#D4E2F0',
-    200: '#A8C4E0',
-    300: '#7A9FCC',
-    400: '#4A7AB8',
-    500: '#2E5A95',
-    600: '#264A7A',
-    700: '#1E3A5F',  // Main brand
-    800: '#152A42',
-    900: '#0F1D2F',
+    50: '#E6F4F5',
+    100: '#CCE9EB',
+    200: '#99D3D7',
+    300: '#66BDC3',
+    400: '#33A7AF',
+    500: '#21808D',  // Main brand - Premium spec primary
+    600: '#1B6A75',  // Hover state
+    700: '#15545D',  // Active state
+    800: '#0F3E45',
+    900: '#09282D',
   },
   
-  // Interactive - Blue (Actions/Links)
+  // Interactive - Teal (Actions/Links) - Aligned with primary
   interactive: {
-    50: '#EFF6FF',
-    100: '#DBEAFE',
-    200: '#BFDBFE',
-    300: '#93C5FD',
-    400: '#60A5FA',
-    500: '#3B82F6',  // Hover
-    600: '#2563EB',  // Main
-    700: '#1D4ED8',
-    800: '#1E40AF',
-    900: '#1E3A8A',
+    50: '#E6F4F5',
+    100: '#CCE9EB',
+    200: '#99D3D7',
+    300: '#32B8C6',  // Light variant for dark mode
+    400: '#33A7AF',
+    500: '#21808D',  // Main interactive
+    600: '#247380',  // Hover
+    700: '#1A7373',  // Deep active
+    800: '#15545D',
+    900: '#09282D',
   },
   
-  // Accent - Amber (Highlights/CTAs)
+  // Accent - Warm Coral/Orange (Highlights/CTAs) - Premium warmth
   accent: {
-    50: '#FFFBEB',
-    100: '#FEF3C7',
-    200: '#FDE68A',
-    300: '#FCD34D',
-    400: '#FBBF24',
-    500: '#F59E0B',  // Highlight
-    600: '#D97706',  // Main
-    700: '#B45309',
-    800: '#92400E',
-    900: '#78350F',
+    50: '#FEF3ED',
+    100: '#FDE7DB',
+    200: '#FBCFB7',
+    300: '#F9B793',
+    400: '#F79F6F',
+    500: '#A84F2F',  // Warning tone from premium spec
+    600: '#8A4127',
+    700: '#6C331F',
+    800: '#4E2517',
+    900: '#30170F',
   },
   
-  // Neutral - Slate (UI elements)
+  // Neutral - Premium Slate/Charcoal (UI elements)
   neutral: {
-    50: '#FFFFFF',
-    100: '#F8FAFC',
-    200: '#F1F5F9',
-    300: '#E2E8F0',
-    400: '#CBD5E1',
-    500: '#94A3B8',
-    600: '#64748B',
-    700: '#475569',
-    800: '#334155',
-    900: '#1E293B',
-    950: '#0F172A',
+    50: '#FCFCF9',   // Cream - Premium spec main background
+    100: '#F5F5F5',  // Off-white - Premium spec surfaces
+    200: '#E8E8E8',
+    300: '#A7A9A9',  // Light - Subtle borders
+    400: '#777C7C',  // Medium - Muted text
+    500: '#62756E',  // Slate info color
+    600: '#475569',
+    700: '#1F2121',  // Darker - Modal overlays
+    800: '#262828',  // Dark - Surface in dark mode
+    900: '#131B3B',  // Charcoal - Text on light backgrounds
+    950: '#0F172A',  // Deep dark
   },
   
-  // Semantic Colors
+  // Semantic Colors - Premium spec aligned
   success: {
     light: '#86efac',
-    main: '#22c55e',
+    main: '#218081',  // Premium spec success (teal-green)
     dark: '#16a34a',
   },
   warning: {
     light: '#fde047',
-    main: '#eab308',
-    dark: '#ca8a04',
+    main: '#A84F2F',  // Premium spec warning (warm orange)
+    dark: '#92400E',
   },
   error: {
     light: '#fca5a5',
-    main: '#ef4444',
-    dark: '#dc2626',
+    main: '#C0152F',  // Premium spec error (deep red)
+    dark: '#9f1239',
   },
   info: {
-    light: '#93C5FD',
-    main: '#3B82F6',
-    dark: '#1D4ED8',
+    light: '#99D3D7',
+    main: '#62756E',  // Premium spec info (slate)
+    dark: '#475569',
   },
   
-  // Backgrounds (Dark Theme)
+  // Backgrounds (Dark Theme) - Premium spec aligned
   background: {
-    base: '#0F172A',      // Slate 950
-    surface: '#1E293B',   // Slate 900
-    elevated: '#334155',  // Slate 800
-    overlay: 'rgba(15, 23, 42, 0.8)',
+    default: '#FCFCF9',   // Cream for light mode
+    base: '#1F2121',      // Dark mode base
+    surface: '#262828',   // Dark mode surface
+    elevated: '#334155',  // Elevated surfaces
+    overlay: 'rgba(31, 33, 33, 0.8)',  // Modal overlay
   },
   
-  // Text
+  // Text - Premium spec aligned
   text: {
-    primary: '#F8FAFC',   // Slate 100
-    secondary: '#94A3B8', // Slate 500
-    tertiary: '#64748B',  // Slate 600
-    disabled: '#475569',  // Slate 700
-    inverse: '#0F172A',   // Slate 950
+    primary: '#131B3B',   // Charcoal - main text (light mode)
+    secondary: '#777C7C', // Medium gray - muted
+    tertiary: '#62756E',  // Slate - helper text
+    muted: '#A7A9A9',     // Light gray - very muted
+    disabled: '#777C7C',  // Disabled state at 40% opacity
+    inverse: '#FCFCF9',   // Cream for dark backgrounds
   },
   
-  // Borders
+  // Borders - Premium spec aligned
   border: {
-    default: '#334155',   // Slate 800
-    subtle: '#1E293B',    // Slate 900
-    strong: '#475569',    // Slate 700
-    focus: '#2563EB',     // Interactive 600
+    default: 'rgba(94, 82, 64, 0.20)',  // Premium spec card borders
+    subtle: 'rgba(119, 124, 124, 0.30)', // Dark mode dividers
+    strong: '#777C7C',
+    focus: '#21808D',     // Primary color for focus
+  },
+  
+  // Background tints (low-opacity overlays for visual interest)
+  tint: {
+    blue: 'rgba(59, 130, 246, 0.08)',
+    yellow: 'rgba(245, 158, 11, 0.08)',
+    green: 'rgba(34, 197, 94, 0.08)',
+    red: 'rgba(239, 68, 68, 0.08)',
+    purple: 'rgba(147, 51, 234, 0.08)',
+    teal: 'rgba(33, 128, 141, 0.08)',
   },
 } as const;
 
@@ -122,3 +134,4 @@ export type SemanticColor = 'success' | 'warning' | 'error' | 'info';
 export type BackgroundColor = keyof typeof colors.background;
 export type TextColor = keyof typeof colors.text;
 export type BorderColor = keyof typeof colors.border;
+export type TintColor = keyof typeof colors.tint;

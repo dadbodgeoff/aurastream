@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: clip-highlight
-version: "1.0.0"
+version: "1.1.0"
 category: social
 asset_type: clip_cover
 dimensions:
@@ -14,29 +14,88 @@ vibes:
   pro:
     name: "Action Freeze-Frame"
     prompt: |
-      A square 1:1 high-impact action shot. A character from {game} captured mid-air during an explosion. High-motion blur on the environment, but the character is razor-sharp. Large bold yellow text with a heavy black stroke reads '{title}'. High-saturation color grading, 'Victory Royale' aesthetic, designed for maximum scroll-stopping impact on social media.
+      A square 1:1 high-impact action shot. {character_description} from {game} captured mid-air during an explosion. High-motion blur on the environment, but the character is razor-sharp. Large bold {accent_color} text with a heavy black stroke reads '{title}'. High-saturation color grading, 'Victory Royale' aesthetic, designed for maximum scroll-stopping impact on social media.
   
   anime:
     name: "Manga Speed-Line"
     prompt: |
-      A square 1:1 black and white manga-style illustration with vibrant color accents. A character making a shocked 'Hype' expression. Dramatic black ink speed lines radiating from the center. Bold 'Katakana-style' English text reads '{title}'. High contrast, sharp edges, extremely stylized and professional.
+      A square 1:1 black and white manga-style illustration with vibrant {accent_color} accents. {character_description} making a shocked 'Hype' expression. Dramatic black ink speed lines radiating from the center. Bold 'Katakana-style' English text reads '{title}'. High contrast, sharp edges, extremely stylized and professional.
   
   playful:
     name: "Pop Victory"
     prompt: |
-      A square 1:1 3D pop-art style render. A cute chibi character celebrating with confetti. Bold 3D bubble text reads '{title}'. Bright saturated colors, comic-style halftone patterns in background. Playful victory aesthetic, social media optimized, 8k textures.
+      A square 1:1 3D pop-art style render. {character_description} celebrating with confetti. Bold 3D bubble text reads '{title}'. Bright saturated {accent_color} colors, comic-style halftone patterns in background. Playful victory aesthetic, social media optimized, 8k textures.
 
 placeholders:
   - name: title
     type: text
     required: true
+    label: "Clip Title"
+    description: "Main text for your clip"
+    placeholder: "1v5 Clutch"
     max_length: 40
     default: "Epic Moment"
+  
   - name: game
     type: text
     required: false
+    label: "Game (optional)"
+    description: "What game the clip is from"
+    placeholder: "Valorant"
     max_length: 30
     default: "gaming"
+  
+  - name: character_description
+    type: select
+    required: false
+    label: "Character Style (optional)"
+    description: "Who appears in your clip cover"
+    hint: "Optional - AI creates an action character if blank"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Action Character"
+        value: "A character"
+      - label: "Anime Character"
+        value: "A stylized anime character"
+      - label: "Chibi Character"
+        value: "A cute chibi character"
+      - label: "Gaming Avatar"
+        value: "A gaming avatar"
+      - label: "Esports Pro"
+        value: "An esports pro character"
+      - label: "Cartoon Character"
+        value: "A cartoon character"
+      - label: "No Character (Text Focus)"
+        value: "dramatic text and action effects"
+    default: "A character"
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main highlight color"
+    hint: "Optional - AI picks high-energy colors if blank"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Yellow"
+        value: "yellow"
+      - label: "Orange"
+        value: "orange"
+      - label: "Red"
+        value: "red"
+      - label: "Pink"
+        value: "pink"
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Green"
+        value: "green"
+      - label: "Gold"
+        value: "gold"
+    default: ""
 
 quality_modifiers:
   - "action-packed"

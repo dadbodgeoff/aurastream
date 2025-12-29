@@ -27,8 +27,8 @@ export function ConfirmDialog({
   isLoading = false,
 }: ConfirmDialogProps) {
   const confirmStyles = {
-    default: 'bg-interactive-600 hover:bg-interactive-500 text-white',
-    danger: 'bg-red-500 hover:bg-red-600 text-white',
+    default: 'bg-interactive-600 hover:bg-interactive-500 active:bg-interactive-700 text-white focus:ring-interactive-500',
+    danger: 'bg-red-500 hover:bg-red-600 active:bg-red-700 text-white focus:ring-red-500',
   };
 
   return (
@@ -42,7 +42,12 @@ export function ConfirmDialog({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-background-elevated rounded-lg transition-colors"
+            className={cn(
+              'px-4 py-2 min-h-[44px] text-sm font-medium rounded-lg transition-all',
+              'text-text-secondary hover:text-text-primary hover:bg-background-elevated',
+              'active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-interactive-500',
+              'disabled:opacity-50 disabled:cursor-not-allowed'
+            )}
           >
             {cancelLabel}
           </button>
@@ -50,7 +55,9 @@ export function ConfirmDialog({
             onClick={onConfirm}
             disabled={isLoading}
             className={cn(
-              'px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50',
+              'px-4 py-2 min-h-[44px] text-sm font-medium rounded-lg transition-all',
+              'active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
               confirmStyles[variant]
             )}
           >

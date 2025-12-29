@@ -36,7 +36,7 @@ export default async function Image() {
             width: '400px',
             height: '400px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(33, 128, 141, 0.3) 0%, transparent 70%)',
           }}
         />
         <div
@@ -47,7 +47,7 @@ export default async function Image() {
             width: '500px',
             height: '500px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(33, 128, 141, 0.2) 0%, transparent 70%)',
           }}
         />
 
@@ -65,7 +65,7 @@ export default async function Image() {
               width: '80px',
               height: '80px',
               borderRadius: '20px',
-              background: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%)',
+              background: 'linear-gradient(135deg, #21808D 0%, #2A9BA8 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -78,7 +78,7 @@ export default async function Image() {
             style={{
               fontSize: '72px',
               fontWeight: 'bold',
-              background: 'linear-gradient(90deg, #FFFFFF 0%, #A5B4FC 100%)',
+              background: 'linear-gradient(90deg, #FFFFFF 0%, #5FBFCC 100%)',
               backgroundClip: 'text',
               color: 'transparent',
             }}
@@ -112,9 +112,9 @@ export default async function Image() {
               style={{
                 padding: '12px 24px',
                 borderRadius: '30px',
-                background: 'rgba(139, 92, 246, 0.2)',
-                border: '1px solid rgba(139, 92, 246, 0.3)',
-                color: '#C4B5FD',
+                background: 'rgba(33, 128, 141, 0.2)',
+                border: '1px solid rgba(33, 128, 141, 0.3)',
+                color: '#5FBFCC',
                 fontSize: '20px',
               }}
             >

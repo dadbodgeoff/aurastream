@@ -117,7 +117,7 @@ function ColorSwatch({ hex, name, isSelected, onClick }: ColorSwatchProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative w-10 h-10 min-w-[44px] min-h-[44px] rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-background-base active:scale-95',
+        'group relative w-10 h-10 min-w-[44px] min-h-[44px] rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:ring-offset-2 focus:ring-offset-background-base active:scale-95',
         isSelected
           ? 'border-primary-500 ring-2 ring-primary-500/30 scale-110'
           : 'border-border-default hover:border-border-hover hover:scale-105'
@@ -175,7 +175,7 @@ function GradientSwatch({ name, stops, isSelected, onClick }: GradientSwatchProp
       type="button"
       onClick={onClick}
       className={cn(
-        'group relative w-16 h-10 min-h-[44px] rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-background-base active:scale-95',
+        'group relative w-16 h-10 min-h-[44px] rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:ring-offset-2 focus:ring-offset-background-base active:scale-95',
         isSelected
           ? 'border-primary-500 ring-2 ring-primary-500/30 scale-110'
           : 'border-border-default hover:border-border-hover hover:scale-105'
@@ -295,7 +295,7 @@ function ColorSelectionSection({ colors, value, onChange }: ColorSelectionSectio
               type="button"
               onClick={() => handleGradientChange(undefined)}
               className={cn(
-                'w-16 h-10 min-h-[44px] rounded-lg border-2 transition-all text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-95',
+                'w-16 h-10 min-h-[44px] rounded-lg border-2 transition-all text-xs font-medium focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-95',
                 value?.use_gradient === undefined
                   ? 'border-primary-500 bg-background-elevated text-text-primary'
                   : 'border-border-default bg-background-surface text-text-secondary hover:border-border-hover'
@@ -359,7 +359,7 @@ function TypographySelectionSection({
               aria-checked={selectedLevel === level.id}
               onClick={() => onChange({ level: level.id })}
               className={cn(
-                'p-3 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-[0.98]',
+                'p-3 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-[0.98]',
                 selectedLevel === level.id
                   ? 'border-primary-500 bg-primary-500/5'
                   : 'border-border-default bg-background-surface hover:border-border-hover'
@@ -473,7 +473,7 @@ function VoiceSelectionSection({ voice, value, onChange }: VoiceSelectionSection
             type="button"
             onClick={handleTaglineToggle}
             className={cn(
-              'w-full p-4 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-[0.99]',
+              'w-full p-4 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-[0.99]',
               value?.use_tagline
                 ? 'border-primary-500 bg-primary-500/5'
                 : 'border-border-default bg-background-surface hover:border-border-hover'
@@ -508,7 +508,7 @@ function VoiceSelectionSection({ voice, value, onChange }: VoiceSelectionSection
               type="button"
               onClick={() => handleCatchphraseSelect(undefined)}
               className={cn(
-                'w-full p-3 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-[0.99]',
+                'w-full p-3 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-[0.99]',
                 value?.use_catchphrase === undefined
                   ? 'border-primary-500 bg-primary-500/5'
                   : 'border-border-default bg-background-surface hover:border-border-hover'
@@ -523,7 +523,7 @@ function VoiceSelectionSection({ voice, value, onChange }: VoiceSelectionSection
                 type="button"
                 onClick={() => handleCatchphraseSelect(index)}
                 className={cn(
-                  'w-full p-3 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-[0.99]',
+                  'w-full p-3 min-h-[44px] rounded-lg border-2 text-left transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-[0.99]',
                   value?.use_catchphrase === index
                     ? 'border-primary-500 bg-primary-500/5'
                     : 'border-border-default bg-background-surface hover:border-border-hover'
@@ -598,7 +598,7 @@ function LogoSelectionSection({ logoUrl, value, onChange }: LogoSelectionSection
           type="button"
           onClick={handleIncludeToggle}
           className={cn(
-            'w-full p-4 min-h-[44px] rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-[0.99]',
+            'w-full p-4 min-h-[44px] rounded-lg border-2 transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-[0.99]',
             value.include_logo
               ? 'border-primary-500 bg-primary-500/5'
               : 'border-border-default bg-background-surface hover:border-border-hover'
@@ -660,7 +660,7 @@ function LogoSelectionSection({ logoUrl, value, onChange }: LogoSelectionSection
                   aria-checked={value.logo_type === type.id}
                   onClick={() => handleTypeChange(type.id)}
                   className={cn(
-                    'px-3 py-2 min-h-[44px] rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-95',
+                    'px-3 py-2 min-h-[44px] rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-95',
                     value.logo_type === type.id
                       ? 'border-primary-500 bg-primary-500/5 text-text-primary'
                       : 'border-border-default bg-background-surface text-text-secondary hover:border-border-hover'
@@ -686,7 +686,7 @@ function LogoSelectionSection({ logoUrl, value, onChange }: LogoSelectionSection
                   aria-checked={value.logo_position === pos.id}
                   onClick={() => handlePositionChange(pos.id)}
                   className={cn(
-                    'px-3 py-2 min-h-[44px] rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-95',
+                    'px-3 py-2 min-h-[44px] rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-95',
                     value.logo_position === pos.id
                       ? 'border-primary-500 bg-primary-500/5 text-text-primary'
                       : 'border-border-default bg-background-surface text-text-secondary hover:border-border-hover'
@@ -712,7 +712,7 @@ function LogoSelectionSection({ logoUrl, value, onChange }: LogoSelectionSection
                   aria-checked={value.logo_size === size.id}
                   onClick={() => handleSizeChange(size.id)}
                   className={cn(
-                    'px-3 py-2 min-h-[44px] rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-95',
+                    'px-3 py-2 min-h-[44px] rounded-lg border-2 text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-95',
                     value.logo_size === size.id
                       ? 'border-primary-500 bg-primary-500/5 text-text-primary'
                       : 'border-border-default bg-background-surface text-text-secondary hover:border-border-hover'
@@ -759,7 +759,7 @@ function IntensitySelector({ value, onChange }: IntensitySelectorProps) {
             aria-checked={value === option.id}
             onClick={() => onChange(option.id)}
             className={cn(
-              'p-3 min-h-[44px] rounded-lg border-2 text-center transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 active:scale-[0.98]',
+              'p-3 min-h-[44px] rounded-lg border-2 text-center transition-all focus:outline-none focus:ring-2 focus:ring-interactive-500 active:scale-[0.98]',
               value === option.id
                 ? 'border-primary-500 bg-primary-500/5'
                 : 'border-border-default bg-background-surface hover:border-border-hover'
@@ -800,7 +800,7 @@ function AccordionSection({
       <button
         type="button"
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 min-h-[44px] text-left hover:bg-background-elevated/50 active:bg-background-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+        className="w-full flex items-center justify-between p-4 min-h-[44px] text-left hover:bg-background-elevated/50 active:bg-background-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-interactive-500"
         aria-expanded={isOpen}
         aria-controls={`section-${id}`}
       >
@@ -892,7 +892,7 @@ export function BrandCustomizationPanel({
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 min-h-[44px] text-left hover:bg-background-elevated/50 active:bg-background-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500"
+        className="w-full flex items-center justify-between p-4 min-h-[44px] text-left hover:bg-background-elevated/50 active:bg-background-elevated transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-interactive-500"
         aria-expanded={isExpanded}
         aria-controls="brand-customization-content"
       >

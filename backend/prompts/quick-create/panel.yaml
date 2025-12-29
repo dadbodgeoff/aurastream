@@ -2,7 +2,7 @@
 # PROPRIETARY - DO NOT EXPOSE TO FRONTEND
 
 name: panel
-version: "1.0.0"
+version: "1.1.0"
 category: twitch
 asset_type: twitch_panel
 dimensions:
@@ -14,28 +14,69 @@ vibes:
   pro:
     name: "Matte Hardware"
     prompt: |
-      A 2:1 horizontal Twitch panel. A 3D render of a matte-white gaming controller or headset on the left. The text '{type}' in a clean, bold black sans-serif font on the right. Background is a soft grey gradient with a subtle hexagonal texture. Professional, minimalist, and high-end.
+      A 2:1 horizontal Twitch panel. A 3D render of a matte-white gaming controller or headset on the left. The text '{type}' in a clean, bold black sans-serif font on the right. Background is a soft {accent_color} gradient with a subtle hexagonal texture. Professional, minimalist, and high-end.
   
   anime:
     name: "Neon Sign"
     prompt: |
-      A 2:1 horizontal neon sign aesthetic. A glowing glass tube shaped like a gaming icon next to the word '{type}' in a vibrant neon font. The background is a dark brick wall with soft color spill. Warm, inviting, 'Night-stream' aesthetic.
+      A 2:1 horizontal neon sign aesthetic. A glowing {accent_color} glass tube shaped like a gaming icon next to the word '{type}' in a vibrant neon font. The background is a dark brick wall with soft color spill. Warm, inviting, 'Night-stream' aesthetic.
   
   playful:
     name: "Cute Icon"
     prompt: |
-      A 2:1 horizontal panel with cute 3D icon style. A playful cartoon icon representing '{type}' on the left. Bold colorful text '{type}' on the right. Soft pastel gradient background. Friendly, approachable, kawaii-inspired aesthetic.
+      A 2:1 horizontal panel with cute 3D icon style. A playful cartoon icon representing '{type}' on the left. Bold colorful text '{type}' on the right. Soft {accent_color} pastel gradient background. Friendly, approachable, kawaii-inspired aesthetic.
 
 placeholders:
   - name: type
     type: select
     required: true
+    label: "Panel Type"
+    description: "What this panel is for"
     options:
-      - about
-      - schedule
-      - rules
-      - donate
+      - label: "About Me"
+        value: "about"
+      - label: "Schedule"
+        value: "schedule"
+      - label: "Rules"
+        value: "rules"
+      - label: "Support/Donate"
+        value: "donate"
+      - label: "Discord"
+        value: "discord"
+      - label: "Social Links"
+        value: "socials"
+      - label: "FAQ"
+        value: "faq"
+      - label: "Commands"
+        value: "commands"
     default: "about"
+  
+  - name: accent_color
+    type: select
+    required: false
+    label: "Accent Color (optional)"
+    description: "Main color accent"
+    hint: "Optional - AI picks professional colors if blank"
+    options:
+      - label: "AI Decides (Recommended)"
+        value: ""
+      - label: "Grey"
+        value: "grey"
+      - label: "Purple"
+        value: "purple"
+      - label: "Cyan"
+        value: "cyan"
+      - label: "Pink"
+        value: "pink"
+      - label: "Blue"
+        value: "blue"
+      - label: "Green"
+        value: "green"
+      - label: "Orange"
+        value: "orange"
+      - label: "Teal"
+        value: "teal"
+    default: ""
 
 quality_modifiers:
   - "clean design"

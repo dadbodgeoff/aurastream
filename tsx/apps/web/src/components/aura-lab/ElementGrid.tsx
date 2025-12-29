@@ -140,7 +140,7 @@ export function ElementGrid({
                       animate={{ opacity: 1, scale: 1 }}
                       className="absolute inset-0 rounded-xl pointer-events-none"
                       style={{
-                        boxShadow: '0 0 20px rgba(59, 130, 246, 0.4)',
+                        boxShadow: '0 0 20px rgba(33, 128, 141, 0.4)',
                       }}
                     />
                   )}

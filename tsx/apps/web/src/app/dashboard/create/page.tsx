@@ -296,13 +296,13 @@ export default function CreatePage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary flex items-center gap-3">
-            <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-interactive-600 to-interactive-700 flex items-center justify-center text-white shadow-lg shadow-interactive-600/20">
+          <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
+            <span className="w-9 h-9 rounded-lg bg-gradient-to-br from-interactive-500 to-interactive-700 flex items-center justify-center text-white shadow-md shadow-interactive-600/25">
               <SparklesIcon />
             </span>
             Create Asset
           </h1>
-          <p className="mt-2 text-text-secondary">
+          <p className="mt-2 text-text-secondary text-sm">
             Generate AI-powered assets for your streams and content
           </p>
         </div>
@@ -315,10 +315,10 @@ export default function CreatePage() {
 
       {/* Vibe Kit Banner */}
       {isVibeKit && (
-        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
-          <div className="flex items-center gap-3">
-            <Sparkles className="w-5 h-5 text-purple-400" />
-            <p className="text-sm text-purple-300">
+        <div className="p-3 rounded-lg bg-interactive-500/10 border border-interactive-500/30">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-interactive-400" />
+            <p className="text-xs text-interactive-300 font-medium">
               Generating with your extracted vibe from Vibe Branding
             </p>
           </div>
@@ -335,13 +335,13 @@ export default function CreatePage() {
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className="font-medium text-red-400">Generation limit reached</h3>
-              <p className="text-sm text-text-secondary mt-1">
+              <h3 className="font-semibold text-red-400 text-sm">Generation limit reached</h3>
+              <p className="text-xs text-text-secondary mt-0.5">
                 You've used all your generations for this period. Upgrade to continue creating.
               </p>
               <button
                 onClick={() => router.push('/dashboard/settings?tab=billing')}
-                className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-sm font-medium rounded-lg transition-colors"
+                className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-400 text-white text-xs font-semibold rounded-lg transition-colors active:scale-[0.98]"
               >
                 Upgrade Now
               </button>
@@ -351,46 +351,56 @@ export default function CreatePage() {
       )}
 
       {/* Platform Filter */}
-      <div>
-        <label className="block text-sm font-medium text-text-secondary mb-3">Platform</label>
+      <section>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="w-6 h-6 rounded-md bg-interactive-600/10 flex items-center justify-center text-interactive-600 text-sm font-bold">1</span>
+          <label className="text-base font-semibold text-text-primary">Choose Platform</label>
+        </div>
         <PlatformFilter selected={platform} onChange={setPlatform} />
-      </div>
+      </section>
 
       {/* Asset Type Selection */}
-      <div>
-        <label className="block text-sm font-medium text-text-secondary mb-3">Asset Type</label>
+      <section>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="w-6 h-6 rounded-md bg-interactive-600/10 flex items-center justify-center text-interactive-600 text-sm font-bold">2</span>
+          <label className="text-base font-semibold text-text-primary">Select Asset Type</label>
+          <span className="text-sm text-text-muted">({filteredAssetTypes.length} available)</span>
+        </div>
         <AssetTypeSelector
           platform={platform}
           selected={selectedAssetType}
           onChange={setSelectedAssetType}
         />
-      </div>
+      </section>
 
       {/* Brand Kit Selection (Optional) */}
-      <div>
-        <label className="block text-sm font-medium text-text-secondary mb-3">
-          Brand Kit <span className="text-text-muted font-normal">(Optional)</span>
-        </label>
+      <section>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="w-6 h-6 rounded-md bg-interactive-600/10 flex items-center justify-center text-interactive-600 text-sm font-bold">3</span>
+          <label className="text-base font-semibold text-text-primary">Brand Kit</label>
+          <span className="px-2 py-0.5 text-xs font-medium bg-background-elevated text-text-muted rounded">Optional</span>
+        </div>
         <BrandKitSelector
           brandKits={brandKits}
           selected={selectedBrandKitId}
           onChange={setSelectedBrandKitId}
           isLoading={isLoadingBrandKits}
         />
-      </div>
+      </section>
 
       {/* Prompt Method Selection - Only show when selections are complete */}
       {canProceedToPrompt && (
-        <div>
-          <label className="block text-sm font-medium text-text-secondary mb-3">
-            How would you like to describe your asset?
-          </label>
+        <section className="pt-6 border-t border-border-subtle">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="w-6 h-6 rounded-md bg-interactive-600/10 flex items-center justify-center text-interactive-600 text-sm font-bold">4</span>
+            <label className="text-base font-semibold text-text-primary">Describe Your Asset</label>
+          </div>
           <PromptMethodSelector
             onSelectManual={handleSelectManualPrompt}
             onSelectCoach={handleSelectCoach}
             isPremium={isPremium}
           />
-        </div>
+        </section>
       )}
     </div>
   );
