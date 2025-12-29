@@ -13,16 +13,16 @@ export type LogoType = 'primary' | 'secondary' | 'icon' | 'monochrome' | 'waterm
 export interface LogoUploadResponse {
   type: LogoType;
   url: string;
-  storage_path: string;
-  content_type: string;
-  file_size: number;
+  storagePath: string;
+  contentType: string;
+  fileSize: number;
   filename?: string;
 }
 
 export interface LogoListResponse {
   logos: Record<LogoType, string | null>;
-  brand_kit_id: string;
-  defaultLogoType?: LogoType;
+  brandKitId: string;
+  defaultLogoType: LogoType;
 }
 
 export interface LogoUrlResponse {
@@ -42,6 +42,14 @@ export const logoKeys = {
   detail: (brandKitId: string, type: LogoType) => [...logoKeys.all, 'detail', brandKitId, type] as const,
 };
 
+// Helper to get base URL - same as apiClient initialization
+function getBaseUrl(): string {
+  if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  return 'http://localhost:8000';
+}
+
 /**
  * Hook to list all logos for a brand kit.
  */
@@ -49,9 +57,12 @@ export function useLogos(brandKitId: string | undefined) {
   return useQuery({
     queryKey: logoKeys.list(brandKitId ?? ''),
     queryFn: async () => {
-      const response = await fetch(`/api/v1/brand-kits/${brandKitId}/logos`, {
+      const baseUrl = getBaseUrl();
+      const token = apiClient.getAccessToken();
+      
+      const response = await fetch(`${baseUrl}/api/v1/brand-kits/${brandKitId}/logos`, {
         headers: {
-          'Authorization': `Bearer ${await getAccessToken()}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
       if (!response.ok) throw new Error('Failed to fetch logos');
@@ -59,7 +70,7 @@ export function useLogos(brandKitId: string | undefined) {
       // Transform snake_case to camelCase
       return {
         logos: data.logos,
-        brand_kit_id: data.brand_kit_id,
+        brandKitId: data.brand_kit_id,
         defaultLogoType: data.default_logo_type || 'primary',
       } as LogoListResponse;
     },
@@ -74,9 +85,12 @@ export function useLogo(brandKitId: string | undefined, logoType: LogoType) {
   return useQuery({
     queryKey: logoKeys.detail(brandKitId ?? '', logoType),
     queryFn: async () => {
-      const response = await fetch(`/api/v1/brand-kits/${brandKitId}/logos/${logoType}`, {
+      const baseUrl = getBaseUrl();
+      const token = apiClient.getAccessToken();
+      
+      const response = await fetch(`${baseUrl}/api/v1/brand-kits/${brandKitId}/logos/${logoType}`, {
         headers: {
-          'Authorization': `Bearer ${await getAccessToken()}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
       if (!response.ok) throw new Error('Failed to fetch logo');
@@ -102,24 +116,35 @@ export function useUploadLogo() {
       logoType: LogoType; 
       file: File;
     }) => {
+      const baseUrl = getBaseUrl();
+      const token = apiClient.getAccessToken();
+      
       const formData = new FormData();
       formData.append('file', file);
       formData.append('logo_type', logoType);
 
-      const response = await fetch(`/api/v1/brand-kits/${brandKitId}/logos`, {
+      const response = await fetch(`${baseUrl}/api/v1/brand-kits/${brandKitId}/logos`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${await getAccessToken()}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: formData,
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ detail: 'Failed to upload logo' }));
         throw new Error(error.detail || 'Failed to upload logo');
       }
 
-      return response.json() as Promise<LogoUploadResponse>;
+      const data = await response.json();
+      return {
+        type: data.type,
+        url: data.url,
+        storagePath: data.storage_path,
+        contentType: data.content_type,
+        fileSize: data.file_size,
+        filename: data.filename,
+      } as LogoUploadResponse;
     },
     onSuccess: (_, variables) => {
       // Invalidate logo queries
@@ -145,15 +170,18 @@ export function useDeleteLogo() {
       brandKitId: string; 
       logoType: LogoType;
     }) => {
-      const response = await fetch(`/api/v1/brand-kits/${brandKitId}/logos/${logoType}`, {
+      const baseUrl = getBaseUrl();
+      const token = apiClient.getAccessToken();
+      
+      const response = await fetch(`${baseUrl}/api/v1/brand-kits/${brandKitId}/logos/${logoType}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${await getAccessToken()}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ detail: 'Failed to delete logo' }));
         throw new Error(error.detail || 'Failed to delete logo');
       }
 
@@ -181,35 +209,29 @@ export function useSetDefaultLogo() {
       brandKitId: string; 
       logoType: LogoType;
     }) => {
-      const response = await fetch(`/api/v1/brand-kits/${brandKitId}/logos/default`, {
+      const baseUrl = getBaseUrl();
+      const token = apiClient.getAccessToken();
+      
+      const response = await fetch(`${baseUrl}/api/v1/brand-kits/${brandKitId}/logos/default`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${await getAccessToken()}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ logo_type: logoType }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ detail: 'Failed to set default logo' }));
         throw new Error(error.detail || 'Failed to set default logo');
       }
 
-      return response.json() as Promise<{ defaultLogoType: LogoType }>;
+      const data = await response.json();
+      return { defaultLogoType: data.default_logo_type } as { defaultLogoType: LogoType };
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: logoKeys.list(variables.brandKitId) });
       queryClient.invalidateQueries({ queryKey: brandKitKeys.detail(variables.brandKitId) });
     },
   });
-}
-
-// Helper to get access token (implement based on your auth setup)
-async function getAccessToken(): Promise<string> {
-  // This should be implemented based on your auth setup
-  // For now, try to get from localStorage or session
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('access_token') || '';
-  }
-  return '';
 }

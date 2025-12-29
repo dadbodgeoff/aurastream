@@ -3,20 +3,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  MessageSquare, 
-  Crown, 
-  Trophy, 
-  Users, 
-  TrendingUp, 
-  ExternalLink,
-  Send,
-  Sparkles,
-  ChevronDown,
-  Clock,
-  DollarSign,
-  Star,
-  Shield,
-  Zap
+  MessageSquare, Crown, Trophy, Users, TrendingUp, ExternalLink,
+  Send, Sparkles, ChevronDown, Clock, DollarSign, Zap
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePromoMessages, usePinnedMessage, useLeaderboard, promoKeys } from '@aurastream/api-client';
@@ -25,10 +13,7 @@ import { useMobileDetection } from '@aurastream/shared';
 import { PromoComposeModal } from '@/components/promo/PromoComposeModal';
 import { PageHeader } from '@/components/navigation';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
+import { cn } from '@/lib/utils';
 
 function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString);
@@ -37,7 +22,6 @@ function formatRelativeTime(dateString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-
   if (diffMins < 1) return 'just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
@@ -49,45 +33,20 @@ function formatCurrency(cents: number): string {
   return `$${(cents / 100).toFixed(0)}`;
 }
 
-// ============================================================================
-// Sub-Components
-// ============================================================================
-
-function Avatar({ 
-  url, 
-  name, 
-  size = 'md',
-  isKing = false,
-  showRing = false 
-}: { 
-  url: string | null; 
-  name: string; 
-  size?: 'sm' | 'md' | 'lg';
-  isKing?: boolean;
-  showRing?: boolean;
-}) {
-  const sizeClasses = {
-    sm: 'w-8 h-8 text-xs',
-    md: 'w-10 h-10 text-sm',
-    lg: 'w-12 h-12 text-base'
-  };
-
+function Avatar({ url, name, size = 'md', isKing = false }: { url: string | null; name: string; size?: 'sm' | 'md'; isKing?: boolean }) {
+  const sizeClasses = { sm: 'w-7 h-7 text-[10px]', md: 'w-8 h-8 text-xs' };
   return (
     <div className="relative">
       {url ? (
-        <img 
-          src={url} 
-          alt={name} 
-          className={`${sizeClasses[size]} rounded-full object-cover ${showRing ? 'ring-2 ring-accent-500 ring-offset-2 ring-offset-background-base' : ''}`} 
-        />
+        <img src={url} alt={name} className={cn(sizeClasses[size], 'rounded-full object-cover')} />
       ) : (
-        <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-interactive-500 to-accent-500 flex items-center justify-center text-white font-semibold ${showRing ? 'ring-2 ring-accent-500 ring-offset-2 ring-offset-background-base' : ''}`}>
+        <div className={cn(sizeClasses[size], 'rounded-full bg-gradient-to-br from-interactive-500 to-accent-500 flex items-center justify-center text-white font-semibold')}>
           {name.charAt(0).toUpperCase()}
         </div>
       )}
       {isKing && (
-        <div className="absolute -top-1 -right-1 w-5 h-5 bg-accent-500 rounded-full flex items-center justify-center shadow-lg">
-          <Crown className="w-3 h-3 text-white" />
+        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-accent-500 rounded-full flex items-center justify-center">
+          <Crown className="w-2 h-2 text-white" />
         </div>
       )}
     </div>
@@ -96,227 +55,101 @@ function Avatar({
 
 function UserBadgeDisplay({ badges }: { badges: UserBadges }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       {badges.isKing && (
-        <span className="px-1.5 py-0.5 bg-accent-500/20 text-accent-400 text-[10px] font-bold rounded flex items-center gap-0.5">
-          <Crown className="w-2.5 h-2.5" /> KING
+        <span className="px-1 py-px bg-accent-500/20 text-accent-400 text-[9px] font-bold rounded flex items-center gap-0.5">
+          <Crown className="w-2 h-2" /> KING
         </span>
       )}
       {badges.isTopTen && !badges.isKing && (
-        <span className="px-1.5 py-0.5 bg-interactive-500/20 text-interactive-400 text-[10px] font-bold rounded flex items-center gap-0.5">
-          <Trophy className="w-2.5 h-2.5" /> TOP 10
-        </span>
-      )}
-      {badges.tier === 'studio' && (
-        <span className="px-1.5 py-0.5 bg-primary-500/20 text-primary-400 text-[10px] font-bold rounded flex items-center gap-0.5">
-          <Star className="w-2.5 h-2.5" /> STUDIO
-        </span>
+        <span className="px-1 py-px bg-interactive-500/20 text-interactive-400 text-[9px] font-bold rounded">TOP 10</span>
       )}
       {badges.tier === 'pro' && (
-        <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-bold rounded flex items-center gap-0.5">
-          <Zap className="w-2.5 h-2.5" /> PRO
+        <span className="px-1 py-px bg-green-500/20 text-green-400 text-[9px] font-bold rounded flex items-center gap-0.5">
+          <Zap className="w-2 h-2" /> PRO
         </span>
-      )}
-      {badges.isVerified && (
-        <Shield className="w-3.5 h-3.5 text-interactive-400" />
       )}
     </div>
   );
 }
 
-
 function ChatMessage({ message, isKingMessage = false }: { message: PromoMessage; isKingMessage?: boolean }) {
   const { author, content, linkUrl, linkPreview, createdAt } = message;
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`group relative ${isKingMessage ? 'pl-4 border-l-2 border-accent-500' : ''}`}
-    >
-      <div className="flex gap-3">
-        <Avatar 
-          url={author.avatarUrl} 
-          name={author.displayName} 
-          isKing={author.badges.isKing}
-          showRing={isKingMessage}
-        />
-        
-        <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className={`font-semibold ${isKingMessage ? 'text-accent-400' : 'text-text-primary'}`}>
-              {author.displayName}
-            </span>
-            <UserBadgeDisplay badges={author.badges} />
-            <span className="text-xs text-text-tertiary flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatRelativeTime(createdAt)}
-            </span>
-          </div>
-
-          {/* Content */}
-          <p className="text-text-secondary leading-relaxed break-words">
-            {content}
-          </p>
-
-          {/* Link Preview */}
-          {linkUrl && (
-            <a 
-              href={linkUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="mt-3 block p-3 rounded-lg bg-background-elevated/50 border border-border-subtle hover:border-interactive-500/50 transition-colors group/link"
-            >
-              <div className="flex items-start gap-3">
-                {linkPreview?.imageUrl && (
-                  <img 
-                    src={linkPreview.imageUrl} 
-                    alt="" 
-                    className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 text-interactive-400 text-sm font-medium group-hover/link:text-interactive-300">
-                    <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{linkPreview?.title || new URL(linkUrl).hostname}</span>
-                  </div>
-                  {linkPreview?.description && (
-                    <p className="text-xs text-text-tertiary mt-1 line-clamp-2">
-                      {linkPreview.description}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </a>
-          )}
+    <div className={cn('flex gap-2', isKingMessage && 'pl-2 border-l-2 border-accent-500')}>
+      <Avatar url={author.avatarUrl} name={author.displayName} isKing={author.badges.isKing} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+          <span className={cn('font-medium text-xs', isKingMessage ? 'text-accent-400' : 'text-text-primary')}>{author.displayName}</span>
+          <UserBadgeDisplay badges={author.badges} />
+          <span className="text-[10px] text-text-tertiary flex items-center gap-0.5">
+            <Clock className="w-2.5 h-2.5" />{formatRelativeTime(createdAt)}
+          </span>
         </div>
+        <p className="text-xs text-text-secondary leading-relaxed break-words">{content}</p>
+        {linkUrl && (
+          <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block p-2 rounded-lg bg-background-elevated/50 border border-border-subtle hover:border-interactive-500/50 transition-colors">
+            <div className="flex items-start gap-2">
+              {linkPreview?.imageUrl && <img src={linkPreview.imageUrl} alt="" className="w-10 h-10 rounded object-cover flex-shrink-0" />}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1 text-interactive-400 text-[11px] font-medium">
+                  <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{linkPreview?.title || new URL(linkUrl).hostname}</span>
+                </div>
+                {linkPreview?.description && <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-1">{linkPreview.description}</p>}
+              </div>
+            </div>
+          </a>
+        )}
       </div>
-    </motion.div>
+    </div>
   );
 }
 
-function KingOfTheHillBanner({ message }: { message: PromoMessage }) {
+function KingBanner({ message }: { message: PromoMessage }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="relative overflow-hidden rounded-xl bg-gradient-to-r from-accent-600/20 via-accent-500/10 to-accent-600/20 border border-accent-500/30 p-4"
-    >
-      {/* Animated background shimmer */}
-      <div className="absolute inset-0 overflow-hidden">
-        <motion.div
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-accent-400/10 to-transparent"
-          animate={{ x: ['-100%', '100%'] }}
-          transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-        />
-      </div>
-
-      <div className="relative">
-        {/* Crown Header */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 rounded-full bg-accent-500 flex items-center justify-center">
-            <Crown className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-accent-400">King of the Hill</h3>
-            <p className="text-[10px] text-accent-500/70 uppercase tracking-wider">Current Top Donor</p>
-          </div>
+    <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-accent-600/10 via-accent-500/5 to-accent-600/10 border border-accent-500/20 p-3">
+      <div className="flex items-center gap-1.5 mb-2">
+        <div className="w-5 h-5 rounded-full bg-accent-500 flex items-center justify-center">
+          <Crown className="w-3 h-3 text-white" />
         </div>
-
-        <ChatMessage message={message} isKingMessage />
+        <div>
+          <h3 className="text-[11px] font-bold text-accent-400">King of the Hill</h3>
+        </div>
       </div>
-    </motion.div>
+      <ChatMessage message={message} isKingMessage />
+    </div>
   );
 }
 
 function LeaderboardCard({ entry, index }: { entry: LeaderboardEntry; index: number }) {
-  const rankColors = [
-    'from-accent-500 to-yellow-500', // 1st - Gold
-    'from-slate-400 to-slate-300',   // 2nd - Silver
-    'from-amber-700 to-amber-600',   // 3rd - Bronze
-  ];
-
+  const rankColors = ['from-accent-500 to-yellow-500', 'from-slate-400 to-slate-300', 'from-amber-700 to-amber-600'];
   const isTopThree = index < 3;
-
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className={`flex items-center gap-3 p-2.5 rounded-lg transition-colors ${
-        isTopThree ? 'bg-background-elevated/50' : 'hover:bg-background-elevated/30'
-      }`}
-    >
-      {/* Rank */}
-      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-        isTopThree 
-          ? `bg-gradient-to-br ${rankColors[index]} text-white shadow-lg` 
-          : 'bg-background-elevated text-text-tertiary'
-      }`}>
+    <div className={cn('flex items-center gap-2 p-1.5 rounded-lg transition-colors', isTopThree ? 'bg-background-elevated/50' : 'hover:bg-background-elevated/30')}>
+      <div className={cn('w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold', isTopThree ? `bg-gradient-to-br ${rankColors[index]} text-white` : 'bg-background-elevated text-text-tertiary')}>
         {entry.rank}
       </div>
-
-      {/* Avatar */}
-      <Avatar 
-        url={entry.avatarUrl} 
-        name={entry.displayName} 
-        size="sm"
-        isKing={entry.isKing}
-      />
-
-      {/* Name */}
+      <Avatar url={entry.avatarUrl} name={entry.displayName} size="sm" isKing={entry.isKing} />
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${entry.isKing ? 'text-accent-400' : 'text-text-primary'}`}>
-          {entry.displayName}
-        </p>
-        <p className="text-[10px] text-text-tertiary">
-          {entry.messageCount} message{entry.messageCount !== 1 ? 's' : ''}
-        </p>
+        <p className={cn('text-[11px] font-medium truncate', entry.isKing ? 'text-accent-400' : 'text-text-primary')}>{entry.displayName}</p>
       </div>
-
-      {/* Amount */}
-      <div className="text-right">
-        <p className={`text-sm font-bold ${isTopThree ? 'text-accent-400' : 'text-text-secondary'}`}>
-          {formatCurrency(entry.totalDonationsCents)}
-        </p>
-      </div>
-    </motion.div>
-  );
-}
-
-
-function StatsCard({ icon: Icon, label, value, trend }: { 
-  icon: React.ElementType; 
-  label: string; 
-  value: string | number;
-  trend?: string;
-}) {
-  return (
-    <div className="p-3 rounded-lg bg-background-elevated/30 border border-border-subtle">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="w-4 h-4 text-text-tertiary" />
-        <span className="text-xs text-text-tertiary">{label}</span>
-      </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-lg font-bold text-text-primary">{value}</span>
-        {trend && <span className="text-xs text-green-400">{trend}</span>}
-      </div>
+      <p className={cn('text-[11px] font-bold', isTopThree ? 'text-accent-400' : 'text-text-tertiary')}>{formatCurrency(entry.totalDonationsCents)}</p>
     </div>
   );
 }
 
 function MessageSkeleton() {
   return (
-    <div className="flex gap-3 animate-pulse">
-      <div className="w-10 h-10 rounded-full bg-background-elevated" />
+    <div className="flex gap-2 animate-pulse">
+      <div className="w-8 h-8 rounded-full bg-background-elevated" />
       <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="h-4 bg-background-elevated rounded w-24" />
-          <div className="h-3 bg-background-elevated rounded w-16" />
+        <div className="flex items-center gap-2 mb-1">
+          <div className="h-3 bg-background-elevated rounded w-20" />
+          <div className="h-2 bg-background-elevated rounded w-12" />
         </div>
-        <div className="h-4 bg-background-elevated rounded w-full mb-1" />
-        <div className="h-4 bg-background-elevated rounded w-3/4" />
+        <div className="h-3 bg-background-elevated rounded w-full mb-0.5" />
+        <div className="h-3 bg-background-elevated rounded w-2/3" />
       </div>
     </div>
   );
@@ -324,29 +157,15 @@ function MessageSkeleton() {
 
 function EmptyState() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex flex-col items-center justify-center py-16 px-4"
-    >
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-interactive-500/20 to-accent-500/20 flex items-center justify-center mb-6">
-        <MessageSquare className="w-10 h-10 text-interactive-400" />
+    <div className="flex flex-col items-center justify-center py-10 px-4">
+      <div className="w-12 h-12 rounded-xl bg-interactive-500/10 flex items-center justify-center mb-3">
+        <MessageSquare className="w-6 h-6 text-interactive-400" />
       </div>
-      <h3 className="text-xl font-semibold text-text-primary mb-2">No messages yet</h3>
-      <p className="text-text-secondary text-center max-w-sm mb-6">
-        Be the first to post on the Promo Board and claim the crown!
-      </p>
-      <div className="flex items-center gap-2 text-sm text-text-tertiary">
-        <DollarSign className="w-4 h-4" />
-        <span>$1 per message • Support the community</span>
-      </div>
-    </motion.div>
+      <h3 className="text-sm font-semibold text-text-primary mb-1">No messages yet</h3>
+      <p className="text-xs text-text-tertiary text-center max-w-xs">Be the first to post and claim the crown!</p>
+    </div>
   );
 }
-
-// ============================================================================
-// Main Page Component
-// ============================================================================
 
 export default function PromoPage() {
   const [showCompose, setShowCompose] = useState(false);
@@ -354,13 +173,7 @@ export default function PromoPage() {
   const queryClient = useQueryClient();
   const { isMobile } = useMobileDetection();
   
-  const { 
-    data: messagesData, 
-    isLoading: messagesLoading, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage 
-  } = usePromoMessages();
+  const { data: messagesData, isLoading: messagesLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = usePromoMessages();
   const { data: pinnedMessage, isLoading: pinnedLoading } = usePinnedMessage();
   const { data: leaderboard, isLoading: leaderboardLoading } = useLeaderboard();
   
@@ -378,205 +191,155 @@ export default function PromoPage() {
 
   return (
     <div className="min-h-screen bg-background-base">
-      {/* Page Header with Breadcrumbs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        <PageHeader 
-          title="Promo Board"
-          subtitle="Community Spotlight • $1/message"
-          showBack={true}
-          actions={
-            <div className="flex items-center gap-4">
-              {/* Quick Stats (Desktop) */}
-              <div className="hidden md:flex items-center gap-6">
-                <div className="flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-text-tertiary" />
-                  <span className="text-text-secondary">{leaderboard?.entries.length ?? 0} donors</span>
+      {/* Header */}
+      <div className="border-b border-border-subtle bg-background-surface/50">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-interactive-600 to-accent-600 flex items-center justify-center shadow-md shadow-interactive-600/25">
+                <MessageSquare className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h1 className="text-base font-bold text-text-primary">Promo Board</h1>
+                <p className="text-[11px] text-text-secondary">Community Spotlight • $1/message</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Stats */}
+              <div className="hidden md:flex items-center gap-4 text-[11px]">
+                <div className="flex items-center gap-1 text-text-tertiary">
+                  <Users className="w-3.5 h-3.5" />
+                  <span>{leaderboard?.entries.length ?? 0} donors</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <MessageSquare className="w-4 h-4 text-text-tertiary" />
-                  <span className="text-text-secondary">{totalMessages} messages</span>
+                <div className="flex items-center gap-1 text-text-tertiary">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>{totalMessages} messages</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                  <span className="text-green-400 font-medium">{formatCurrency(totalDonations)} raised</span>
+                <div className="flex items-center gap-1 text-success-muted">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span className="font-medium">{formatCurrency(totalDonations)} raised</span>
                 </div>
               </div>
 
-              {/* Post Button */}
               <button
                 onClick={() => setShowCompose(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-interactive-600 to-accent-600 hover:from-interactive-500 hover:to-accent-500 text-white font-semibold rounded-lg shadow-lg shadow-interactive-500/25 transition-all hover:scale-105"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-interactive-600 to-accent-600 hover:from-interactive-500 hover:to-accent-500 text-white text-xs font-semibold rounded-lg shadow-lg shadow-interactive-500/25 transition-all"
               >
-                <Send className="w-4 h-4" />
-                <span className="hidden sm:inline">Post Message</span>
-                <span className="sm:hidden">Post</span>
+                <Send className="w-3.5 h-3.5" />
+                Post Message
               </button>
             </div>
-          }
-        />
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-4">
         <PullToRefresh onRefresh={handleRefresh} disabled={!isMobile}>
-          <div className="flex gap-6">
-          {/* Chat Feed */}
-          <div className="flex-1 min-w-0">
-            {/* King of the Hill Banner */}
-            <AnimatePresence>
-              {!pinnedLoading && pinnedMessage && (
-                <div className="mb-6">
-                  <KingOfTheHillBanner message={pinnedMessage} />
-                </div>
-              )}
-            </AnimatePresence>
-
-            {/* Messages Container */}
-            <div 
-              ref={chatContainerRef}
-              className="bg-background-surface/50 rounded-2xl border border-border-subtle overflow-hidden"
-            >
-              {/* Chat Header */}
-              <div className="px-4 py-3 border-b border-border-subtle bg-background-surface/80 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-sm font-medium text-text-secondary">Live Feed</span>
-                </div>
-                <span className="text-xs text-text-tertiary">
-                  {totalMessages} message{totalMessages !== 1 ? 's' : ''}
-                </span>
-              </div>
+          <div className="flex gap-4">
+            {/* Chat Feed */}
+            <div className="flex-1 min-w-0 space-y-3">
+              {/* King Banner */}
+              {!pinnedLoading && pinnedMessage && <KingBanner message={pinnedMessage} />}
 
               {/* Messages */}
-              <div className="p-4 space-y-6 min-h-[400px] max-h-[600px] overflow-y-auto">
-                {messagesLoading ? (
-                  <div className="space-y-6">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <MessageSkeleton key={i} />
-                    ))}
+              <div ref={chatContainerRef} className="bg-background-surface/50 rounded-lg border border-border-subtle overflow-hidden">
+                <div className="px-3 py-2 border-b border-border-subtle bg-background-surface/80 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-success-muted animate-pulse" />
+                    <span className="text-[11px] font-medium text-text-secondary">Live Feed</span>
                   </div>
-                ) : allMessages.length === 0 ? (
-                  <EmptyState />
-                ) : (
-                  <AnimatePresence>
-                    {allMessages.map((msg) => (
-                      <ChatMessage key={msg.id} message={msg} />
-                    ))}
-                  </AnimatePresence>
+                  <span className="text-[10px] text-text-tertiary">{totalMessages} message{totalMessages !== 1 ? 's' : ''}</span>
+                </div>
+
+                <div className="p-3 space-y-4 min-h-[300px] max-h-[500px] overflow-y-auto">
+                  {messagesLoading ? (
+                    <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => <MessageSkeleton key={i} />)}</div>
+                  ) : allMessages.length === 0 ? (
+                    <EmptyState />
+                  ) : (
+                    <AnimatePresence>{allMessages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}</AnimatePresence>
+                  )}
+                </div>
+
+                {hasNextPage && (
+                  <div className="px-3 py-2 border-t border-border-subtle">
+                    <button onClick={() => fetchNextPage()} disabled={isFetchingNextPage} className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50">
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      {isFetchingNextPage ? 'Loading...' : 'Load more'}
+                    </button>
+                  </div>
                 )}
               </div>
 
-              {/* Load More */}
-              {hasNextPage && (
-                <div className="px-4 py-3 border-t border-border-subtle">
-                  <button
-                    onClick={() => fetchNextPage()}
-                    disabled={isFetchingNextPage}
-                    className="w-full flex items-center justify-center gap-2 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
-                  >
-                    {isFetchingNextPage ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                          className="w-4 h-4 border-2 border-text-tertiary/30 border-t-text-tertiary rounded-full"
-                        />
-                        Loading...
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="w-4 h-4" />
-                        Load older messages
-                      </>
-                    )}
-                  </button>
+              {/* Mobile Stats */}
+              <div className="grid grid-cols-3 gap-2 lg:hidden">
+                <div className="p-2 rounded-lg bg-background-surface border border-border-subtle text-center">
+                  <p className="text-sm font-bold text-text-primary">{leaderboard?.entries.length ?? 0}</p>
+                  <p className="text-[10px] text-text-tertiary">Donors</p>
                 </div>
-              )}
+                <div className="p-2 rounded-lg bg-background-surface border border-border-subtle text-center">
+                  <p className="text-sm font-bold text-text-primary">{totalMessages}</p>
+                  <p className="text-[10px] text-text-tertiary">Messages</p>
+                </div>
+                <div className="p-2 rounded-lg bg-background-surface border border-border-subtle text-center">
+                  <p className="text-sm font-bold text-success-muted">{formatCurrency(totalDonations)}</p>
+                  <p className="text-[10px] text-text-tertiary">Raised</p>
+                </div>
+              </div>
             </div>
 
-            {/* Mobile Stats */}
-            <div className="grid grid-cols-3 gap-3 mt-6 lg:hidden">
-              <StatsCard icon={Users} label="Donors" value={leaderboard?.entries.length ?? 0} />
-              <StatsCard icon={MessageSquare} label="Messages" value={totalMessages} />
-              <StatsCard icon={TrendingUp} label="Raised" value={formatCurrency(totalDonations)} />
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <aside className="hidden lg:block w-80 flex-shrink-0">
-            <div className="sticky top-24 space-y-4">
+            {/* Sidebar */}
+            <aside className="hidden lg:block w-64 flex-shrink-0 space-y-3">
               {/* Leaderboard */}
-              <div className="rounded-2xl border border-border-subtle bg-background-surface/50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-border-subtle bg-background-surface/80">
-                  <div className="flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-accent-400" />
-                    <h2 className="font-semibold text-text-primary">Top Donors</h2>
-                  </div>
+              <div className="rounded-lg border border-border-subtle bg-background-surface/50 overflow-hidden">
+                <div className="px-3 py-2 border-b border-border-subtle bg-background-surface/80 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-accent-400" />
+                  <h2 className="text-xs font-semibold text-text-primary">Top Donors</h2>
                 </div>
-
-                <div className="p-3">
+                <div className="p-2">
                   {leaderboardLoading ? (
-                    <div className="space-y-3">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-3 p-2 animate-pulse">
-                          <div className="w-7 h-7 rounded-full bg-background-elevated" />
-                          <div className="w-8 h-8 rounded-full bg-background-elevated" />
-                          <div className="flex-1">
-                            <div className="h-4 bg-background-elevated rounded w-20 mb-1" />
-                            <div className="h-3 bg-background-elevated rounded w-12" />
-                          </div>
-                          <div className="h-4 bg-background-elevated rounded w-10" />
-                        </div>
-                      ))}
-                    </div>
+                    <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-8 bg-background-elevated rounded animate-pulse" />)}</div>
                   ) : leaderboard?.entries.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <Trophy className="w-10 h-10 text-text-disabled mx-auto mb-3" />
-                      <p className="text-sm text-text-tertiary">No donors yet</p>
-                      <p className="text-xs text-text-disabled mt-1">Be the first!</p>
+                    <div className="py-6 text-center">
+                      <Trophy className="w-8 h-8 text-text-disabled mx-auto mb-2" />
+                      <p className="text-[11px] text-text-tertiary">No donors yet</p>
+                      <p className="text-[10px] text-text-disabled">Be the first!</p>
                     </div>
                   ) : (
-                    <div className="space-y-1">
-                      {leaderboard?.entries.slice(0, 10).map((entry, index) => (
-                        <LeaderboardCard key={entry.userId} entry={entry} index={index} />
-                      ))}
-                    </div>
+                    <div className="space-y-0.5">{leaderboard?.entries.slice(0, 10).map((entry, index) => <LeaderboardCard key={entry.userId} entry={entry} index={index} />)}</div>
                   )}
                 </div>
               </div>
 
               {/* How It Works */}
-              <div className="rounded-2xl border border-border-subtle bg-background-surface/50 p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-5 h-5 text-interactive-400" />
-                  <h3 className="font-semibold text-text-primary">How It Works</h3>
+              <div className="rounded-lg border border-border-subtle bg-background-surface/50 p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Sparkles className="w-4 h-4 text-interactive-400" />
+                  <h3 className="text-xs font-semibold text-text-primary">How It Works</h3>
                 </div>
-                <ul className="space-y-3 text-sm text-text-secondary">
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-interactive-500/20 text-interactive-400 text-xs flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                <ul className="space-y-2 text-[11px] text-text-secondary">
+                  <li className="flex items-start gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-[9px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
                     <span>Post a message for $1 to promote your content</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-interactive-500/20 text-interactive-400 text-xs flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                  <li className="flex items-start gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-[9px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
                     <span>Top donor becomes King of the Hill</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-interactive-500/20 text-interactive-400 text-xs flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                  <li className="flex items-start gap-1.5">
+                    <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-[9px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
                     <span>King's message stays pinned at the top</span>
                   </li>
                 </ul>
               </div>
-            </div>
-          </aside>
-        </div>
+            </aside>
+          </div>
         </PullToRefresh>
       </div>
 
-      {/* Compose Modal */}
-      <PromoComposeModal
-        isOpen={showCompose}
-        onClose={() => setShowCompose(false)}
-      />
+      <PromoComposeModal isOpen={showCompose} onClose={() => setShowCompose(false)} />
     </div>
   );
 }

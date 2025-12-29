@@ -149,9 +149,11 @@ async def start_session(
     
     # Audit log
     audit_service = get_audit_service()
-    await audit_service.log_event(
+    await audit_service.log(
         user_id=current_user.sub,
-        event_type="profile_creator.session_start",
+        action="profile_creator.session_start",
+        resource_type="profile_creator_session",
+        resource_id="new",
         details={
             "creation_type": data.creation_type,
             "style_preset": data.style_preset,
@@ -383,11 +385,12 @@ async def generate_from_session(
     
     # Audit log
     audit_service = get_audit_service()
-    await audit_service.log_event(
+    await audit_service.log(
         user_id=current_user.sub,
-        event_type="profile_creator.generate",
+        action="profile_creator.generate",
+        resource_type="profile_creator_session",
+        resource_id=session_id,
         details={
-            "session_id": session_id,
             "job_id": job.id,
             "creation_type": session["creation_type"],
             "size": data.output_size,

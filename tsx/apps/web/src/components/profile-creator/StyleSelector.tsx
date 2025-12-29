@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { StylePreset } from '@aurastream/api-client/src/types/profileCreator';
 import { STYLE_PRESETS } from '@aurastream/api-client/src/types/profileCreator';
 
@@ -10,53 +11,44 @@ interface StyleSelectorProps {
   onSelect: (style: StylePreset) => void;
 }
 
-/**
- * Style preset selector grid.
- */
 export function StyleSelector({ selected, onSelect }: StyleSelectorProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+    <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
       {STYLE_PRESETS.map((preset) => {
         const isSelected = selected === preset.id;
         
         return (
-          <motion.button
+          <button
             key={preset.id}
             onClick={() => onSelect(preset.id)}
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            className={`
-              relative p-3 rounded-lg border text-left transition-all
-              ${isSelected
-                ? 'bg-pink-500/20 border-pink-500/50'
-                : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
-              }
-            `}
+            className={cn(
+              "relative p-2 rounded-lg border text-left transition-all",
+              isSelected
+                ? "bg-interactive-600/10 border-interactive-600/50"
+                : "bg-background-surface border-border-subtle hover:border-border-default"
+            )}
           >
-            {/* Selection indicator */}
             {isSelected && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="absolute top-1.5 right-1.5 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center"
+                className="absolute top-1 right-1 w-3.5 h-3.5 bg-interactive-600 rounded-full flex items-center justify-center"
               >
-                <Check className="w-2.5 h-2.5 text-white" />
+                <Check className="w-2 h-2 text-white" />
               </motion.div>
             )}
 
-            {/* Icon + Name inline */}
-            <div className="flex items-center gap-2">
-              <span className="text-base">{preset.icon}</span>
-              <h3 className={`font-medium text-sm ${isSelected ? 'text-pink-400' : 'text-white'}`}>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">{preset.icon}</span>
+              <h3 className={cn("font-medium text-[11px]", isSelected ? "text-interactive-400" : "text-text-primary")}>
                 {preset.name}
               </h3>
             </div>
 
-            {/* Description */}
-            <p className="text-[11px] text-gray-400 mt-1 line-clamp-1">
+            <p className="text-[9px] text-text-tertiary mt-0.5 line-clamp-1">
               {preset.description}
             </p>
-          </motion.button>
+          </button>
         );
       })}
     </div>

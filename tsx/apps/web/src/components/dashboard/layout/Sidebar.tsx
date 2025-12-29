@@ -20,6 +20,7 @@ import {
   VibeIcon,
   AuraLabIcon,
   PromoIcon,
+  ProfileCreatorIcon,
 } from '../icons';
 
 export interface NavItem {
@@ -55,6 +56,7 @@ const mainNavItems: NavItem[] = [
 
 const toolsNavItems: NavItem[] = [
   { name: 'Prompt Coach', href: '/dashboard/coach', icon: CoachIcon, badge: 'Pro', dataTour: 'coach' },
+  { name: 'Profile Creator', href: '/dashboard/profile-creator', icon: ProfileCreatorIcon, badge: 'New', dataTour: 'profile-creator' },
   { name: 'Vibe Branding', href: '/dashboard/brand-kits?vibe=true', icon: VibeIcon, badge: 'New', dataTour: 'vibe-branding' },
   { name: 'Aura Lab', href: '/dashboard/aura-lab', icon: AuraLabIcon, badge: 'New', dataTour: 'aura-lab' },
 ];

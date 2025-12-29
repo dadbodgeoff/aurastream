@@ -168,7 +168,7 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-screen bg-background-base">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
         <PullToRefresh onRefresh={handleRefresh} disabled={!isMobile}>
           {/* Page Header */}
           <PageHeader 
@@ -181,7 +181,7 @@ export default function CommunityPage() {
 
           {/* Quick Action Cards */}
           <section>
-            <h2 className="text-lg font-semibold text-text-primary mb-4">
+            <h2 className="text-sm font-semibold text-text-primary mb-2">
               What would you like to create today?
             </h2>
             <QuickActionCards />

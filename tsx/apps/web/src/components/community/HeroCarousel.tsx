@@ -46,49 +46,53 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Slides */}
+      {/* Slides Container - Fixed height ensures consistent sizing */}
       <div
-        className="flex transition-transform duration-500 ease-standard"
+        className="flex transition-transform duration-500 ease-standard h-[180px] md:h-[220px]"
         style={{ transform: `translateX(-${currentIndex * 100}%)` }}
       >
         {banners.map((banner) => (
           <div
             key={banner.id}
             className={cn(
-              'flex-shrink-0 w-full min-h-[200px] md:min-h-[280px] p-6 md:p-10 flex flex-col justify-center relative overflow-hidden',
+              'flex-shrink-0 w-full h-full relative overflow-hidden',
               banner.image ? 'bg-background-base' : banner.bgGradient
             )}
           >
-            {/* Background Image */}
+            {/* Background Image - object-cover fills container, centered positioning */}
             {banner.image && (
-              <div className="absolute inset-0">
-                <img src={banner.image} alt="" className="w-full h-full object-fill" />
-              </div>
+              <img 
+                src={banner.image} 
+                alt={banner.title}
+                className="absolute inset-0 w-full h-full object-cover object-center" 
+              />
             )}
             
-            {/* Content - hide when image has baked-in content */}
+            {/* Content - for gradient banners without images */}
             {!banner.image && (
-              <div className="relative z-10 max-w-lg">
-                {banner.badge && (
-                  <span className="inline-block px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm rounded-full mb-3">
-                    {banner.badge}
-                  </span>
-                )}
-                <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight">
-                  {banner.title}
-                </h2>
-                {banner.subtitle && (
-                  <p className="text-white/80 text-sm md:text-base mb-4">{banner.subtitle}</p>
-                )}
-                <a
-                  href={banner.ctaHref}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-white text-gray-900 font-semibold rounded-lg hover:bg-white/90 transition-colors"
-                >
-                  {banner.ctaText}
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </a>
+              <div className="absolute inset-0 p-4 md:p-6 flex flex-col justify-center">
+                <div className="max-w-lg">
+                  {banner.badge && (
+                    <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-white/20 backdrop-blur-sm rounded-full mb-2">
+                      {banner.badge}
+                    </span>
+                  )}
+                  <h2 className="text-lg md:text-xl font-bold text-white mb-1 leading-tight">
+                    {banner.title}
+                  </h2>
+                  {banner.subtitle && (
+                    <p className="text-white/80 text-xs mb-3 line-clamp-2">{banner.subtitle}</p>
+                  )}
+                  <a
+                    href={banner.ctaHref}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-900 text-xs font-semibold rounded-lg hover:bg-white/90 transition-colors"
+                  >
+                    {banner.ctaText}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
               </div>
             )}
           </div>
@@ -100,19 +104,19 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
         <>
           <button
             onClick={prevSlide}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
             aria-label="Previous slide"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
           <button
             onClick={nextSlide}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors"
             aria-label="Next slide"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </button>
@@ -121,14 +125,14 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
 
       {/* Dots */}
       {banners.length > 1 && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
           {banners.map((_, idx) => (
             <button
               key={idx}
               onClick={() => setCurrentIndex(idx)}
               className={cn(
-                'w-2 h-2 rounded-full transition-all',
-                idx === currentIndex ? 'bg-white w-6' : 'bg-white/50 hover:bg-white/70'
+                'w-1.5 h-1.5 rounded-full transition-all',
+                idx === currentIndex ? 'bg-white w-4' : 'bg-white/50 hover:bg-white/70'
               )}
               aria-label={`Go to slide ${idx + 1}`}
             />

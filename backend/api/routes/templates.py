@@ -14,7 +14,7 @@ from pathlib import Path
 import yaml
 
 
-router = APIRouter(prefix="/templates", tags=["templates"])
+router = APIRouter(tags=["templates"])
 
 
 # ============================================================================

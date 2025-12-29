@@ -576,3 +576,48 @@ export {
   getContinueSessionUrl,
   transformStartRequest,
 } from './hooks/useProfileCreator';
+
+
+// Social (Friends & Messages) type exports
+export type {
+  Friend,
+  FriendRequest,
+  FriendsListResponse,
+  UserSearchResult,
+  UserSearchResponse,
+  FriendActionResponse,
+  Message,
+  LastMessage,
+  Conversation,
+  ConversationListResponse,
+  MessageHistoryResponse,
+  BlockedUser,
+  BlockedUsersListResponse,
+  SendFriendRequest,
+  SendMessageRequest,
+} from './types/social';
+
+// Friends hooks exports
+export {
+  friendsKeys,
+  useFriendsList,
+  useUserSearch,
+  useBlockedUsers,
+  useSendFriendRequest,
+  useAcceptFriendRequest,
+  useDeclineFriendRequest,
+  useRemoveFriend,
+  useBlockUser,
+  useUnblockUser,
+} from './hooks/useFriends';
+
+// Messages hooks exports
+export {
+  messagesKeys,
+  useConversations,
+  useMessageHistory,
+  useUnreadCount,
+  useSendMessage,
+  useMarkAsRead,
+  useLoadOlderMessages,
+} from './hooks/useMessages';

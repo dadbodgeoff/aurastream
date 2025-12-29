@@ -184,15 +184,15 @@ export function QuickCreateWizard() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
+    <div className="max-w-5xl mx-auto pb-8">
       {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-interactive-600 to-interactive-500 flex items-center justify-center shadow-md shadow-interactive-600/25">
+      <div className="mb-4 flex items-center gap-2">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-interactive-600 to-interactive-500 flex items-center justify-center shadow-md shadow-interactive-600/25">
           <BoltIcon />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-text-primary">Quick Create</h1>
-          <p className="text-sm text-text-secondary">Professional templates, instant results</p>
+          <h1 className="text-lg font-bold text-text-primary">Quick Create</h1>
+          <p className="text-xs text-text-secondary">Professional templates, instant results</p>
         </div>
       </div>
 

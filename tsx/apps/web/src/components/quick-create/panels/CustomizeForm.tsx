@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { SectionCard } from '../shared';
 import { ChevronLeftIcon, CheckIcon, ImageIcon } from '../icons';
 import type { QuickTemplate, VibeOption } from '../types';
 
@@ -31,42 +30,36 @@ interface CustomizeFormProps {
 const LOGO_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'];
 const LOGO_SIZES = ['small', 'medium', 'large'];
 
-function VibeCard({ vibe, selected, onClick }: { vibe: VibeOption; selected: boolean; onClick: () => void }) {
+function VibeCard({ vibe, selected, onClick, compact }: { vibe: VibeOption; selected: boolean; onClick: () => void; compact?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "relative p-4 rounded-xl border-2 text-left transition-all group overflow-hidden",
+        "relative rounded-lg border text-left transition-all group overflow-hidden",
+        compact ? "p-2" : "p-2.5",
         selected 
-          ? "border-interactive-600 bg-interactive-600/5 shadow-lg shadow-interactive-600/10" 
+          ? "border-interactive-600 bg-interactive-600/5" 
           : "border-border-subtle hover:border-border-default bg-background-surface/50"
       )}
     >
-      {/* Gradient accent bar */}
-      <div className={cn(
-        "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r opacity-0 transition-opacity",
-        vibe.gradient,
-        selected && "opacity-100"
-      )} />
-      
-      <div className="flex items-start gap-3">
+      <div className={cn("flex items-center", compact ? "gap-2" : "gap-2")}>
         <div className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center text-xl bg-gradient-to-br shrink-0",
+          "rounded-lg flex items-center justify-center bg-gradient-to-br shrink-0",
+          compact ? "w-6 h-6 text-xs" : "w-7 h-7 text-sm",
           vibe.gradient
         )}>
           {vibe.icon}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-text-primary">{vibe.name}</h4>
+          <div className="flex items-center justify-between gap-1">
+            <h4 className={cn("font-medium text-text-primary truncate", compact ? "text-xs" : "text-xs")}>{vibe.name}</h4>
             {selected && (
-              <div className="w-5 h-5 bg-interactive-600 rounded-full flex items-center justify-center text-white">
+              <div className="w-3.5 h-3.5 bg-interactive-600 rounded-full flex items-center justify-center text-white shrink-0">
                 <CheckIcon />
               </div>
             )}
           </div>
-          <p className="text-sm text-text-secondary mt-0.5 line-clamp-1">{vibe.tagline}</p>
         </div>
       </div>
     </button>
@@ -82,246 +75,213 @@ export function CustomizeForm(props: CustomizeFormProps) {
     logoSize, onLogoSizeChange, isFormValid, onBack, onNext, isLoading 
   } = props;
 
-  const isEmoteTemplate = template.id === 'emote';
+  const hasLotsOfVibes = template.vibes.length > 6;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <button onClick={onBack} className="flex items-center gap-2 text-text-secondary hover:text-text-primary">
+    <div className="space-y-3 animate-in fade-in duration-300">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-text-secondary hover:text-text-primary text-sm">
         <ChevronLeftIcon />
-        <span className="text-sm font-medium">Back</span>
+        <span className="font-medium">Back</span>
       </button>
 
-      {/* Header */}
-      <SectionCard>
-        <div className="flex items-center gap-4">
-          <span className="text-4xl">{template.emoji}</span>
-          <div>
-            <h2 className="text-xl font-bold text-text-primary">{template.name}</h2>
-            <p className="text-text-secondary">{template.tagline} • {template.dimensions}</p>
-          </div>
+      {/* Header - Compact */}
+      <div className="flex items-center gap-3 p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+        <span className="text-xl">{template.emoji}</span>
+        <div>
+          <h2 className="text-sm font-semibold text-text-primary">{template.name}</h2>
+          <p className="text-xs text-text-secondary">{template.tagline} • {template.dimensions}</p>
         </div>
-      </SectionCard>
+      </div>
 
-      {/* Vibe Selection */}
-      <SectionCard>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-text-primary">Choose Your Vibe</h3>
-            <p className="text-sm text-text-tertiary mt-0.5">Select the visual style for your asset</p>
-          </div>
-          <span className="px-3 py-1 bg-interactive-600/10 text-interactive-600 text-xs font-medium rounded-full">
-            {template.vibes.length} styles
-          </span>
-        </div>
-        
-        <div className={cn(
-          "grid gap-3",
-          isEmoteTemplate ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 md:grid-cols-3"
-        )}>
-          {template.vibes.map(vibe => (
-            <VibeCard
-              key={vibe.id}
-              vibe={vibe}
-              selected={selectedVibe === vibe.id}
-              onClick={() => onVibeChange(vibe.id)}
-            />
-          ))}
-        </div>
-      </SectionCard>
-
-      {/* Fields */}
-      <SectionCard>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Details</h3>
-        <div className="space-y-4">
-          {template.fields
-            .filter(field => !field.showForVibes || field.showForVibes.includes(selectedVibe))
-            .map(field => {
-            // For dynamic_select, get options based on parent field value
-            let options = field.options;
-            if (field.type === 'dynamic_select' && field.dependsOn && field.optionsMap) {
-              const parentValue = formValues[field.dependsOn] || '';
-              options = field.optionsMap[parentValue] || [];
-            }
-            
-            // Check if this is an optional customization field
-            const isOptionalCustomization = !field.required && (
-              field.id.includes('character') || 
-              field.id.includes('color') || 
-              field.id.includes('accent')
-            );
-            
-            return (
-            <div key={field.id} className={isOptionalCustomization ? 'pt-2 border-t border-border-subtle/50' : ''}>
-              {isOptionalCustomization && field === template.fields.filter(f => !f.required && (f.id.includes('character') || f.id.includes('color') || f.id.includes('accent')))[0] && (
-                <p className="text-xs text-text-tertiary mb-4 flex items-center gap-1.5">
-                  <span className="text-interactive-500">✨</span>
-                  Optional customization - leave blank for AI to decide
-                </p>
-              )}
-              <label className="block text-sm font-medium text-text-secondary mb-2">
-                {field.label}
-                {field.required && <span className="text-error-light ml-1">*</span>}
-                {!field.required && <span className="text-text-muted ml-1 text-xs font-normal">(optional)</span>}
-              </label>
-              {field.description && (
-                <p className="text-xs text-text-tertiary mb-2">{field.description}</p>
-              )}
-              {(field.type === 'select' || field.type === 'dynamic_select') ? (
-                <select
-                  value={formValues[field.id] || ''}
-                  onChange={(e) => {
-                    onFieldChange(field.id, e.target.value);
-                    // Clear dependent fields when parent changes
-                    template.fields.forEach(f => {
-                      if (f.dependsOn === field.id) {
-                        onFieldChange(f.id, '');
-                      }
-                    });
-                  }}
-                  disabled={field.type === 'dynamic_select' && field.dependsOn ? !formValues[field.dependsOn] : false}
-                  className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary focus:outline-none focus:border-interactive-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">{field.required ? 'Select...' : 'AI Decides (Recommended)'}</option>
-                  {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={formValues[field.id] || ''}
-                  onChange={(e) => onFieldChange(field.id, e.target.value)}
-                  placeholder={field.placeholder}
-                  maxLength={field.maxLength}
-                  className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600"
-                />
-              )}
-              {field.hint && (
-                <p className="mt-1.5 text-xs text-text-tertiary">{field.hint}</p>
-              )}
+      {/* Two Column Layout for Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        {/* Left Column - Vibes & Details */}
+        <div className="space-y-3">
+          {/* Vibe Selection - Compact */}
+          <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-text-primary">Style</h3>
+              <span className="px-1.5 py-0.5 bg-interactive-600/10 text-interactive-600 text-[10px] font-medium rounded">
+                {template.vibes.length}
+              </span>
             </div>
-          )})}
-        </div>
-      </SectionCard>
-
-      {/* Brand Kit */}
-      <SectionCard>
-        <h3 className="text-lg font-semibold text-text-primary mb-4">Brand Kit</h3>
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="w-8 h-8 border-3 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => onBrandKitChange('')}
-              className={cn(
-                "w-full p-4 rounded-xl border-2 text-left transition-all",
-                selectedBrandKitId === '' ? "border-interactive-600 bg-interactive-600/5" : "border-border-subtle hover:border-border-default"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">🎨</span>
-                  <div>
-                    <p className="font-medium text-text-primary">Let AI decide</p>
-                    <p className="text-sm text-text-tertiary">Creative defaults</p>
-                  </div>
-                </div>
-                {selectedBrandKitId === '' && <div className="w-5 h-5 bg-interactive-600 rounded-full flex items-center justify-center text-white"><CheckIcon /></div>}
-              </div>
-            </button>
-
-            <div className="grid grid-cols-2 gap-3">
-              {brandKits.map(kit => (
-                <button
-                  key={kit.id}
-                  type="button"
-                  onClick={() => onBrandKitChange(kit.id)}
-                  className={cn(
-                    "p-4 rounded-xl border-2 text-left transition-all",
-                    selectedBrandKitId === kit.id ? "border-interactive-600 bg-interactive-600/5" : "border-border-subtle hover:border-border-default"
-                  )}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-text-primary truncate">{kit.name}</p>
-                      <div className="flex gap-1 mt-2">
-                        {[...(kit.primary_colors || []), ...(kit.accent_colors || [])].slice(0, 4).map((c, i) => (
-                          <div key={i} className="w-4 h-4 rounded" style={{ backgroundColor: c }} />
-                        ))}
-                      </div>
-                    </div>
-                    {selectedBrandKitId === kit.id && <div className="w-5 h-5 bg-interactive-600 rounded-full flex items-center justify-center text-white"><CheckIcon /></div>}
-                  </div>
-                </button>
+            
+            <div className={cn(
+              "grid gap-1.5",
+              hasLotsOfVibes ? "grid-cols-3 lg:grid-cols-4" : "grid-cols-2 lg:grid-cols-3"
+            )}>
+              {template.vibes.map(vibe => (
+                <VibeCard
+                  key={vibe.id}
+                  vibe={vibe}
+                  selected={selectedVibe === vibe.id}
+                  onClick={() => onVibeChange(vibe.id)}
+                  compact={hasLotsOfVibes}
+                />
               ))}
             </div>
+          </div>
 
-            {brandKits.length === 0 && (
-              <p className="text-center text-text-tertiary text-sm py-4">
-                No brand kits. <Link href="/dashboard/brand-kits" className="text-interactive-600 hover:underline">Create one</Link>
-              </p>
+          {/* Fields - Compact */}
+          <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+            <h3 className="text-xs font-semibold text-text-primary mb-2">Details</h3>
+            <div className="space-y-2">
+              {template.fields
+                .filter(field => !field.showForVibes || field.showForVibes.includes(selectedVibe))
+                .map(field => {
+                let options = field.options;
+                if (field.type === 'dynamic_select' && field.dependsOn && field.optionsMap) {
+                  const parentValue = formValues[field.dependsOn] || '';
+                  options = field.optionsMap[parentValue] || [];
+                }
+                
+                return (
+                <div key={field.id}>
+                  <label className="block text-[11px] font-medium text-text-secondary mb-1">
+                    {field.label}
+                    {field.required && <span className="text-error-light ml-0.5">*</span>}
+                  </label>
+                  {(field.type === 'select' || field.type === 'dynamic_select') ? (
+                    <select
+                      value={formValues[field.id] || ''}
+                      onChange={(e) => {
+                        onFieldChange(field.id, e.target.value);
+                        template.fields.forEach(f => {
+                          if (f.dependsOn === field.id) {
+                            onFieldChange(f.id, '');
+                          }
+                        });
+                      }}
+                      disabled={field.type === 'dynamic_select' && field.dependsOn ? !formValues[field.dependsOn] : false}
+                      className="w-full px-2.5 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary focus:outline-none focus:border-interactive-600 disabled:opacity-50"
+                    >
+                      <option value="">{field.required ? 'Select...' : 'AI Decides'}</option>
+                      {options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formValues[field.id] || ''}
+                      onChange={(e) => onFieldChange(field.id, e.target.value)}
+                      placeholder={field.placeholder}
+                      maxLength={field.maxLength}
+                      className="w-full px-2.5 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600"
+                    />
+                  )}
+                </div>
+              )})}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Brand Kit & Logo */}
+        <div className="space-y-3">
+          {/* Brand Kit - Compact */}
+          <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+            <h3 className="text-xs font-semibold text-text-primary mb-2">Brand Kit</h3>
+            {isLoading ? (
+              <div className="flex justify-center py-3">
+                <div className="w-5 h-5 border-2 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => onBrandKitChange('')}
+                  className={cn(
+                    "w-full p-2 rounded-lg border text-left transition-all flex items-center justify-between",
+                    selectedBrandKitId === '' ? "border-interactive-600 bg-interactive-600/5" : "border-border-subtle hover:border-border-default"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🎨</span>
+                    <span className="text-xs font-medium text-text-primary">AI decides</span>
+                  </div>
+                  {selectedBrandKitId === '' && <div className="w-3.5 h-3.5 bg-interactive-600 rounded-full flex items-center justify-center text-white"><CheckIcon /></div>}
+                </button>
+
+                <div className="grid grid-cols-2 gap-1.5">
+                  {brandKits.map(kit => (
+                    <button
+                      key={kit.id}
+                      type="button"
+                      onClick={() => onBrandKitChange(kit.id)}
+                      className={cn(
+                        "p-2 rounded-lg border text-left transition-all",
+                        selectedBrandKitId === kit.id ? "border-interactive-600 bg-interactive-600/5" : "border-border-subtle hover:border-border-default"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-xs font-medium text-text-primary truncate">{kit.name}</p>
+                        {selectedBrandKitId === kit.id && <div className="w-3.5 h-3.5 bg-interactive-600 rounded-full flex items-center justify-center text-white shrink-0"><CheckIcon /></div>}
+                      </div>
+                      <div className="flex gap-0.5 mt-1">
+                        {[...(kit.primary_colors || []), ...(kit.accent_colors || [])].slice(0, 4).map((c, i) => (
+                          <div key={i} className="w-2.5 h-2.5 rounded" style={{ backgroundColor: c }} />
+                        ))}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {brandKits.length === 0 && (
+                  <p className="text-center text-text-tertiary text-[10px] py-2">
+                    No brand kits. <Link href="/dashboard/brand-kits" className="text-interactive-600 hover:underline">Create one</Link>
+                  </p>
+                )}
+              </div>
             )}
           </div>
-        )}
-      </SectionCard>
 
-      {/* Logo Options */}
-      {selectedBrandKitId && (
-        <SectionCard>
-          <h3 className="text-lg font-semibold text-text-primary mb-4">Logo</h3>
-          <div className="flex items-center justify-between p-4 bg-background-base rounded-xl">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-background-elevated rounded-lg flex items-center justify-center text-text-muted"><ImageIcon /></div>
-              <p className="font-medium text-text-primary">Include Logo</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onIncludeLogoChange(!includeLogo)}
-              disabled={!hasLogo}
-              className={cn("relative w-12 h-7 rounded-full transition-colors", includeLogo && hasLogo ? "bg-interactive-600" : "bg-background-elevated", !hasLogo && "opacity-50")}
-            >
-              <span className={cn("absolute top-1 w-5 h-5 bg-white rounded-full transition-transform shadow-sm", includeLogo && hasLogo ? "translate-x-6" : "translate-x-1")} />
-            </button>
-          </div>
-          {includeLogo && hasLogo && (
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Position</label>
-                <select value={logoPosition} onChange={(e) => onLogoPositionChange(e.target.value)} className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary">
-                  {LOGO_POSITIONS.map(p => <option key={p} value={p}>{p.replace('-', ' ')}</option>)}
-                </select>
+          {/* Logo Options - Compact */}
+          {selectedBrandKitId && (
+            <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-background-elevated rounded flex items-center justify-center text-text-muted"><ImageIcon /></div>
+                  <span className="text-xs font-medium text-text-primary">Include Logo</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onIncludeLogoChange(!includeLogo)}
+                  disabled={!hasLogo}
+                  className={cn("relative w-8 h-5 rounded-full transition-colors", includeLogo && hasLogo ? "bg-interactive-600" : "bg-background-elevated", !hasLogo && "opacity-50")}
+                >
+                  <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm", includeLogo && hasLogo ? "translate-x-3.5" : "translate-x-0.5")} />
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Size</label>
-                <select value={logoSize} onChange={(e) => onLogoSizeChange(e.target.value)} className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary">
-                  {LOGO_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+              {includeLogo && hasLogo && (
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <label className="block text-[10px] font-medium text-text-secondary mb-1">Position</label>
+                    <select value={logoPosition} onChange={(e) => onLogoPositionChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
+                      {LOGO_POSITIONS.map(p => <option key={p} value={p}>{p.replace('-', ' ')}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-medium text-text-secondary mb-1">Size</label>
+                    <select value={logoSize} onChange={(e) => onLogoSizeChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
+                      {LOGO_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           )}
-        </SectionCard>
-      )}
+        </div>
+      </div>
 
-      {/* Continue */}
-      <div className="flex items-center justify-between">
-        {!isFormValid && (
-          <p className="text-sm text-text-tertiary">
-            Fill in required fields to continue
-          </p>
-        )}
-        {isFormValid && !selectedVibe && (
-          <p className="text-sm text-text-tertiary">
-            Select a vibe to continue
-          </p>
-        )}
+      {/* Continue - Compact */}
+      <div className="flex items-center justify-between pt-1">
+        {!isFormValid && <p className="text-[10px] text-text-tertiary">Fill required fields</p>}
+        {isFormValid && !selectedVibe && <p className="text-[10px] text-text-tertiary">Select a style</p>}
         {isFormValid && selectedVibe && <div />}
         <button
           onClick={onNext}
           disabled={!isFormValid || !selectedVibe}
           className={cn(
-            "flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all",
-            isFormValid && selectedVibe ? "bg-interactive-600 text-white hover:bg-interactive-500 shadow-lg" : "bg-background-elevated text-text-muted cursor-not-allowed"
+            "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all",
+            isFormValid && selectedVibe ? "bg-interactive-600 text-white hover:bg-interactive-500" : "bg-background-elevated text-text-muted cursor-not-allowed"
           )}
         >
           Continue

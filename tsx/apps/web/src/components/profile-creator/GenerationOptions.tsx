@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Download, ArrowLeft } from 'lucide-react';
+import { Loader2, Download, ChevronLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { OutputSize, OutputFormat, BackgroundType } from '@aurastream/api-client/src/types/profileCreator';
 import { OUTPUT_SIZES } from '@aurastream/api-client/src/types/profileCreator';
 
@@ -18,15 +19,7 @@ interface GenerationOptionsProps {
   onBack: () => void;
 }
 
-/**
- * Generation options panel before final generation.
- */
-export function GenerationOptions({
-  refinedDescription,
-  isGenerating,
-  onGenerate,
-  onBack,
-}: GenerationOptionsProps) {
+export function GenerationOptions({ refinedDescription, isGenerating, onGenerate, onBack }: GenerationOptionsProps) {
   const [outputSize, setOutputSize] = useState<OutputSize>('medium');
   const [outputFormat, setOutputFormat] = useState<OutputFormat>('png');
   const [background, setBackground] = useState<BackgroundType>('transparent');
@@ -42,148 +35,108 @@ export function GenerationOptions({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-white mb-2">
-          Generation Options
-        </h2>
-        <p className="text-gray-400 max-w-lg mx-auto">
-          Configure the output settings for your creation
-        </p>
+    <div className="space-y-3">
+      <button onClick={onBack} disabled={isGenerating} className="flex items-center gap-1 text-text-secondary hover:text-text-primary text-xs disabled:opacity-50">
+        <ChevronLeft className="w-3.5 h-3.5" />
+        <span>Back</span>
+      </button>
+
+      <div className="text-center mb-3">
+        <h2 className="text-base font-semibold text-text-primary">Output Settings</h2>
+        <p className="text-xs text-text-secondary mt-0.5">Configure your generation</p>
       </div>
 
-      {/* Preview of description */}
-      <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-        <p className="text-sm text-gray-400 mb-1">What will be generated:</p>
-        <p className="text-white">{refinedDescription}</p>
+      {/* Description Preview */}
+      <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+        <p className="text-[10px] text-text-tertiary mb-1">What will be generated:</p>
+        <p className="text-xs text-text-primary line-clamp-2">{refinedDescription}</p>
       </div>
 
       {/* Options Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-3">
         {/* Size Selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-3">
-            Output Size
-          </label>
-          <div className="space-y-2">
+        <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+          <h3 className="text-[11px] font-semibold text-text-primary mb-2">Size</h3>
+          <div className="space-y-1">
             {OUTPUT_SIZES.map((size) => (
               <button
                 key={size.id}
                 onClick={() => setOutputSize(size.id)}
-                className={`
-                  w-full p-2.5 rounded-lg border text-left transition-all
-                  ${outputSize === size.id
-                    ? 'bg-pink-500/20 border-pink-500/50'
-                    : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
-                  }
-                `}
+                className={cn(
+                  "w-full p-2 rounded-lg border text-left transition-all",
+                  outputSize === size.id
+                    ? "bg-interactive-600/10 border-interactive-600/50"
+                    : "bg-background-base border-border-subtle hover:border-border-default"
+                )}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-medium text-sm ${outputSize === size.id ? 'text-pink-400' : 'text-white'}`}>
-                      {size.name}
-                    </span>
-                    <span className="text-gray-500 text-xs">
-                      {size.pixels}×{size.pixels}px
-                    </span>
-                  </div>
-                  {outputSize === size.id && (
-                    <div className="w-2 h-2 bg-pink-500 rounded-full" />
-                  )}
+                  <span className={cn("text-[11px] font-medium", outputSize === size.id ? "text-interactive-400" : "text-text-primary")}>
+                    {size.name}
+                  </span>
+                  <span className="text-[9px] text-text-tertiary">{size.pixels}px</span>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-0.5">{size.description}</p>
               </button>
             ))}
           </div>
         </div>
 
         {/* Format & Background */}
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Format */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Format
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setOutputFormat('png')}
-                className={`
-                  flex-1 p-3 rounded-lg border text-center transition-all
-                  ${outputFormat === 'png'
-                    ? 'bg-pink-500/20 border-pink-500/50 text-pink-400'
-                    : 'bg-gray-800/50 border-gray-700 text-white hover:border-gray-600'
-                  }
-                `}
-              >
-                PNG
-              </button>
-              <button
-                onClick={() => setOutputFormat('webp')}
-                className={`
-                  flex-1 p-3 rounded-lg border text-center transition-all
-                  ${outputFormat === 'webp'
-                    ? 'bg-pink-500/20 border-pink-500/50 text-pink-400'
-                    : 'bg-gray-800/50 border-gray-700 text-white hover:border-gray-600'
-                  }
-                `}
-              >
-                WebP
-              </button>
+          <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+            <h3 className="text-[11px] font-semibold text-text-primary mb-2">Format</h3>
+            <div className="flex gap-1.5">
+              {(['png', 'webp'] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  onClick={() => setOutputFormat(fmt)}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg border text-center text-[11px] font-medium transition-all",
+                    outputFormat === fmt
+                      ? "bg-interactive-600/10 border-interactive-600/50 text-interactive-400"
+                      : "bg-background-base border-border-subtle text-text-primary hover:border-border-default"
+                  )}
+                >
+                  {fmt.toUpperCase()}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Background */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Background
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setBackground('transparent')}
-                className={`
-                  flex-1 p-3 rounded-lg border text-center transition-all
-                  ${background === 'transparent'
-                    ? 'bg-pink-500/20 border-pink-500/50 text-pink-400'
-                    : 'bg-gray-800/50 border-gray-700 text-white hover:border-gray-600'
-                  }
-                `}
-              >
-                Transparent
-              </button>
-              <button
-                onClick={() => setBackground('solid')}
-                className={`
-                  flex-1 p-3 rounded-lg border text-center transition-all
-                  ${background === 'solid'
-                    ? 'bg-pink-500/20 border-pink-500/50 text-pink-400'
-                    : 'bg-gray-800/50 border-gray-700 text-white hover:border-gray-600'
-                  }
-                `}
-              >
-                Solid
-              </button>
+          <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+            <h3 className="text-[11px] font-semibold text-text-primary mb-2">Background</h3>
+            <div className="flex gap-1.5">
+              {(['transparent', 'solid'] as const).map((bg) => (
+                <button
+                  key={bg}
+                  onClick={() => setBackground(bg)}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg border text-center text-[10px] font-medium transition-all capitalize",
+                    background === bg
+                      ? "bg-interactive-600/10 border-interactive-600/50 text-interactive-400"
+                      : "bg-background-base border-border-subtle text-text-primary hover:border-border-default"
+                  )}
+                >
+                  {bg}
+                </button>
+              ))}
             </div>
 
-            {/* Color picker for solid background */}
             {background === 'solid' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="mt-3"
-              >
-                <div className="flex items-center gap-3">
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-2">
+                <div className="flex items-center gap-2">
                   <input
                     type="color"
                     value={backgroundColor}
                     onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="w-10 h-10 rounded cursor-pointer"
+                    className="w-7 h-7 rounded cursor-pointer border-0"
                   />
                   <input
                     type="text"
                     value={backgroundColor}
                     onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+                    className="flex-1 px-2 py-1 text-[10px] bg-background-base border border-border-subtle rounded-lg text-text-primary"
                   />
                 </div>
               </motion.div>
@@ -192,29 +145,26 @@ export function GenerationOptions({
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-between pt-4">
-        <button
-          onClick={onBack}
-          disabled={isGenerating}
-          className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Chat
-        </button>
+      {/* Generate Button */}
+      <div className="flex justify-end pt-2">
         <button
           onClick={handleGenerate}
           disabled={isGenerating}
-          className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 disabled:from-gray-600 disabled:to-gray-600 text-white font-medium rounded-lg transition-all shadow-lg shadow-pink-500/25"
+          className={cn(
+            "flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-medium transition-all",
+            isGenerating
+              ? "bg-background-elevated text-text-muted cursor-not-allowed"
+              : "bg-gradient-to-r from-interactive-600 to-accent-600 text-white hover:from-interactive-500 hover:to-accent-500 shadow-lg shadow-interactive-600/25"
+          )}
         >
           {isGenerating ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
               Generating...
             </>
           ) : (
             <>
-              <Download className="w-5 h-5" />
+              <Download className="w-4 h-4" />
               Generate
             </>
           )}

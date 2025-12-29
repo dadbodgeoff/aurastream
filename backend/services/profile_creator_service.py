@@ -246,8 +246,9 @@ class ProfileCreatorService:
             {"profile_creator_data": session_data}
         )
         
-        # Build messages for LLM
+        # Build messages for LLM (system prompt must be in messages list)
         messages = [
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": initial_message}
         ]
         
@@ -255,10 +256,7 @@ class ProfileCreatorService:
         full_response = ""
         
         try:
-            async for token in self.llm_client.stream_chat(
-                messages=messages,
-                system_prompt=system_prompt,
-            ):
+            async for token in self.llm_client.stream_chat(messages=messages):
                 full_response += token
                 yield StreamChunk(type="token", content=token)
             
@@ -368,8 +366,8 @@ class ProfileCreatorService:
             creation_type, brand_context, style_preset
         )
         
-        # Build conversation history
-        messages = []
+        # Build conversation history (system prompt must be first)
+        messages = [{"role": "system", "content": system_prompt}]
         for msg in session.messages:
             messages.append({"role": msg.role, "content": msg.content})
         messages.append({"role": "user", "content": message})
@@ -378,10 +376,7 @@ class ProfileCreatorService:
         full_response = ""
         
         try:
-            async for token in self.llm_client.stream_chat(
-                messages=messages,
-                system_prompt=system_prompt,
-            ):
+            async for token in self.llm_client.stream_chat(messages=messages):
                 full_response += token
                 yield StreamChunk(type="token", content=token)
             

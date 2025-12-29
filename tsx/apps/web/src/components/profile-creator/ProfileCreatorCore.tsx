@@ -2,16 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, 
-  Palette, 
-  Sparkles, 
-  Send, 
-  Loader2, 
-  Check,
-  ArrowRight,
-  RefreshCw,
-} from 'lucide-react';
+import { User, Palette, Sparkles, Send, Loader2, Check, ArrowRight, RefreshCw, ChevronLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 import { 
   apiClient,
@@ -19,7 +11,6 @@ import {
   getContinueSessionUrl,
   transformStartRequest,
   useGenerateFromSession,
-  STYLE_PRESETS,
 } from '@aurastream/api-client';
 import type { 
   CreationType, 
@@ -44,17 +35,12 @@ interface ChatMessage {
   isStreaming?: boolean;
 }
 
-/**
- * Core Profile Creator component with AI-guided flow.
- */
 export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCoreProps) {
-  // Step state
   const [step, setStep] = useState<Step>('type');
   const [creationType, setCreationType] = useState<CreationType | null>(null);
   const [stylePreset, setStylePreset] = useState<StylePreset | null>(null);
   const [initialDescription, setInitialDescription] = useState('');
 
-  // Chat state
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -63,40 +49,29 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const [refinedDescription, setRefinedDescription] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(0);
 
-  // Generation state
   const generateMutation = useGenerateFromSession();
-
-  // Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Focus input when entering chat step
   useEffect(() => {
-    if (step === 'chat') {
-      inputRef.current?.focus();
-    }
+    if (step === 'chat') inputRef.current?.focus();
   }, [step]);
 
-  // Handle type selection
   const handleTypeSelect = (type: CreationType) => {
     setCreationType(type);
     setStep('style');
   };
 
-  // Handle style selection
   const handleStyleSelect = (style: StylePreset) => {
     setStylePreset(style);
   };
 
-  // Start the session
   const startSession = useCallback(async () => {
     if (!creationType || !canCreate) return;
-
     setStep('chat');
     setIsStreaming(true);
 
@@ -117,9 +92,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
         body: JSON.stringify(transformStartRequest(request)),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to start session');
-      }
+      if (!response.ok) throw new Error('Failed to start session');
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
@@ -128,13 +101,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       let assistantMessage = '';
       const messageId = `assistant-${Date.now()}`;
 
-      // Add streaming message
-      setMessages([{
-        id: messageId,
-        role: 'assistant',
-        content: '',
-        isStreaming: true,
-      }]);
+      setMessages([{ id: messageId, role: 'assistant', content: '', isStreaming: true }]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -147,37 +114,22 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
           if (line.startsWith('data: ')) {
             try {
               const data: StreamChunk = JSON.parse(line.slice(6));
-
               if (data.type === 'token') {
                 assistantMessage += data.content;
-                setMessages(prev => prev.map(m => 
-                  m.id === messageId 
-                    ? { ...m, content: assistantMessage }
-                    : m
-                ));
+                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
               } else if (data.type === 'intent_ready') {
                 setIsReady(true);
                 setRefinedDescription(data.metadata?.refinedDescription || null);
                 setConfidence(data.metadata?.confidence || 0);
               } else if (data.type === 'done') {
                 setSessionId(data.metadata?.sessionId || null);
-              } else if (data.type === 'error') {
-                console.error('Stream error:', data.content);
               }
-            } catch (e) {
-              // Ignore parse errors for incomplete chunks
-            }
+            } catch (e) {}
           }
         }
       }
 
-      // Mark message as complete
-      setMessages(prev => prev.map(m => 
-        m.id === messageId 
-          ? { ...m, isStreaming: false }
-          : m
-      ));
-
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
     } catch (error) {
       console.error('Failed to start session:', error);
     } finally {
@@ -185,7 +137,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     }
   }, [creationType, stylePreset, initialDescription, canCreate]);
 
-  // Send a message
   const sendMessage = useCallback(async () => {
     if (!sessionId || !inputValue.trim() || isStreaming) return;
 
@@ -193,13 +144,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setInputValue('');
     setIsStreaming(true);
 
-    // Add user message
     const userMessageId = `user-${Date.now()}`;
-    setMessages(prev => [...prev, {
-      id: userMessageId,
-      role: 'user',
-      content: userMessage,
-    }]);
+    setMessages(prev => [...prev, { id: userMessageId, role: 'user', content: userMessage }]);
 
     try {
       const accessToken = apiClient.getAccessToken();
@@ -212,9 +158,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
         body: JSON.stringify({ message: userMessage }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
+      if (!response.ok) throw new Error('Failed to send message');
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
@@ -223,13 +167,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       let assistantMessage = '';
       const messageId = `assistant-${Date.now()}`;
 
-      // Add streaming message
-      setMessages(prev => [...prev, {
-        id: messageId,
-        role: 'assistant',
-        content: '',
-        isStreaming: true,
-      }]);
+      setMessages(prev => [...prev, { id: messageId, role: 'assistant', content: '', isStreaming: true }]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -242,33 +180,20 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
           if (line.startsWith('data: ')) {
             try {
               const data: StreamChunk = JSON.parse(line.slice(6));
-
               if (data.type === 'token') {
                 assistantMessage += data.content;
-                setMessages(prev => prev.map(m => 
-                  m.id === messageId 
-                    ? { ...m, content: assistantMessage }
-                    : m
-                ));
+                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
               } else if (data.type === 'intent_ready') {
                 setIsReady(true);
                 setRefinedDescription(data.metadata?.refinedDescription || null);
                 setConfidence(data.metadata?.confidence || 0);
               }
-            } catch (e) {
-              // Ignore parse errors
-            }
+            } catch (e) {}
           }
         }
       }
 
-      // Mark message as complete
-      setMessages(prev => prev.map(m => 
-        m.id === messageId 
-          ? { ...m, isStreaming: false }
-          : m
-      ));
-
+      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
     } catch (error) {
       console.error('Failed to send message:', error);
     } finally {
@@ -276,14 +201,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     }
   }, [sessionId, inputValue, isStreaming]);
 
-  // Handle generate
-  const handleGenerate = () => {
-    if (isReady) {
-      setStep('generate');
-    }
-  };
+  const handleGenerate = () => { if (isReady) setStep('generate'); };
 
-  // Execute generation
   const executeGeneration = async (options: {
     outputSize: 'small' | 'medium' | 'large';
     outputFormat: 'png' | 'webp';
@@ -291,22 +210,15 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     backgroundColor?: string;
   }) => {
     if (!sessionId) return;
-
     try {
-      await generateMutation.mutateAsync({
-        sessionId,
-        options,
-      });
+      await generateMutation.mutateAsync({ sessionId, options });
       setStep('complete');
-      setTimeout(() => {
-        onComplete();
-      }, 2000);
+      setTimeout(() => onComplete(), 2000);
     } catch (error) {
       console.error('Generation failed:', error);
     }
   };
 
-  // Reset and start over
   const handleReset = () => {
     setStep('type');
     setCreationType(null);
@@ -319,73 +231,52 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setConfidence(0);
   };
 
-  // Render based on step
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-3xl mx-auto">
       <AnimatePresence mode="wait">
         {/* Step 1: Type Selection */}
         {step === 'type' && (
-          <motion.div
-            key="type"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
-          >
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">
-                What would you like to create?
-              </h2>
-              <p className="text-gray-400">
-                Choose the type of asset you want to generate
-              </p>
+          <motion.div key="type" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
+            <div className="text-center mb-4">
+              <h2 className="text-base font-semibold text-text-primary">What would you like to create?</h2>
+              <p className="text-xs text-text-secondary mt-0.5">Choose the type of asset</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => handleTypeSelect('profile_picture')}
-                className="group p-4 bg-gray-800/50 border border-gray-700 rounded-xl hover:border-pink-500/50 transition-all text-left"
+                className="group p-3 bg-background-surface border border-border-subtle rounded-lg hover:border-interactive-600/50 transition-all text-left"
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-pink-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-pink-500/30 transition-colors">
-                    <User className="w-5 h-5 text-pink-400" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-interactive-600/10 rounded-lg flex items-center justify-center group-hover:bg-interactive-600/20 transition-colors">
+                    <User className="w-4 h-4 text-interactive-400" />
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-white">
-                      Profile Picture
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Unique avatar for your streaming channels
-                    </p>
+                  <div>
+                    <h3 className="text-xs font-semibold text-text-primary">Profile Picture</h3>
+                    <p className="text-[10px] text-text-tertiary">Avatar for your channels</p>
                   </div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleTypeSelect('streamer_logo')}
-                className="group p-4 bg-gray-800/50 border border-gray-700 rounded-xl hover:border-purple-500/50 transition-all text-left"
+                className="group p-3 bg-background-surface border border-border-subtle rounded-lg hover:border-accent-600/50 transition-all text-left"
               >
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-500/30 transition-colors">
-                    <Palette className="w-5 h-5 text-purple-400" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-accent-600/10 rounded-lg flex items-center justify-center group-hover:bg-accent-600/20 transition-colors">
+                    <Palette className="w-4 h-4 text-accent-400" />
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-semibold text-white">
-                      Streamer Logo
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Professional logo or brand mark
-                    </p>
+                  <div>
+                    <h3 className="text-xs font-semibold text-text-primary">Streamer Logo</h3>
+                    <p className="text-[10px] text-text-tertiary">Brand mark or icon</p>
                   </div>
                 </div>
               </button>
             </div>
 
             {!canCreate && (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-center">
-                <p className="text-amber-400 text-sm">
-                  You've reached your monthly limit. Upgrade to Pro for more creations!
-                </p>
+              <div className="p-2.5 bg-warning-muted/10 border border-warning-muted/20 rounded-lg text-center">
+                <p className="text-warning-muted text-xs">Monthly limit reached. Upgrade for more!</p>
               </div>
             )}
           </motion.div>
@@ -393,55 +284,41 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
         {/* Step 2: Style Selection */}
         {step === 'style' && (
-          <motion.div
-            key="style"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
-          >
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Choose a style
-              </h2>
-              <p className="text-gray-400">
-                Select a preset or describe your own style
-              </p>
+          <motion.div key="style" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
+            <button onClick={() => setStep('type')} className="flex items-center gap-1 text-text-secondary hover:text-text-primary text-xs">
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
+            </button>
+
+            <div className="text-center mb-3">
+              <h2 className="text-base font-semibold text-text-primary">Choose a style</h2>
+              <p className="text-xs text-text-secondary mt-0.5">Select a preset or describe your own</p>
             </div>
 
-            <StyleSelector
-              selected={stylePreset}
-              onSelect={handleStyleSelect}
-            />
+            <StyleSelector selected={stylePreset} onSelect={handleStyleSelect} />
 
-            {/* Optional description */}
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Describe what you want (optional)
-              </label>
+            <div className="mt-3">
+              <label className="block text-[11px] font-medium text-text-secondary mb-1">Initial description (optional)</label>
               <input
                 type="text"
                 value={initialDescription}
                 onChange={(e) => setInitialDescription(e.target.value)}
                 placeholder="e.g., A cool fox mascot with gaming headphones..."
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pink-500"
+                className="w-full px-2.5 py-2 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600"
               />
             </div>
 
-            <div className="flex justify-between pt-4">
-              <button
-                onClick={() => setStep('type')}
-                className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
-              >
-                Back
-              </button>
+            <div className="flex justify-end pt-2">
               <button
                 onClick={startSession}
                 disabled={!stylePreset}
-                className="flex items-center gap-2 px-6 py-2 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors"
+                className={cn(
+                  "flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all",
+                  stylePreset ? "bg-interactive-600 text-white hover:bg-interactive-500" : "bg-background-elevated text-text-muted cursor-not-allowed"
+                )}
               >
                 Continue
-                <ArrowRight className="w-4 h-4" />
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </motion.div>
@@ -449,31 +326,17 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
         {/* Step 3: Chat */}
         {step === 'chat' && (
-          <motion.div
-            key="chat"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-4"
-          >
+          <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
             {/* Chat messages */}
-            <div className="h-[400px] overflow-y-auto bg-gray-800/30 rounded-xl p-4 space-y-4">
+            <div className="h-[280px] overflow-y-auto bg-background-surface rounded-lg border border-border-subtle p-3 space-y-2.5">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[80%] px-4 py-3 rounded-xl ${
-                      message.role === 'user'
-                        ? 'bg-pink-500/20 text-white'
-                        : 'bg-gray-700/50 text-gray-100'
-                    }`}
-                  >
+                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={cn(
+                    "max-w-[85%] px-3 py-2 rounded-lg text-xs",
+                    message.role === 'user' ? "bg-interactive-600/20 text-text-primary" : "bg-background-elevated text-text-secondary"
+                  )}>
                     <p className="whitespace-pre-wrap">{message.content}</p>
-                    {message.isStreaming && (
-                      <span className="inline-block w-2 h-4 bg-pink-400 animate-pulse ml-1" />
-                    )}
+                    {message.isStreaming && <span className="inline-block w-1.5 h-3 bg-interactive-400 animate-pulse ml-0.5" />}
                   </div>
                 </div>
               ))}
@@ -482,25 +345,16 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
             {/* Ready indicator */}
             {isReady && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
-                    <Check className="w-4 h-4 text-green-400" />
+              <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-2.5 bg-success-muted/10 border border-success-muted/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-success-muted/20 rounded-full flex items-center justify-center">
+                    <Check className="w-3 h-3 text-success-muted" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-green-400 font-medium">Ready to generate!</p>
-                    <p className="text-sm text-gray-400 mt-1">
-                      {refinedDescription?.slice(0, 100)}...
-                    </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-success-muted text-xs font-medium">Ready to generate!</p>
+                    <p className="text-[10px] text-text-tertiary truncate">{refinedDescription?.slice(0, 80)}...</p>
                   </div>
-                  <button
-                    onClick={handleGenerate}
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-                  >
+                  <button onClick={handleGenerate} className="px-3 py-1.5 bg-success-muted hover:bg-success-muted/80 text-white text-xs font-medium rounded-lg transition-colors">
                     Generate
                   </button>
                 </div>
@@ -517,28 +371,20 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                 placeholder="Describe what you want or ask for changes..."
                 disabled={isStreaming}
-                className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pink-500 disabled:opacity-50"
+                className="flex-1 px-2.5 py-2 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600 disabled:opacity-50"
               />
               <button
                 onClick={sendMessage}
                 disabled={isStreaming || !inputValue.trim()}
-                className="px-4 py-3 bg-pink-500 hover:bg-pink-600 disabled:bg-gray-700 text-white rounded-lg transition-colors"
+                className="px-3 py-2 bg-interactive-600 hover:bg-interactive-500 disabled:bg-background-elevated disabled:text-text-muted text-white rounded-lg transition-colors"
               >
-                {isStreaming ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Send className="w-5 h-5" />
-                )}
+                {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
 
-            {/* Actions */}
-            <div className="flex justify-between pt-2">
-              <button
-                onClick={handleReset}
-                className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-white transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
+            <div className="flex justify-start">
+              <button onClick={handleReset} className="flex items-center gap-1 px-2 py-1 text-text-tertiary hover:text-text-secondary text-xs transition-colors">
+                <RefreshCw className="w-3 h-3" />
                 Start Over
               </button>
             </div>
@@ -547,12 +393,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
         {/* Step 4: Generation Options */}
         {step === 'generate' && (
-          <motion.div
-            key="generate"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
+          <motion.div key="generate" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
             <GenerationOptions
               refinedDescription={refinedDescription || ''}
               isGenerating={generateMutation.isPending}
@@ -564,21 +405,12 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
         {/* Step 5: Complete */}
         {step === 'complete' && (
-          <motion.div
-            key="complete"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-12"
-          >
-            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="w-8 h-8 text-green-400" />
+          <motion.div key="complete" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
+            <div className="w-12 h-12 bg-success-muted/20 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Sparkles className="w-6 h-6 text-success-muted" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Generation Started!
-            </h2>
-            <p className="text-gray-400">
-              Your creation is being generated. Check the gallery in a moment!
-            </p>
+            <h2 className="text-base font-semibold text-text-primary">Generation Started!</h2>
+            <p className="text-xs text-text-secondary mt-1">Check the gallery in a moment</p>
           </motion.div>
         )}
       </AnimatePresence>

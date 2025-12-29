@@ -1,18 +1,79 @@
 'use client';
 
+import { useRef, useState, useEffect } from 'react';
 import { SectionCard, SectionHeader, ToneSelector, SaveButton } from '../shared';
-import { SparklesIcon, PaletteIcon, TypeIcon, MicIcon, PlusIcon } from '../icons';
+import { SparklesIcon, PaletteIcon, TypeIcon, MicIcon, PlusIcon, ImageIcon, TrashIcon } from '../icons';
 import { SUPPORTED_FONTS, PRESET_PALETTES } from '../constants';
 import type { IdentityPanelProps } from '../types';
-import { cn } from '@/lib/utils';
+import { useLogos, useUploadLogo, useDeleteLogo } from '@aurastream/api-client';
+
+interface IdentityPanelPropsExtended extends IdentityPanelProps {
+  pendingLogoFile?: File | null;
+  onPendingLogoChange?: (file: File | null) => void;
+}
 
 export function IdentityPanel({ 
   identity, 
   onChange, 
   onSave, 
   isSaving,
-  isNew 
-}: IdentityPanelProps) {
+  isNew,
+  brandKitId,
+  pendingLogoFile,
+  onPendingLogoChange,
+}: IdentityPanelPropsExtended) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  // For existing brand kits, use the API
+  const { data: logosData } = useLogos(brandKitId || undefined);
+  const uploadMutation = useUploadLogo();
+  const deleteMutation = useDeleteLogo();
+  
+  const existingLogo = logosData?.logos?.primary || null;
+
+  // Update preview when pendingLogoFile changes (e.g., from parent)
+  useEffect(() => {
+    if (pendingLogoFile) {
+      setPreviewUrl(URL.createObjectURL(pendingLogoFile));
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [pendingLogoFile]);
+
+  const handleFileSelect = (file: File) => {
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a PNG, JPEG, WebP, or SVG image.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB.');
+      return;
+    }
+
+    if (isNew) {
+      // For new brand kits, store the file to upload after save
+      onPendingLogoChange?.(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    } else if (brandKitId) {
+      // For existing brand kits, upload immediately
+      uploadMutation.mutate({ brandKitId, logoType: 'primary', file });
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    if (isNew) {
+      onPendingLogoChange?.(null);
+      setPreviewUrl(null);
+    } else if (brandKitId) {
+      deleteMutation.mutate({ brandKitId, logoType: 'primary' });
+    }
+  };
+
+  const displayLogo = isNew ? previewUrl : existingLogo;
+  const isUploading = uploadMutation.isPending;
+  const isDeleting = deleteMutation.isPending;
   const addPrimaryColor = () => {
     if (identity.primaryColors.length < 5) {
       onChange({ ...identity, primaryColors: [...identity.primaryColors, '#21808D'] });
@@ -255,6 +316,89 @@ export function IdentityPanel({
           className="w-full px-4 py-3 bg-background-base border border-border-subtle rounded-xl text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600 focus:ring-2 focus:ring-interactive-600/20 transition-all resize-none"
           placeholder="Describe your brand style, inspirations, or reference other creators... (optional)"
         />
+      </SectionCard>
+
+      {/* Primary Logo Upload */}
+      <SectionCard>
+        <SectionHeader
+          icon={<ImageIcon />}
+          title="Primary Logo"
+          description="Upload your main logo to use in generated assets"
+          optional
+        />
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileSelect(file);
+            e.target.value = '';
+          }}
+        />
+
+        {displayLogo ? (
+          <div className="relative group">
+            <div className="w-full aspect-[3/1] max-w-xs bg-background-base border border-border-subtle rounded-xl overflow-hidden">
+              <img 
+                src={displayLogo} 
+                alt="Primary logo" 
+                className="w-full h-full object-contain p-4"
+              />
+            </div>
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="px-3 py-1.5 bg-background-elevated hover:bg-background-surface text-text-primary text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isUploading ? 'Uploading...' : 'Replace'}
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveLogo}
+                disabled={isDeleting}
+                className="px-3 py-1.5 bg-error-dark/20 hover:bg-error-dark/30 text-error-light text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+              >
+                <TrashIcon />
+                {isDeleting ? 'Removing...' : 'Remove'}
+              </button>
+            </div>
+            {isNew && (
+              <p className="text-xs text-text-muted mt-2">
+                Logo will be uploaded when you save the brand kit
+              </p>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-full max-w-xs aspect-[3/1] flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border-subtle hover:border-interactive-600 rounded-xl bg-background-base transition-colors cursor-pointer group"
+          >
+            {isUploading ? (
+              <div className="w-8 h-8 border-2 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
+            ) : (
+              <>
+                <div className="w-10 h-10 bg-background-elevated rounded-lg flex items-center justify-center text-text-muted group-hover:text-interactive-600 transition-colors">
+                  <ImageIcon />
+                </div>
+                <div className="text-center">
+                  <p className="text-xs font-medium text-text-primary">Click to upload logo</p>
+                  <p className="text-[10px] text-text-muted mt-0.5">PNG, JPEG, WebP, SVG • Max 10MB</p>
+                </div>
+              </>
+            )}
+          </button>
+        )}
+
+        <p className="text-xs text-text-tertiary mt-3">
+          You can add more logo variations (icon, watermark, etc.) in the Logos panel after saving.
+        </p>
       </SectionCard>
     </div>
   );

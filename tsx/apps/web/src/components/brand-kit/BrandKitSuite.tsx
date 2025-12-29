@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import {
   useBrandKit,
-  useBrandKits,
   useCreateBrandKit,
   useUpdateBrandKit,
   useExtendedColors,
@@ -16,6 +14,7 @@ import {
   useUpdateBrandVoice,
   useBrandGuidelines,
   useUpdateBrandGuidelines,
+  useUploadLogo,
   DEFAULT_COLOR_PALETTE,
   DEFAULT_TYPOGRAPHY,
   DEFAULT_BRAND_VOICE,
@@ -40,7 +39,6 @@ import {
   calculateCompletionStatus,
 } from './types';
 import { DEFAULT_IDENTITY } from './constants';
-import { ArrowLeftIcon } from './icons';
 
 interface BrandKitSuiteProps {
   brandKitId?: string;
@@ -57,7 +55,6 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
 
   // API hooks
   const { data: brandKit, isLoading } = useBrandKit(brandKitId || '');
-  const { data: brandKitsData } = useBrandKits();
   const createMutation = useCreateBrandKit();
   const updateMutation = useUpdateBrandKit();
 
@@ -79,6 +76,10 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
   const [typography, setTypography] = useState(DEFAULT_TYPOGRAPHY);
   const [voice, setVoice] = useState(DEFAULT_BRAND_VOICE);
   const [guidelines, setGuidelines] = useState(DEFAULT_BRAND_GUIDELINES);
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+
+  // Logo upload mutation
+  const uploadLogoMutation = useUploadLogo();
 
   // Populate from API data
   useEffect(() => {
@@ -131,6 +132,22 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
           tone: identity.tone,
           style_reference: identity.styleReference,
         });
+        
+        // Upload pending logo if one was selected
+        if (pendingLogoFile && result.id) {
+          try {
+            await uploadLogoMutation.mutateAsync({
+              brandKitId: result.id,
+              logoType: 'primary',
+              file: pendingLogoFile,
+            });
+          } catch (logoErr) {
+            console.error('Failed to upload logo:', logoErr);
+            // Continue anyway - brand kit was created
+          }
+          setPendingLogoFile(null);
+        }
+        
         // Redirect to edit mode with the new ID
         router.push(`/dashboard/brand-kits?id=${result.id}&panel=overview`);
       } else if (brandKitId) {
@@ -247,7 +264,9 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
               identity={identity}
               onChange={setIdentity}
               onSave={handleSaveIdentity}
-              isSaving={createMutation.isPending || updateMutation.isPending}
+              isSaving={createMutation.isPending || updateMutation.isPending || uploadLogoMutation.isPending}
+              pendingLogoFile={pendingLogoFile}
+              onPendingLogoChange={setPendingLogoFile}
             />
           )}
 

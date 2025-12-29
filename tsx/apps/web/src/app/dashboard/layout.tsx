@@ -7,6 +7,7 @@ import { DashboardShell, LoadingState } from '@/components/dashboard';
 import { CelebrationOverlay } from '@/components/celebrations/CelebrationOverlay';
 import { OnboardingProvider } from '@/providers/OnboardingProvider';
 import { UndoToastContainer } from '@/components/undo';
+import { SocialHub } from '@/components/social/SocialHub';
 
 // Admin email whitelist
 const ADMIN_EMAILS = ['dadbodgeoff@gmail.com'];
@@ -68,6 +69,7 @@ export default function DashboardLayout({
         </DashboardShell>
         <CelebrationOverlay />
         <UndoToastContainer />
+        {user?.id && <SocialHub currentUserId={user.id} />}
       </>
     </OnboardingProvider>
   );

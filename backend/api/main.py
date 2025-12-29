@@ -335,6 +335,8 @@ def create_app() -> FastAPI:
     from api.routes.promo import router as promo_router
     from api.routes.profile_creator import router as profile_creator_router
     from api.routes.templates import router as templates_router
+    from api.routes.friends import router as friends_router
+    from api.routes.messages import router as messages_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -361,6 +363,8 @@ def create_app() -> FastAPI:
     app.include_router(promo_router, prefix="/api/v1/promo", tags=["Promo Chatroom"])
     app.include_router(profile_creator_router, prefix="/api/v1/profile-creator", tags=["Profile Creator"])
     app.include_router(templates_router, prefix="/api/v1/templates", tags=["Templates"])
+    app.include_router(friends_router, prefix="/api/v1", tags=["Friends"])
+    app.include_router(messages_router, prefix="/api/v1", tags=["Messages"])
     
     return app
 
