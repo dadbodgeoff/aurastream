@@ -2,8 +2,11 @@
  * Prompt Coach Page.
  * 
  * Main page for the Prompt Coach feature that combines the Context Capture UI
- * and Chat Interface. Premium users get the full AI-powered coaching experience,
- * while free/pro users see static tips with an upgrade CTA.
+ * and Chat Interface. Users with remaining coach sessions get the full AI-powered
+ * coaching experience. Users who have exhausted their limit see tips with upgrade CTA.
+ * 
+ * Free tier: 1 coach session/month
+ * Pro/Studio: Unlimited coach sessions
  * 
  * Now uses CoachChatIntegrated for inline generation (Coach UX 2025).
  * 
@@ -14,6 +17,7 @@
 
 import { useState, useCallback } from 'react';
 import { useUser, createDevLogger } from '@aurastream/shared';
+import { useUsageStatus } from '@aurastream/api-client';
 import { CoachContextForm } from '../../../components/coach/CoachContextForm';
 import { CoachChatIntegrated, COACH_UX_2025_ENABLED } from '../../../components/coach';
 import { CoachChat } from '../../../components/coach/CoachChat';
@@ -140,6 +144,7 @@ function LoadingState({ message = 'Loading...' }: LoadingStateProps) {
  */
 export default function CoachPage() {
   const user = useUser();
+  const { data: usageStatus, isLoading: isLoadingUsage } = useUsageStatus();
 
   // Phase state
   const [phase, setPhase] = useState<CoachPhase>('context');
@@ -152,10 +157,16 @@ export default function CoachPage() {
   const [isStartingSession, setIsStartingSession] = useState(false);
 
   /**
-   * Check if user has premium access.
-   * Premium tier is 'studio' in this system.
+   * Check if user has coach access based on usage limits.
+   * - Unlimited (-1 limit) means always has access
+   * - Otherwise, check if remaining > 0
    */
-  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+  const hasCoachAccess = usageStatus?.coach 
+    ? (usageStatus.coach.unlimited || usageStatus.coach.remaining > 0)
+    : true; // Default to true while loading to avoid flash
+  
+  const coachUsage = usageStatus?.coach;
+  const isUnlimited = coachUsage?.unlimited ?? false;
 
   /**
    * Handle starting the chat from context form.
@@ -195,8 +206,8 @@ export default function CoachPage() {
   }, []);
 
   // Show loading state while user data is being fetched
-  if (user === null && typeof window !== 'undefined') {
-    // User is loading - show loading state
+  if ((user === null || isLoadingUsage) && typeof window !== 'undefined') {
+    // User or usage is loading - show loading state
     return (
       <div className="p-6">
         <LoadingState message="Loading your profile..." />
@@ -204,8 +215,8 @@ export default function CoachPage() {
     );
   }
 
-  // Non-premium users see tips with upgrade CTA
-  if (!isPremium) {
+  // Users without remaining coach sessions see tips with upgrade CTA
+  if (!hasCoachAccess) {
     return (
       <div className="p-6">
         <PageHeader 
@@ -218,7 +229,9 @@ export default function CoachPage() {
     );
   }
 
-  // Premium users get the full coach experience
+  // Users with coach access get the full experience
+  // Show usage indicator for free tier users
+  const showUsageIndicator = !isUnlimited && coachUsage;
   return (
     <div className="h-full flex flex-col">
       {phase === 'context' ? (
@@ -229,6 +242,22 @@ export default function CoachPage() {
             subtitle="Select your context to get started"
             showBack={false}
           />
+          {/* Usage indicator for limited users */}
+          {showUsageIndicator && (
+            <div className="mb-4 p-3 bg-interactive-600/10 border border-interactive-600/20 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <SparklesIcon className="w-4 h-4 text-interactive-400" />
+                  <span className="text-sm text-text-secondary">
+                    Coach sessions: <span className="font-medium text-text-primary">{coachUsage.remaining}</span> of {coachUsage.limit} remaining
+                  </span>
+                </div>
+                {coachUsage.remaining === 1 && (
+                  <span className="text-xs text-amber-400">Last session this month</span>
+                )}
+              </div>
+            </div>
+          )}
           <CoachContextForm
             onStartChat={handleStartChat}
             isLoading={isStartingSession}
