@@ -48,6 +48,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const [isReady, setIsReady] = useState(false);
   const [refinedDescription, setRefinedDescription] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const generateMutation = useGenerateFromSession();
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -74,6 +75,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     if (!creationType || !canCreate) return;
     setStep('chat');
     setIsStreaming(true);
+    setError(null);
 
     const request: StartProfileCreatorRequest = {
       creationType,
@@ -92,7 +94,10 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
         body: JSON.stringify(transformStartRequest(request)),
       });
 
-      if (!response.ok) throw new Error('Failed to start session');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail?.message || errorData.detail || 'Failed to start session');
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
@@ -123,6 +128,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 setConfidence(data.metadata?.confidence || 0);
               } else if (data.type === 'done') {
                 setSessionId(data.metadata?.sessionId || null);
+              } else if (data.type === 'error') {
+                setError(data.content || 'An error occurred');
               }
             } catch (e) {}
           }
@@ -132,6 +139,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
     } catch (error) {
       console.error('Failed to start session:', error);
+      setError(error instanceof Error ? error.message : 'Failed to start session');
     } finally {
       setIsStreaming(false);
     }
@@ -229,6 +237,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setIsReady(false);
     setRefinedDescription(null);
     setConfidence(0);
+    setError(null);
   };
 
   return (
@@ -329,6 +338,25 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
           <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
             {/* Chat messages */}
             <div className="h-[280px] overflow-y-auto bg-background-surface rounded-lg border border-border-subtle p-3 space-y-2.5">
+              {/* Loading state when no messages yet */}
+              {messages.length === 0 && isStreaming && !error && (
+                <div className="flex items-center gap-2 text-text-tertiary">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-xs">Starting conversation...</span>
+                </div>
+              )}
+              {/* Error state */}
+              {error && (
+                <div className="p-3 bg-error-muted/10 border border-error-muted/30 rounded-lg">
+                  <p className="text-error-muted text-xs">{error}</p>
+                  <button 
+                    onClick={handleReset}
+                    className="mt-2 text-xs text-interactive-400 hover:text-interactive-300"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
               {messages.map((message) => (
                 <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={cn(
