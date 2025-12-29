@@ -13,20 +13,20 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-import { apiClient } from '@aurastream/api-client';
 import { 
+  apiClient,
   getStartSessionUrl, 
   getContinueSessionUrl,
   transformStartRequest,
   useGenerateFromSession,
+  STYLE_PRESETS,
 } from '@aurastream/api-client';
 import type { 
   CreationType, 
   StylePreset, 
   StreamChunk,
   StartProfileCreatorRequest,
-} from '@aurastream/api-client/src/types/profileCreator';
-import { STYLE_PRESETS } from '@aurastream/api-client/src/types/profileCreator';
+} from '@aurastream/api-client';
 import { StyleSelector } from './StyleSelector';
 import { GenerationOptions } from './GenerationOptions';
 

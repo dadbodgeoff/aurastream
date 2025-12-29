@@ -100,14 +100,42 @@ function transformTemplate(template: any): TemplateMeta {
 // API Functions
 // ============================================================================
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 async function fetchTemplates(): Promise<TemplateMeta[]> {
-  const response = await apiClient.get<TemplateListResponse>('/api/v1/templates');
-  return (response.templates || []).map(transformTemplate);
+  const accessToken = apiClient.getAccessToken();
+  
+  const response = await fetch(`${API_BASE_URL}/api/v1/templates`, {
+    headers: {
+      'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch templates');
+  }
+
+  const data = await response.json();
+  return (data.templates || []).map(transformTemplate);
 }
 
 async function fetchTemplate(templateId: string): Promise<TemplateMeta> {
-  const response = await apiClient.get<any>(`/api/v1/templates/${templateId}`);
-  return transformTemplate(response);
+  const accessToken = apiClient.getAccessToken();
+  
+  const response = await fetch(`${API_BASE_URL}/api/v1/templates/${templateId}`, {
+    headers: {
+      'Authorization': accessToken ? `Bearer ${accessToken}` : '',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch template');
+  }
+
+  const data = await response.json();
+  return transformTemplate(data);
 }
 
 // ============================================================================

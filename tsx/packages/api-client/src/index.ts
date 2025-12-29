@@ -546,3 +546,33 @@ export {
   useTemplates,
   useTemplate,
 } from './hooks/useTemplates';
+
+// Profile Creator type exports
+export type {
+  CreationType,
+  StylePreset,
+  StreamChunk,
+  StartProfileCreatorRequest,
+  GenerateFromSessionRequest,
+  ProfileCreatorAccessResponse,
+  SessionStateResponse,
+  GenerationResultResponse,
+  GalleryResponse,
+  GalleryItem,
+  BrandContext as ProfileCreatorBrandContext,
+  ColorInfo as ProfileCreatorColorInfo,
+} from './types/profileCreator';
+
+export { STYLE_PRESETS } from './types/profileCreator';
+
+// Profile Creator hooks exports
+export {
+  profileCreatorKeys,
+  useProfileCreatorAccess,
+  useProfileCreatorSession,
+  useProfileCreatorGallery,
+  useGenerateFromSession,
+  getStartSessionUrl,
+  getContinueSessionUrl,
+  transformStartRequest,
+} from './hooks/useProfileCreator';

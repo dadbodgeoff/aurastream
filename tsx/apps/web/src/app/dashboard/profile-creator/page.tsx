@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Sparkles, Image, AlertCircle } from 'lucide-react';
+import { Sparkles, Image, AlertCircle } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { analytics } from '@aurastream/shared';
@@ -50,7 +50,6 @@ export default function ProfileCreatorPage() {
       <PageHeader
         title="Profile Creator"
         subtitle="Create stunning profile pictures and logos with AI"
-        icon={<User className="w-6 h-6 text-pink-400" />}
       />
 
       {/* Usage Indicator */}

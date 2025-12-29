@@ -227,9 +227,9 @@ export function useProfileCreatorSession(sessionId: string | null) {
     queryKey: profileCreatorKeys.session(sessionId || ''),
     queryFn: () => fetchSession(sessionId!),
     enabled: !!sessionId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Poll while generating
-      if (data?.status === 'generating') {
+      if (query.state.data?.status === 'generating') {
         return 2000;
       }
       return false;
