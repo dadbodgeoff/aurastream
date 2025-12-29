@@ -60,6 +60,9 @@ placeholders:
     label: "Character Style (optional)"
     description: "Who appears in your announcement"
     hint: "Optional - AI creates a streamer character if left blank"
+    show_for_vibes:
+      - anime
+      - playful
     options:
       - label: "AI Decides (Recommended)"
         value: ""
