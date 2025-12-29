@@ -1,16 +1,37 @@
 'use client';
 
+import { useState } from 'react';
 import { useAcceptFriendRequest, useDeclineFriendRequest } from '@aurastream/api-client/src/hooks/useFriends';
 import type { FriendRequest } from '@aurastream/api-client/src/types/social';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 
 interface FriendRequestsProps {
   pendingRequests: FriendRequest[];
   sentRequests: FriendRequest[];
+  isLoading?: boolean;
 }
 
-export function FriendRequests({ pendingRequests, sentRequests }: FriendRequestsProps) {
+export function FriendRequests({ pendingRequests, sentRequests, isLoading }: FriendRequestsProps) {
   const acceptRequest = useAcceptFriendRequest();
   const declineRequest = useDeclineFriendRequest();
+  const [acceptingIds, setAcceptingIds] = useState<Set<string>>(new Set());
+  const [decliningIds, setDecliningIds] = useState<Set<string>>(new Set());
+
+  // Show loading skeletons
+  if (isLoading) {
+    return (
+      <div className="p-2 space-y-4">
+        <div>
+          <Skeleton className="h-3 w-20 mb-2 ml-2" aria-label="" />
+          <div className="space-y-1">
+            <RequestItemSkeleton />
+            <RequestItemSkeleton />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (pendingRequests.length === 0 && sentRequests.length === 0) {
     return (
@@ -26,6 +47,44 @@ export function FriendRequests({ pendingRequests, sentRequests }: FriendRequests
     );
   }
 
+  const handleAccept = async (friendshipId: string, displayName: string | null) => {
+    setAcceptingIds(prev => new Set(prev).add(friendshipId));
+    
+    try {
+      await acceptRequest.mutateAsync(friendshipId);
+      showSuccessToast(`You are now friends with ${displayName || 'this user'}!`);
+    } catch (error) {
+      showErrorToast(error, {
+        onRetry: () => handleAccept(friendshipId, displayName),
+      });
+    } finally {
+      setAcceptingIds(prev => {
+        const next = new Set(prev);
+        next.delete(friendshipId);
+        return next;
+      });
+    }
+  };
+
+  const handleDecline = async (friendshipId: string, displayName: string | null) => {
+    setDecliningIds(prev => new Set(prev).add(friendshipId));
+    
+    try {
+      await declineRequest.mutateAsync(friendshipId);
+      showSuccessToast(`Declined request from ${displayName || 'user'}`);
+    } catch (error) {
+      showErrorToast(error, {
+        onRetry: () => handleDecline(friendshipId, displayName),
+      });
+    } finally {
+      setDecliningIds(prev => {
+        const next = new Set(prev);
+        next.delete(friendshipId);
+        return next;
+      });
+    }
+  };
+
   return (
     <div className="p-2 space-y-4">
       {/* Pending Requests */}
@@ -35,59 +94,75 @@ export function FriendRequests({ pendingRequests, sentRequests }: FriendRequests
             Pending ({pendingRequests.length})
           </h3>
           <div className="space-y-1">
-            {pendingRequests.map((request) => (
-              <div
-                key={request.friendshipId}
-                className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02]"
-              >
-                {/* Avatar */}
-                {request.avatarUrl ? (
-                  <img
-                    src={request.avatarUrl}
-                    alt=""
-                    className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center flex-shrink-0">
-                    <span className="text-xs font-medium text-text-secondary">
-                      {(request.displayName || '?')[0].toUpperCase()}
-                    </span>
+            {pendingRequests.map((request) => {
+              const isAccepting = acceptingIds.has(request.friendshipId);
+              const isDeclining = decliningIds.has(request.friendshipId);
+              const isProcessing = isAccepting || isDeclining;
+              
+              return (
+                <div
+                  key={request.friendshipId}
+                  className={`flex items-center gap-2 p-2 rounded-lg bg-white/[0.02] transition-opacity ${
+                    isProcessing ? 'opacity-50' : ''
+                  }`}
+                >
+                  {/* Avatar */}
+                  {request.avatarUrl ? (
+                    <img
+                      src={request.avatarUrl}
+                      alt=""
+                      className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-medium text-text-secondary">
+                        {(request.displayName || '?')[0].toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-text-primary truncate">
+                      {request.displayName || 'Unknown'}
+                    </p>
+                    <p className="text-[10px] text-text-tertiary">Wants to be friends</p>
                   </div>
-                )}
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-text-primary truncate">
-                    {request.displayName || 'Unknown'}
-                  </p>
-                  <p className="text-[10px] text-text-tertiary">Wants to be friends</p>
+                  {/* Actions */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleAccept(request.friendshipId, request.displayName)}
+                      disabled={isProcessing}
+                      className="p-1.5 text-success-main hover:bg-success-main/10 rounded-md transition-colors disabled:opacity-50"
+                      title="Accept"
+                    >
+                      {isAccepting ? (
+                        <div className="w-4 h-4 border-2 border-success-main/30 border-t-success-main rounded-full animate-spin" />
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDecline(request.friendshipId, request.displayName)}
+                      disabled={isProcessing}
+                      className="p-1.5 text-error-main hover:bg-error-main/10 rounded-md transition-colors disabled:opacity-50"
+                      title="Decline"
+                    >
+                      {isDeclining ? (
+                        <div className="w-4 h-4 border-2 border-error-main/30 border-t-error-main rounded-full animate-spin" />
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => acceptRequest.mutate(request.friendshipId)}
-                    disabled={acceptRequest.isPending}
-                    className="p-1.5 text-success-main hover:bg-success-main/10 rounded-md transition-colors disabled:opacity-50"
-                    title="Accept"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => declineRequest.mutate(request.friendshipId)}
-                    disabled={declineRequest.isPending}
-                    className="p-1.5 text-error-main hover:bg-error-main/10 rounded-md transition-colors disabled:opacity-50"
-                    title="Decline"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -136,6 +211,25 @@ export function FriendRequests({ pendingRequests, sentRequests }: FriendRequests
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Skeleton for friend request items.
+ */
+function RequestItemSkeleton(): JSX.Element {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.02]">
+      <Skeleton width={36} height={36} rounded="full" aria-label="" />
+      <div className="flex-1 space-y-1.5">
+        <Skeleton className="h-3 w-20" aria-label="" />
+        <Skeleton className="h-2.5 w-24" aria-label="" />
+      </div>
+      <div className="flex gap-1">
+        <Skeleton width={28} height={28} rounded="md" aria-label="" />
+        <Skeleton width={28} height={28} rounded="md" aria-label="" />
+      </div>
     </div>
   );
 }

@@ -3,7 +3,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBrandKits, useLogos, useGenerateAsset, useTemplate } from '@aurastream/api-client';
-import type { LogoPosition, LogoSize } from '@aurastream/api-client';
+import type { LogoPosition, LogoSize, ClassifiedError } from '@aurastream/api-client';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 
 import { StepIndicator } from './shared';
 import { BoltIcon } from './icons';
@@ -16,7 +17,18 @@ const STEPS = ['Choose Template', 'Customize', 'Review'];
 export function QuickCreateWizard() {
   const router = useRouter();
   const { data: brandKitsData, isLoading } = useBrandKits();
-  const generateMutation = useGenerateAsset();
+  
+  // Enhanced generation mutation with enterprise error handling
+  const generateMutation = useGenerateAsset({
+    onSuccess: (data) => {
+      // Redirect to generation progress page with SSE streaming
+      router.push(`/dashboard/generate/${data.id}`);
+    },
+    onError: (classifiedError: ClassifiedError) => {
+      // Show appropriate error toast based on error type
+      handleGenerationError(classifiedError);
+    },
+  });
 
   // State
   const [step, setStep] = useState<WizardStep>('select');
@@ -28,6 +40,46 @@ export function QuickCreateWizard() {
   const [includeLogo, setIncludeLogo] = useState(false);
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('bottom-right');
   const [logoSize, setLogoSize] = useState<LogoSize>('medium');
+
+  // Handle generation errors with appropriate toasts
+  const handleGenerationError = useCallback((error: ClassifiedError) => {
+    switch (error.code) {
+      case 'GENERATION_RATE_LIMIT':
+        showErrorToast(
+          { code: error.code, message: error.message },
+          {
+            onRetry: error.retryAfter 
+              ? undefined // Don't show retry if there's a cooldown
+              : () => generateMutation.retry(),
+          }
+        );
+        break;
+      case 'GENERATION_LIMIT_EXCEEDED':
+        showErrorToast(
+          { code: error.code, message: error.message },
+          {
+            onUpgrade: () => router.push('/pricing'),
+          }
+        );
+        break;
+      case 'GENERATION_CONTENT_POLICY':
+        showErrorToast(
+          { code: error.code, message: error.message },
+          {
+            onNavigate: (path) => router.push(path),
+          }
+        );
+        break;
+      default:
+        // For retryable errors, show retry action
+        showErrorToast(
+          { code: error.code, message: error.message },
+          {
+            onRetry: error.retryable ? () => generateMutation.retry() : undefined,
+          }
+        );
+    }
+  }, [generateMutation, router]);
 
   // Fetch dynamic fields from backend when template is selected
   const { data: backendTemplate } = useTemplate(template?.id ?? null);
@@ -156,31 +208,26 @@ export function QuickCreateWizard() {
 
   const handleGenerate = async () => {
     if (!mergedTemplate || !selectedVibe) return;
-    try {
-      // Determine the asset type - for emotes, use platform + size-specific type
-      let assetType = mergedTemplate.assetType;
-      if (mergedTemplate.id === 'emote' && formValues.size && formValues.platform) {
-        // Build platform-specific emote type: twitch_emote_112, tiktok_emote_300, etc.
-        assetType = `${formValues.platform}_emote_${formValues.size}`;
-      }
-      
-      const result = await generateMutation.mutateAsync({
-        assetType: assetType as any,
-        brandKitId: brandKitId || undefined,
-        customPrompt: buildPrompt(),
-        brandCustomization: brandKitId ? {
-          include_logo: includeLogo && hasLogo,
-          logo_type: 'primary' as const,
-          logo_position: logoPosition,
-          logo_size: logoSize,
-          brand_intensity: 'balanced' as const,
-        } : undefined,
-      });
-      // Redirect to generation progress page with SSE streaming
-      router.push(`/dashboard/generate/${result.id}`);
-    } catch (e) {
-      console.error('Generation failed:', e);
+    
+    // Determine the asset type - for emotes, use platform + size-specific type
+    let assetType = mergedTemplate.assetType;
+    if (mergedTemplate.id === 'emote' && formValues.size && formValues.platform) {
+      // Build platform-specific emote type: twitch_emote_112, tiktok_emote_300, etc.
+      assetType = `${formValues.platform}_emote_${formValues.size}`;
     }
+    
+    generateMutation.mutate({
+      assetType: assetType as any,
+      brandKitId: brandKitId || undefined,
+      customPrompt: buildPrompt(),
+      brandCustomization: brandKitId ? {
+        include_logo: includeLogo && hasLogo,
+        logo_type: 'primary' as const,
+        logo_position: logoPosition,
+        logo_size: logoSize,
+        brand_intensity: 'balanced' as const,
+      } : undefined,
+    });
   };
 
   return (
@@ -241,8 +288,10 @@ export function QuickCreateWizard() {
           logoSize={logoSize}
           onBack={() => setStep('customize')}
           onGenerate={handleGenerate}
+          onRetry={() => generateMutation.retry()}
           isGenerating={generateMutation.isPending}
           error={generateMutation.error}
+          classifiedError={generateMutation.classifiedError}
         />
       )}
     </div>

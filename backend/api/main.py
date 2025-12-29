@@ -18,6 +18,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from api.config import get_settings
 from api.middleware.security_headers import SecurityHeadersMiddleware
+from api.middleware.api_rate_limit import APIRateLimitMiddleware
 
 # =============================================================================
 # Constants
@@ -264,6 +265,9 @@ def create_app() -> FastAPI:
     # GZip compression for responses larger than 1000 bytes
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     
+    # Global API rate limiting (tier-based)
+    app.add_middleware(APIRateLimitMiddleware)
+    
     # Security headers middleware (added last so headers are on final response)
     app.add_middleware(SecurityHeadersMiddleware)
     
@@ -337,6 +341,7 @@ def create_app() -> FastAPI:
     from api.routes.templates import router as templates_router
     from api.routes.friends import router as friends_router
     from api.routes.messages import router as messages_router
+    from api.routes.simple_analytics import router as simple_analytics_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -365,6 +370,7 @@ def create_app() -> FastAPI:
     app.include_router(templates_router, prefix="/api/v1/templates", tags=["Templates"])
     app.include_router(friends_router, prefix="/api/v1", tags=["Friends"])
     app.include_router(messages_router, prefix="/api/v1", tags=["Messages"])
+    app.include_router(simple_analytics_router, prefix="/api/v1/simple-analytics", tags=["Simple Analytics"])
     
     return app
 

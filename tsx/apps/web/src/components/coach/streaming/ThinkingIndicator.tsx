@@ -20,7 +20,7 @@ import { useReducedMotion } from '@aurastream/shared';
 /**
  * Thinking stages with corresponding messages
  */
-export type ThinkingStage = 'thinking' | 'analyzing' | 'crafting' | 'validating';
+export type ThinkingStage = 'thinking' | 'analyzing' | 'crafting' | 'validating' | 'reconnecting';
 
 export interface ThinkingIndicatorProps {
   /** Current thinking stage */
@@ -43,6 +43,7 @@ const STAGE_MESSAGES: Record<ThinkingStage, string> = {
   analyzing: 'Analyzing your brand context...',
   crafting: 'Crafting your prompt...',
   validating: 'Validating quality...',
+  reconnecting: 'Reconnecting...',
 };
 
 // ============================================================================

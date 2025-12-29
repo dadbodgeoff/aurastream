@@ -42,6 +42,9 @@ AssetTypeEnum = Literal[
     "tiktok_story",
     "instagram_story",
     "instagram_reel",
+    # Profile Creator types
+    "profile_picture",
+    "streamer_logo",
 ]
 
 

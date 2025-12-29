@@ -1,6 +1,7 @@
 'use client';
 
 import { useConversations, useUnreadCount } from '@aurastream/api-client/src/hooks/useMessages';
+import { Skeleton, ProfileSkeleton } from '@/components/ui/Skeleton';
 import type { Conversation } from '@aurastream/api-client/src/types/social';
 
 interface MessagesPanelProps {
@@ -72,8 +73,11 @@ export function MessagesPanel({ isOpen, onClose, onOpenChat }: MessagesPanelProp
         {/* Conversations */}
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
-            <div className="flex items-center justify-center h-48">
-              <div className="w-5 h-5 border-2 border-interactive-600/30 border-t-interactive-400 rounded-full animate-spin" />
+            <div className="p-2 space-y-2">
+              <ConversationSkeleton />
+              <ConversationSkeleton />
+              <ConversationSkeleton />
+              <ConversationSkeleton />
             </div>
           ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 px-4 text-center">
@@ -154,5 +158,22 @@ function ConversationItem({ conversation, formatTime, onClick }: ConversationIte
         </span>
       )}
     </button>
+  );
+}
+
+
+/**
+ * Skeleton for conversation list items.
+ */
+function ConversationSkeleton(): JSX.Element {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg">
+      <Skeleton width={40} height={40} rounded="full" aria-label="" />
+      <div className="flex-1 space-y-1.5">
+        <Skeleton className="h-3 w-24" aria-label="" />
+        <Skeleton className="h-2.5 w-32" aria-label="" />
+      </div>
+      <Skeleton className="h-3 w-10" aria-label="" />
+    </div>
   );
 }

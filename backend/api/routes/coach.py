@@ -344,7 +344,8 @@ async def start_coach_session(
     """
     tier = current_user.tier or "free"
     
-    # Check usage limits
+    # Check usage limits - but don't increment yet
+    # Usage is only counted when an image is actually generated
     usage_info = await check_usage_eligibility(current_user.sub, tier)
     
     if not usage_info["can_use_coach"]:
@@ -352,7 +353,7 @@ async def start_coach_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
                 "error": "limit_exceeded",
-                "message": f"You've used all {usage_info['limit']} Coach sessions this month. Upgrade to Pro for more!",
+                "message": f"You've used all {usage_info['limit']} creations this month. Upgrade to Pro for more!",
                 "feature": "full_coach",
                 "used": usage_info["used"],
                 "limit": usage_info["limit"],
@@ -363,9 +364,8 @@ async def start_coach_session(
     # Check rate limit for session creation
     await check_coach_session_rate_limit(current_user.sub)
     
-    # Increment usage counter
+    # NOTE: Usage is NOT incremented here - only when image is generated
     is_free_tier = usage_info["is_free_tier"]
-    await increment_coach_usage(current_user.sub)
     
     coach_service = get_coach_service()
     
@@ -382,14 +382,16 @@ async def start_coach_session(
         """Generate SSE events from coach service."""
         try:
             # Send usage info at start for UI feedback
+            # Note: Usage is only counted when an image is generated, not at session start
             if is_free_tier:
                 usage_event = json.dumps({
                     "type": "usage_info",
-                    "content": f"Coach session started. {usage_info['remaining'] - 1} remaining this month.",
+                    "content": f"Coach session started. You have {usage_info['remaining']} creation(s) remaining this month.",
                     "metadata": {
                         "is_free_tier": True,
-                        "remaining": usage_info["remaining"] - 1,
+                        "remaining": usage_info["remaining"],
                         "limit": usage_info["limit"],
+                        "note": "Usage is only counted when you generate an image",
                     },
                 })
                 yield f"data: {usage_event}\n\n"
@@ -790,18 +792,28 @@ async def generate_from_session(
     
     This enables inline generation within the coach chat - the user
     doesn't need to leave the coach to generate their asset.
+    
+    Usage is counted here (not at session start) - users only lose
+    a creation when they actually generate an image.
     """
     from backend.services.generation_service import get_generation_service
     from backend.workers.generation_worker import enqueue_generation_job
     
     tier = current_user.tier or "free"
     
-    if not check_premium_access(tier):
+    # Check usage limits before generating - this is where usage is counted
+    usage_info = await check_usage_eligibility(current_user.sub, tier)
+    
+    if not usage_info["can_use_coach"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
-                "error": "upgrade_required",
-                "message": "Prompt Coach requires Pro or Studio subscription",
+                "error": "limit_exceeded",
+                "message": f"You've used all {usage_info['limit']} creations this month. Upgrade to Pro for more!",
+                "feature": "full_coach",
+                "used": usage_info["used"],
+                "limit": usage_info["limit"],
+                "resets_at": usage_info["resets_at"],
             },
         )
     
@@ -854,6 +866,9 @@ async def generate_from_session(
         custom_prompt=session.current_prompt_draft,
         parameters=parameters,
     )
+    
+    # Increment usage counter NOW - when image generation is triggered
+    await increment_coach_usage(current_user.sub)
     
     # Enqueue for background processing
     enqueue_generation_job(job.id, current_user.sub)

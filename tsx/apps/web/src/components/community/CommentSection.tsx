@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export interface CommentSectionProps {
   postId: string;
@@ -20,6 +21,7 @@ export interface CommentSectionProps {
   onDeleteComment?: (commentId: string) => void;
   isLoading?: boolean;
   isSubmitting?: boolean;
+  isDeleting?: boolean;
   className?: string;
 }
 
@@ -57,17 +59,33 @@ function Spinner() {
 
 export function CommentSection({
   postId, comments, currentUserId, onAddComment, onEditComment, onDeleteComment,
-  isLoading = false, isSubmitting = false, className,
+  isLoading = false, isSubmitting = false, isDeleting = false, className,
 }: CommentSectionProps) {
   const [newComment, setNewComment] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [validationState, setValidationState] = useState<'valid' | 'invalid' | null>(null);
+
+  // Inline validation for comment content
+  const validateComment = useCallback((value: string) => {
+    if (value.trim().length >= 2) {
+      setValidationState('valid');
+      return true;
+    } else if (value.length > 0) {
+      setValidationState('invalid');
+      return false;
+    }
+    setValidationState(null);
+    return false;
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newComment.trim() && !isSubmitting) {
+    if (newComment.trim() && !isSubmitting && validateComment(newComment)) {
       onAddComment(newComment.trim());
       setNewComment('');
+      setValidationState(null);
     }
   };
 
@@ -86,34 +104,65 @@ export function CommentSection({
 
   const handleEditCancel = () => { setEditingId(null); setEditContent(''); };
 
+  const handleDelete = (commentId: string) => {
+    setDeletingId(commentId);
+    onDeleteComment?.(commentId);
+  };
+
   return (
     <div className={cn('space-y-4', className)} data-post-id={postId}>
-      {/* Comment Form */}
+      {/* Comment Form with inline validation */}
       <form onSubmit={handleSubmit} className="space-y-3">
-        <textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Add a comment..."
-          disabled={isSubmitting}
-          rows={3}
-          className={cn(
-            'w-full px-3 py-2 rounded-lg border border-border-subtle bg-background-surface',
-            'text-text-primary placeholder:text-text-muted resize-none',
-            'focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:border-transparent',
-            'disabled:opacity-50 disabled:cursor-not-allowed'
+        <div className="relative">
+          <textarea
+            value={newComment}
+            onChange={(e) => {
+              setNewComment(e.target.value);
+              validateComment(e.target.value);
+            }}
+            placeholder="Add a comment..."
+            disabled={isSubmitting}
+            rows={3}
+            className={cn(
+              'w-full px-3 py-2 rounded-lg border bg-background-surface',
+              'text-text-primary placeholder:text-text-muted resize-none',
+              'focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:border-transparent',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+              validationState === 'valid' ? 'border-green-500' : 
+              validationState === 'invalid' ? 'border-yellow-500' : 'border-border-subtle'
+            )}
+          />
+          {validationState === 'valid' && (
+            <div className="absolute top-3 right-3 text-green-500">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
           )}
-        />
-        <div className="flex justify-end">
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-text-muted">
+            {validationState === 'valid' && '✓ Ready to post'}
+            {validationState === 'invalid' && 'Comment must be at least 2 characters'}
+          </span>
           <button
             type="submit"
-            disabled={!newComment.trim() || isSubmitting}
+            disabled={!newComment.trim() || isSubmitting || validationState !== 'valid'}
             className={cn(
               'px-4 py-2 rounded-lg font-medium text-sm transition-colors bg-interactive-500 text-white',
               'hover:bg-interactive-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-interactive-500',
-              'focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
+              'focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed',
+              'flex items-center gap-2'
             )}
           >
-            {isSubmitting ? <Spinner /> : 'Post Comment'}
+            {isSubmitting ? (
+              <>
+                <Spinner />
+                <span>Posting...</span>
+              </>
+            ) : (
+              'Post Comment'
+            )}
           </button>
         </div>
       </form>
@@ -121,17 +170,18 @@ export function CommentSection({
       {/* Comments List */}
       <div className="space-y-4">
         {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Spinner />
-            <span className="ml-2 text-text-muted">Loading comments...</span>
-          </div>
+          <CommentsSkeleton />
         ) : comments.length === 0 ? (
-          <div className="text-center py-8 text-text-muted">
-            <p>No comments yet. Be the first to comment!</p>
-          </div>
+          <EmptyCommentsState />
         ) : (
           comments.map((comment) => (
-            <div key={comment.id} className="flex gap-3 p-3 rounded-lg bg-background-surface">
+            <div 
+              key={comment.id} 
+              className={cn(
+                'flex gap-3 p-3 rounded-lg bg-background-surface transition-opacity',
+                (isDeleting && deletingId === comment.id) && 'opacity-50'
+              )}
+            >
               <Avatar displayName={comment.author.displayName} avatarUrl={comment.author.avatarUrl} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -161,7 +211,13 @@ export function CommentSection({
                       <button onClick={() => handleEditStart(comment)} className="text-xs text-text-muted hover:text-interactive-500 transition-colors">Edit</button>
                     )}
                     {comment.canDelete && onDeleteComment && (
-                      <button onClick={() => onDeleteComment(comment.id)} className="text-xs text-text-muted hover:text-red-500 transition-colors">Delete</button>
+                      <button 
+                        onClick={() => handleDelete(comment.id)} 
+                        disabled={isDeleting && deletingId === comment.id}
+                        className="text-xs text-text-muted hover:text-red-500 transition-colors disabled:opacity-50"
+                      >
+                        {isDeleting && deletingId === comment.id ? 'Deleting...' : 'Delete'}
+                      </button>
                     )}
                   </div>
                 )}
@@ -170,6 +226,45 @@ export function CommentSection({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Skeleton loading state for comments
+ */
+function CommentsSkeleton() {
+  return (
+    <div className="space-y-4" role="status" aria-label="Loading comments...">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="flex gap-3 p-3 rounded-lg bg-background-surface">
+          <Skeleton width={32} height={32} rounded="full" />
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-3 w-16" />
+            </div>
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Empty state for comments section
+ */
+function EmptyCommentsState() {
+  return (
+    <div className="text-center py-8">
+      <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-background-elevated flex items-center justify-center">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      </div>
+      <p className="text-text-muted">No comments yet. Be the first to comment!</p>
     </div>
   );
 }

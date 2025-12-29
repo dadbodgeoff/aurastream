@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Check, ArrowRight, RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { analytics } from '@aurastream/shared';
 import { ColorPalettePreview } from './ColorPalettePreview';
 import { LIGHTING_MOOD_LABELS, TONE_LABELS } from './constants';
 import type { VibeAnalysis } from './types';
@@ -25,11 +24,7 @@ export function VibeResultsDisplay({
   const router = useRouter();
   
   const handleGenerateNow = () => {
-    // Track generate assets click
     if (brandKitId) {
-      analytics.track('vibe_branding_generate_clicked', {
-        brandKitId,
-      }, 'feature');
       router.push(`/dashboard/create?vibe_kit=${brandKitId}`);
     }
     onClose();

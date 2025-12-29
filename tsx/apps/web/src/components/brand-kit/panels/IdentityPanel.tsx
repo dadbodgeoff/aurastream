@@ -6,12 +6,22 @@ import { SparklesIcon, PaletteIcon, TypeIcon, MicIcon, PlusIcon, ImageIcon, Tras
 import { SUPPORTED_FONTS, PRESET_PALETTES } from '../constants';
 import type { IdentityPanelProps } from '../types';
 import { useLogos, useUploadLogo, useDeleteLogo } from '@aurastream/api-client';
+import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
 
 interface IdentityPanelPropsExtended extends IdentityPanelProps {
   pendingLogoFile?: File | null;
   onPendingLogoChange?: (file: File | null) => void;
 }
 
+/**
+ * IdentityPanel with Enterprise UX Patterns
+ * 
+ * Features:
+ * - Inline validation for brand kit name
+ * - showErrorToast for validation errors
+ * - showSuccessToast for successful operations
+ * - Loading states during upload
+ */
 export function IdentityPanel({ 
   identity, 
   onChange, 
@@ -24,6 +34,7 @@ export function IdentityPanel({
 }: IdentityPanelPropsExtended) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   
   // For existing brand kits, use the API
   const { data: logosData } = useLogos(brandKitId || undefined);
@@ -41,14 +52,33 @@ export function IdentityPanel({
     }
   }, [pendingLogoFile]);
 
+  // Inline validation for brand kit name
+  const validateName = (name: string) => {
+    if (name.length > 50) {
+      setNameError('Brand kit name must be 50 characters or less');
+      return false;
+    }
+    if (name.length > 0 && name.trim().length === 0) {
+      setNameError('Brand kit name cannot be only whitespace');
+      return false;
+    }
+    setNameError(null);
+    return true;
+  };
+
+  const handleNameChange = (name: string) => {
+    validateName(name);
+    onChange({ ...identity, name });
+  };
+
   const handleFileSelect = (file: File) => {
     const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a PNG, JPEG, WebP, or SVG image.');
+      showErrorToast({ code: 'VALIDATION_ERROR', message: 'Please upload a PNG, JPEG, WebP, or SVG image.' });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB.');
+      showErrorToast({ code: 'VALIDATION_ERROR', message: 'File size must be less than 10MB.' });
       return;
     }
 
@@ -58,7 +88,21 @@ export function IdentityPanel({
       setPreviewUrl(URL.createObjectURL(file));
     } else if (brandKitId) {
       // For existing brand kits, upload immediately
-      uploadMutation.mutate({ brandKitId, logoType: 'primary', file });
+      uploadMutation.mutate(
+        { brandKitId, logoType: 'primary', file },
+        {
+          onSuccess: () => {
+            showSuccessToast('Logo uploaded!', {
+              description: 'Your primary logo has been saved',
+            });
+          },
+          onError: (error) => {
+            showErrorToast({ code: 'BRAND_KIT_UPLOAD_FAILED' }, {
+              onRetry: () => uploadMutation.mutate({ brandKitId, logoType: 'primary', file }),
+            });
+          },
+        }
+      );
     }
   };
 
@@ -67,7 +111,21 @@ export function IdentityPanel({
       onPendingLogoChange?.(null);
       setPreviewUrl(null);
     } else if (brandKitId) {
-      deleteMutation.mutate({ brandKitId, logoType: 'primary' });
+      deleteMutation.mutate(
+        { brandKitId, logoType: 'primary' },
+        {
+          onSuccess: () => {
+            showSuccessToast('Logo removed', {
+              description: 'Your primary logo has been deleted',
+            });
+          },
+          onError: (error) => {
+            showErrorToast(error, {
+              onRetry: () => deleteMutation.mutate({ brandKitId, logoType: 'primary' }),
+            });
+          },
+        }
+      );
     }
   };
 
@@ -106,16 +164,32 @@ export function IdentityPanel({
           action={<SaveButton onClick={onSave} isSaving={isSaving} />}
         />
         
-        <input
-          type="text"
-          value={identity.name}
-          onChange={(e) => onChange({ ...identity, name: e.target.value })}
-          className="w-full px-4 py-4 bg-background-base border border-border-subtle rounded-xl text-text-primary text-lg placeholder-text-muted focus:outline-none focus:border-interactive-600 focus:ring-2 focus:ring-interactive-600/20 transition-all"
-          placeholder="My Gaming Brand (optional)"
-        />
-        <p className="text-xs text-text-muted mt-2">
-          Leave empty to let AI generate a name based on your content
-        </p>
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={identity.name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            className={`w-full px-4 py-4 bg-background-base border rounded-xl text-text-primary text-lg placeholder-text-muted focus:outline-none focus:ring-2 transition-all ${
+              nameError 
+                ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20' 
+                : 'border-border-subtle focus:border-interactive-600 focus:ring-interactive-600/20'
+            }`}
+            placeholder="My Gaming Brand (optional)"
+            maxLength={50}
+          />
+          <div className="flex justify-between items-center">
+            {nameError ? (
+              <p className="text-xs text-red-500">{nameError}</p>
+            ) : (
+              <p className="text-xs text-text-muted">
+                Leave empty to let AI generate a name based on your content
+              </p>
+            )}
+            <p className={`text-xs ${identity.name.length > 45 ? 'text-yellow-500' : 'text-text-tertiary'}`}>
+              {identity.name.length}/50
+            </p>
+          </div>
+        </div>
       </SectionCard>
 
       {/* Color Palette */}

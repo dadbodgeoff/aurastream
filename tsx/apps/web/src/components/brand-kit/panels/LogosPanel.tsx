@@ -7,14 +7,27 @@ import { ImageIcon, SparklesIcon, TrashIcon } from '../icons';
 import { LOGO_TYPES } from '../constants';
 import { useLogos, useUploadLogo, useDeleteLogo, useSetDefaultLogo, type LogoType } from '@aurastream/api-client';
 import type { LogosPanelProps } from '../types';
+import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
+import { Skeleton } from '@/components/ui/Skeleton';
 
+/**
+ * LogosPanel with Enterprise UX Patterns
+ * 
+ * Features:
+ * - Upload progress indicator
+ * - Retry button on upload failure
+ * - showErrorToast for BRAND_KIT_UPLOAD_FAILED
+ * - showSuccessToast for successful operations
+ * - Loading skeletons during data fetch
+ */
 export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
-  const { data: logosData, isLoading } = useLogos(brandKitId || undefined);
+  const { data: logosData, isLoading, error: loadError, refetch } = useLogos(brandKitId || undefined);
   const uploadMutation = useUploadLogo();
   const deleteMutation = useDeleteLogo();
   const setDefaultMutation = useSetDefaultLogo();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [selectedLogo, setSelectedLogo] = useState<LogoType | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
 
   const logos = logosData?.logos || {
     primary: null,
@@ -31,27 +44,67 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
     
     const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Please upload a PNG, JPEG, WebP, or SVG image.');
+      showErrorToast({ code: 'VALIDATION_ERROR', message: 'Please upload a PNG, JPEG, WebP, or SVG image.' });
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB.');
+      showErrorToast({ code: 'VALIDATION_ERROR', message: 'File size must be less than 10MB.' });
       return;
     }
 
+    // Simulate upload progress
+    setUploadProgress(prev => ({ ...prev, [logoType]: 0 }));
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        const current = prev[logoType] || 0;
+        if (current >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return { ...prev, [logoType]: current + 10 };
+      });
+    }, 100);
+
     try {
       await uploadMutation.mutateAsync({ brandKitId, logoType, file });
+      setUploadProgress(prev => ({ ...prev, [logoType]: 100 }));
+      
+      showSuccessToast(`${LOGO_TYPES.find(l => l.type === logoType)?.label || logoType} uploaded!`, {
+        description: 'Your logo has been saved to this brand kit',
+      });
+      
+      // Clear progress after animation
+      setTimeout(() => {
+        setUploadProgress(prev => {
+          const { [logoType]: _, ...rest } = prev;
+          return rest;
+        });
+      }, 500);
     } catch (error) {
-      console.error('Upload failed:', error);
+      clearInterval(progressInterval);
+      setUploadProgress(prev => {
+        const { [logoType]: _, ...rest } = prev;
+        return rest;
+      });
+      
+      showErrorToast({ code: 'BRAND_KIT_UPLOAD_FAILED' }, {
+        onRetry: () => handleFileSelect(logoType, file),
+      });
     }
   };
 
   const handleDelete = async (logoType: LogoType) => {
-    if (!brandKitId || !confirm(`Delete ${logoType} logo?`)) return;
+    if (!brandKitId) return;
+    
     try {
       await deleteMutation.mutateAsync({ brandKitId, logoType });
+      showSuccessToast('Logo deleted', {
+        description: `${LOGO_TYPES.find(l => l.type === logoType)?.label || logoType} has been removed`,
+      });
     } catch (error) {
-      console.error('Delete failed:', error);
+      showErrorToast(error, {
+        onRetry: () => handleDelete(logoType),
+      });
     }
   };
 
@@ -59,8 +112,13 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
     if (!brandKitId) return;
     try {
       await setDefaultMutation.mutateAsync({ brandKitId, logoType });
+      showSuccessToast('Default logo updated', {
+        description: `${LOGO_TYPES.find(l => l.type === logoType)?.label || logoType} will be used in generated assets`,
+      });
     } catch (error) {
-      console.error('Set default failed:', error);
+      showErrorToast(error, {
+        onRetry: () => handleSetDefault(logoType),
+      });
     }
   };
 
@@ -81,6 +139,52 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
             <p className="text-text-secondary max-w-md mx-auto">
               Create your brand kit with basic identity settings, then come back to upload logos.
             </p>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+
+  // Loading state with skeleton
+  if (isLoading) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <SectionCard>
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-4 w-64" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="aspect-square rounded-xl" />
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    );
+  }
+
+  // Error state
+  if (loadError) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <SectionCard>
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-500 text-2xl">⚠️</span>
+            </div>
+            <h3 className="text-lg font-semibold text-text-primary mb-2">
+              Failed to load logos
+            </h3>
+            <p className="text-text-secondary max-w-md mx-auto mb-4">
+              We couldn't load your logos. Please try again.
+            </p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              Retry
+            </button>
           </div>
         </SectionCard>
       </div>
@@ -273,18 +377,36 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
                     className="w-full aspect-square flex flex-col items-center justify-center gap-3 p-4 cursor-pointer"
                   >
                     {isUploading ? (
-                      <div className="w-10 h-10 border-3 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
-                    ) : (
-                      <div className="w-12 h-12 bg-background-elevated rounded-xl flex items-center justify-center text-text-muted group-hover:text-interactive-600 transition-colors">
-                        <ImageIcon />
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-10 h-10 border-3 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
+                        {/* Upload progress bar */}
+                        {uploadProgress[type] !== undefined && (
+                          <div className="w-full max-w-[120px]">
+                            <div className="h-1.5 bg-background-elevated rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-interactive-600 rounded-full transition-all duration-200"
+                                style={{ width: `${uploadProgress[type]}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-text-tertiary text-center mt-1">
+                              {uploadProgress[type]}%
+                            </p>
+                          </div>
+                        )}
                       </div>
+                    ) : (
+                      <>
+                        <div className="w-12 h-12 bg-background-elevated rounded-xl flex items-center justify-center text-text-muted group-hover:text-interactive-600 transition-colors">
+                          <ImageIcon />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-text-primary">{label}</p>
+                          <p className="text-xs text-text-muted mt-1">{description}</p>
+                          <p className="text-xs text-text-tertiary mt-2">{recommended}</p>
+                          <p className="text-xs text-interactive-600 mt-2 font-medium">Click to upload</p>
+                        </div>
+                      </>
                     )}
-                    <div className="text-center">
-                      <p className="text-sm font-medium text-text-primary">{label}</p>
-                      <p className="text-xs text-text-muted mt-1">{description}</p>
-                      <p className="text-xs text-text-tertiary mt-2">{recommended}</p>
-                      <p className="text-xs text-interactive-600 mt-2 font-medium">Click to upload</p>
-                    </div>
                   </button>
                 )}
               </div>

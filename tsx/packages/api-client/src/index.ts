@@ -123,6 +123,13 @@ export {
   useAsset,
   useDeleteAsset,
   useUpdateAssetVisibility,
+  classifyGenerationError,
+} from './hooks/useGeneration';
+
+export type {
+  GenerationErrorCode,
+  ClassifiedError,
+  UseGenerateAssetOptions,
 } from './hooks/useGeneration';
 
 // Brand Kit Enhanced type exports
@@ -621,3 +628,24 @@ export {
   useMarkAsRead,
   useLoadOlderMessages,
 } from './hooks/useMessages';
+
+
+// Analytics Dashboard type exports
+export type {
+  DashboardSummary,
+  TrendDataPoint,
+  TopPage,
+  RecentSignup,
+  AssetTypeStats,
+  GenerationStats,
+} from './hooks/useAnalyticsDashboard';
+
+// Analytics Dashboard hooks exports
+export {
+  useAnalyticsSummary,
+  useAnalyticsTrend,
+  useTopPages,
+  useRecentSignups,
+  useGenerationStats,
+  useAnalyticsDashboard,
+} from './hooks/useAnalyticsDashboard';

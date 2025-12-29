@@ -13,6 +13,8 @@ import {
   ErrorState,
   JobsIcon,
 } from '@/components/dashboard';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { showErrorToast } from '@/utils/errorMessages';
 import type { JobStatus } from '@/components/dashboard';
 
 // =============================================================================
@@ -43,6 +45,17 @@ const ASSET_TYPE_OPTIONS = [
 // =============================================================================
 
 export default function GeneratePage() {
+  return (
+    <AsyncErrorBoundary 
+      resourceName="generation jobs"
+      onRefetch={() => window.location.reload()}
+    >
+      <GeneratePageContent />
+    </AsyncErrorBoundary>
+  );
+}
+
+function GeneratePageContent() {
   const router = useRouter();
   const { data, isLoading, error, refetch } = useJobs({ limit: 50 });
 

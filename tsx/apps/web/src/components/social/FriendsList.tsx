@@ -2,17 +2,34 @@
 
 import { useRemoveFriend, useBlockUser } from '@aurastream/api-client/src/hooks/useFriends';
 import type { Friend } from '@aurastream/api-client/src/types/social';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 
 interface FriendsListProps {
   friends: Friend[];
+  isLoading?: boolean;
   onOpenChat: (userId: string, displayName: string | null, avatarUrl: string | null) => void;
 }
 
-export function FriendsList({ friends, onOpenChat }: FriendsListProps) {
+export function FriendsList({ friends, isLoading, onOpenChat }: FriendsListProps) {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
+  const [blockingIds, setBlockingIds] = useState<Set<string>>(new Set());
   const removeFriend = useRemoveFriend();
   const blockUser = useBlockUser();
+
+  // Show loading skeletons
+  if (isLoading) {
+    return (
+      <div className="p-2 space-y-1">
+        <FriendItemSkeleton />
+        <FriendItemSkeleton />
+        <FriendItemSkeleton />
+        <FriendItemSkeleton />
+      </div>
+    );
+  }
 
   if (friends.length === 0) {
     return (
@@ -28,101 +45,156 @@ export function FriendsList({ friends, onOpenChat }: FriendsListProps) {
     );
   }
 
-  const handleRemove = async (friendshipId: string) => {
+  const handleRemove = async (friendshipId: string, displayName: string | null) => {
     setMenuOpen(null);
-    await removeFriend.mutateAsync(friendshipId);
+    setRemovingIds(prev => new Set(prev).add(friendshipId));
+    
+    try {
+      await removeFriend.mutateAsync(friendshipId);
+      showSuccessToast(`Removed ${displayName || 'friend'} from friends`);
+    } catch (error) {
+      showErrorToast(error, {
+        onRetry: () => handleRemove(friendshipId, displayName),
+      });
+    } finally {
+      setRemovingIds(prev => {
+        const next = new Set(prev);
+        next.delete(friendshipId);
+        return next;
+      });
+    }
   };
 
-  const handleBlock = async (userId: string) => {
+  const handleBlock = async (userId: string, displayName: string | null) => {
     setMenuOpen(null);
-    await blockUser.mutateAsync(userId);
+    setBlockingIds(prev => new Set(prev).add(userId));
+    
+    try {
+      await blockUser.mutateAsync(userId);
+      showSuccessToast(`Blocked ${displayName || 'user'}`);
+    } catch (error) {
+      showErrorToast(error, {
+        onRetry: () => handleBlock(userId, displayName),
+      });
+    } finally {
+      setBlockingIds(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    }
   };
 
   return (
     <div className="p-2 space-y-1">
-      {friends.map((friend) => (
-        <div
-          key={friend.friendshipId}
-          className="group flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.03] transition-colors"
-        >
-          {/* Avatar */}
-          <div className="relative flex-shrink-0">
-            {friend.avatarUrl ? (
-              <img
-                src={friend.avatarUrl}
-                alt=""
-                className="w-9 h-9 rounded-full object-cover"
+      {friends.map((friend) => {
+        const isRemoving = removingIds.has(friend.friendshipId);
+        const isBlocking = blockingIds.has(friend.userId);
+        const isProcessing = isRemoving || isBlocking;
+        
+        return (
+          <div
+            key={friend.friendshipId}
+            className={`group flex items-center gap-2 p-2 rounded-lg hover:bg-white/[0.03] transition-all ${
+              isProcessing ? 'opacity-50 pointer-events-none' : ''
+            }`}
+          >
+            {/* Avatar */}
+            <div className="relative flex-shrink-0">
+              {friend.avatarUrl ? (
+                <img
+                  src={friend.avatarUrl}
+                  alt=""
+                  className="w-9 h-9 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center">
+                  <span className="text-xs font-medium text-text-secondary">
+                    {(friend.displayName || '?')[0].toUpperCase()}
+                  </span>
+                </div>
+              )}
+              <span
+                className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background-surface ${
+                  friend.isOnline ? 'bg-success-main' : 'bg-neutral-600'
+                }`}
               />
-            ) : (
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center">
-                <span className="text-xs font-medium text-text-secondary">
-                  {(friend.displayName || '?')[0].toUpperCase()}
-                </span>
-              </div>
-            )}
-            <span
-              className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background-surface ${
-                friend.isOnline ? 'bg-success-main' : 'bg-neutral-600'
-              }`}
-            />
-          </div>
+            </div>
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-text-primary truncate">
-              {friend.displayName || 'Unknown'}
-            </p>
-            <p className="text-[10px] text-text-tertiary">
-              {friend.isOnline ? 'Online' : 'Offline'}
-            </p>
-          </div>
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-text-primary truncate">
+                {friend.displayName || 'Unknown'}
+              </p>
+              <p className="text-[10px] text-text-tertiary">
+                {friend.isOnline ? 'Online' : 'Offline'}
+              </p>
+            </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={() => onOpenChat(friend.userId, friend.displayName, friend.avatarUrl)}
-              className="p-1.5 text-text-tertiary hover:text-interactive-400 rounded-md hover:bg-interactive-600/10 transition-colors"
-              title="Message"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </button>
-
-            {/* More menu */}
-            <div className="relative">
+            {/* Actions */}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={() => setMenuOpen(menuOpen === friend.friendshipId ? null : friend.friendshipId)}
-                className="p-1.5 text-text-tertiary hover:text-text-secondary rounded-md hover:bg-white/5 transition-colors"
+                onClick={() => onOpenChat(friend.userId, friend.displayName, friend.avatarUrl)}
+                className="p-1.5 text-text-tertiary hover:text-interactive-400 rounded-md hover:bg-interactive-600/10 transition-colors"
+                title="Message"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </button>
 
-              {menuOpen === friend.friendshipId && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
-                  <div className="absolute right-0 top-full mt-1 w-32 bg-background-surface border border-border-subtle rounded-lg shadow-lg z-20 py-1">
-                    <button
-                      onClick={() => handleRemove(friend.friendshipId)}
-                      className="w-full px-3 py-1.5 text-left text-[11px] text-text-secondary hover:bg-white/5 transition-colors"
-                    >
-                      Remove Friend
-                    </button>
-                    <button
-                      onClick={() => handleBlock(friend.userId)}
-                      className="w-full px-3 py-1.5 text-left text-[11px] text-error-main hover:bg-error-main/10 transition-colors"
-                    >
-                      Block User
-                    </button>
-                  </div>
-                </>
-              )}
+              {/* More menu */}
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(menuOpen === friend.friendshipId ? null : friend.friendshipId)}
+                  className="p-1.5 text-text-tertiary hover:text-text-secondary rounded-md hover:bg-white/5 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                  </svg>
+                </button>
+
+                {menuOpen === friend.friendshipId && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+                    <div className="absolute right-0 top-full mt-1 w-32 bg-background-surface border border-border-subtle rounded-lg shadow-lg z-20 py-1">
+                      <button
+                        onClick={() => handleRemove(friend.friendshipId, friend.displayName)}
+                        disabled={isRemoving}
+                        className="w-full px-3 py-1.5 text-left text-[11px] text-text-secondary hover:bg-white/5 transition-colors disabled:opacity-50"
+                      >
+                        {isRemoving ? 'Removing...' : 'Remove Friend'}
+                      </button>
+                      <button
+                        onClick={() => handleBlock(friend.userId, friend.displayName)}
+                        disabled={isBlocking}
+                        className="w-full px-3 py-1.5 text-left text-[11px] text-error-main hover:bg-error-main/10 transition-colors disabled:opacity-50"
+                      >
+                        {isBlocking ? 'Blocking...' : 'Block User'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * Skeleton for friend list items.
+ */
+function FriendItemSkeleton(): JSX.Element {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg">
+      <Skeleton width={36} height={36} rounded="full" aria-label="" />
+      <div className="flex-1 space-y-1.5">
+        <Skeleton className="h-3 w-20" aria-label="" />
+        <Skeleton className="h-2.5 w-12" aria-label="" />
+      </div>
     </div>
   );
 }

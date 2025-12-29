@@ -247,10 +247,12 @@ Reserve 9-10 for truly exceptional outputs.
 class AuraLabService:
     """Service for The Aura Lab feature."""
     
+    # Note: Tier limits are now managed by usage_limit_service (migration 031)
+    # Free: 2/month, Pro: 25/month, Studio: 25/month
     TIER_LIMITS = {
-        "free": 1,  # Free users get 1 fusion per 28 days via free_tier_service
-        "pro": 20,
-        "studio": 999999
+        "free": 2,
+        "pro": 25,
+        "studio": 25
     }
     
     def __init__(self):

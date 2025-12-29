@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Image, AlertCircle, User } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { analytics } from '@aurastream/shared';
 import { useProfileCreatorAccess, useProfileCreatorGallery, profileCreatorKeys } from '@aurastream/api-client';
 import { PageHeader } from '@/components/navigation';
 import { ProfileCreatorCore } from '@/components/profile-creator/ProfileCreatorCore';
@@ -21,7 +20,6 @@ export default function ProfileCreatorPage() {
   const { data: gallery, isLoading: isLoadingGallery } = useProfileCreatorGallery();
 
   useEffect(() => {
-    analytics.page('profile_creator', { tab: activeTab });
   }, [activeTab]);
 
   const handleCreationComplete = () => {

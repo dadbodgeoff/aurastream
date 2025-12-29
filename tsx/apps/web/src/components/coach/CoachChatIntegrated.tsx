@@ -11,6 +11,13 @@
  * - Task 5: Inline Generation Preview
  * - Task 6: Session Context Display
  * 
+ * Enterprise UX Features:
+ * - Connection loss recovery with auto-reconnect
+ * - Streaming progress feedback (Thinking, Searching, Responding)
+ * - Rate limit handling with countdown
+ * - Session timeout recovery prompt
+ * - Grounding error fallback handling
+ * 
  * @module coach/CoachChatIntegrated
  */
 
@@ -24,7 +31,13 @@ const log = createDevLogger({ prefix: '[CoachChat]' });
 // Hooks
 import { useCoachChat } from '../../hooks/useCoachChat';
 import type { StartCoachRequest } from '../../hooks/useCoachContext';
-import type { ChatMessage, StreamingStage } from '../../hooks/useCoachChat';
+import type { ChatMessage, StreamingStage, CoachError } from '../../hooks/useCoachChat';
+
+// Enterprise error handling
+import { showErrorToast } from '@/utils/errorMessages';
+import { ErrorRecovery, useErrorRecovery } from '@/components/ErrorRecovery';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { CoachMessageSkeleton } from '@/components/ui/Skeleton';
 
 // Context components (Task 6)
 import { SessionContextBar } from './context';
@@ -148,6 +161,8 @@ function mapStreamingToThinkingStage(stage: StreamingStage): ThinkingStage {
       return 'validating';
     case 'streaming':
       return 'crafting';
+    case 'reconnecting':
+      return 'reconnecting';
     default:
       return 'thinking';
   }
@@ -216,32 +231,145 @@ const EmptyState = memo(function EmptyState({ isLoading }: EmptyStateProps) {
 EmptyState.displayName = 'EmptyState';
 
 interface ErrorBannerProps {
-  message: string;
+  error: CoachError | null;
+  message?: string;
   onDismiss: () => void;
+  onRetry?: () => void;
+  onUpgrade?: () => void;
+  onStartNewSession?: () => void;
 }
 
 /**
- * Error banner with dismiss button
+ * Enterprise error banner with contextual recovery actions.
+ * Handles different error types with appropriate messaging and actions.
  */
-const ErrorBanner = memo(function ErrorBanner({ message, onDismiss }: ErrorBannerProps) {
+const ErrorBanner = memo(function ErrorBanner({ 
+  error, 
+  message, 
+  onDismiss, 
+  onRetry,
+  onUpgrade,
+  onStartNewSession,
+}: ErrorBannerProps) {
+  const [countdown, setCountdown] = useState(error?.retryAfter || 0);
+  
+  // Countdown timer for rate limits
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setInterval(() => {
+        setCountdown(c => Math.max(0, c - 1));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [countdown]);
+
+  // Reset countdown when error changes
+  useEffect(() => {
+    if (error?.retryAfter) {
+      setCountdown(error.retryAfter);
+    }
+  }, [error?.retryAfter]);
+
+  const displayMessage = message || error?.message || 'An error occurred';
+  const errorCode = error?.code;
+
+  // Determine banner style based on error type
+  const isWarning = errorCode === 'COACH_RATE_LIMIT' || errorCode === 'COACH_SESSION_EXPIRED';
+  const isInfo = errorCode === 'COACH_TIER_REQUIRED' || errorCode === 'COACH_GROUNDING_FAILED';
+
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 px-4 py-3',
-        'bg-red-500/10 border-t border-red-500/20',
-        'text-red-400 text-sm'
+        'flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3',
+        'border-t',
+        isInfo 
+          ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+          : isWarning 
+            ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+            : 'bg-red-500/10 border-red-500/20 text-red-400'
       )}
       role="alert"
     >
-      <span>{message}</span>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="text-red-400 hover:text-red-300 transition-colors"
-        aria-label="Dismiss error"
-      >
-        ×
-      </button>
+      <div className="flex items-start gap-2 flex-1">
+        <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          {isInfo ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          )}
+        </svg>
+        <div className="flex-1">
+          <span className="font-medium">{displayMessage}</span>
+          {countdown > 0 && (
+            <span className="ml-2 text-sm opacity-80">
+              (retry in {countdown}s)
+            </span>
+          )}
+          {errorCode === 'COACH_GROUNDING_FAILED' && (
+            <p className="text-sm opacity-80 mt-1">
+              Continuing without game context. Your asset will still be created.
+            </p>
+          )}
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2">
+        {/* Contextual action buttons */}
+        {errorCode === 'COACH_TIER_REQUIRED' && onUpgrade && (
+          <button
+            type="button"
+            onClick={onUpgrade}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium',
+              'bg-blue-500/20 hover:bg-blue-500/30',
+              'transition-colors'
+            )}
+          >
+            Upgrade
+          </button>
+        )}
+        
+        {errorCode === 'COACH_SESSION_EXPIRED' && onStartNewSession && (
+          <button
+            type="button"
+            onClick={onStartNewSession}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium',
+              'bg-yellow-500/20 hover:bg-yellow-500/30',
+              'transition-colors'
+            )}
+          >
+            New Session
+          </button>
+        )}
+        
+        {error?.canRetry && onRetry && countdown === 0 && (
+          <button
+            type="button"
+            onClick={onRetry}
+            className={cn(
+              'px-3 py-1.5 rounded-md text-sm font-medium',
+              isWarning 
+                ? 'bg-yellow-500/20 hover:bg-yellow-500/30'
+                : 'bg-red-500/20 hover:bg-red-500/30',
+              'transition-colors'
+            )}
+          >
+            Retry
+          </button>
+        )}
+        
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="p-1 hover:opacity-70 transition-opacity"
+          aria-label="Dismiss error"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 });
@@ -427,11 +555,18 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     refinedDescription,
     isGenerationReady,
     error,
+    errorMessage,
     isGrounding,
     groundingQuery,
+    isSessionExpired,
+    sessionStartTime,
+    retryCount,
     startSession,
     sendMessage,
     endSession,
+    retry,
+    clearError,
+    startNewSession,
   } = useCoachChat();
 
   // Local state
@@ -570,7 +705,25 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
   // Handle error dismiss
   const handleDismissError = useCallback(() => {
     setLocalError(null);
+    clearError();
+  }, [clearError]);
+
+  // Handle retry
+  const handleRetry = useCallback(async () => {
+    setLocalError(null);
+    await retry();
+  }, [retry]);
+
+  // Handle upgrade navigation
+  const handleUpgrade = useCallback(() => {
+    window.location.href = '/pricing';
   }, []);
+
+  // Handle start new session (for expired sessions)
+  const handleStartNewSessionFromError = useCallback(() => {
+    startNewSession();
+    setLocalError(null);
+  }, [startNewSession]);
 
   // Handle reference image upload
   const handleImageUpload = useCallback((file: File) => {
@@ -598,8 +751,9 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     setInputValue('');
     setLocalError(null);
     resetGeneration();
+    startNewSession();
     onEndSession?.();
-  }, [referenceImage, resetGeneration, onEndSession]);
+  }, [referenceImage, resetGeneration, startNewSession, onEndSession]);
 
   // Cleanup reference image on unmount
   useEffect(() => {
@@ -610,14 +764,46 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     };
   }, [referenceImage]);
 
-  // Combined error
-  const displayError = localError || error || generationError;
+  // Show error toast for certain error types
+  useEffect(() => {
+    if (error && error.code === 'COACH_RATE_LIMIT') {
+      showErrorToast(
+        { error: { code: 'COACH_RATE_LIMIT', message: error.message } },
+        { onRetry: error.canRetry ? handleRetry : undefined }
+      );
+    }
+  }, [error, handleRetry]);
+
+  // Combined error - prefer structured error over local error string
+  const displayError = error || (localError ? { code: 'UNKNOWN_ERROR' as const, message: localError, canRetry: true } : null);
 
   // Show empty state
   const showEmptyState = messages.length === 0;
 
   // Check if generation is in progress
   const isGenerating = generationStatus === 'queued' || generationStatus === 'processing';
+
+  // Get streaming progress message for enhanced UX feedback
+  const getStreamingProgressMessage = useCallback((): string | null => {
+    if (!isStreaming) return null;
+    
+    switch (streamingStage) {
+      case 'connecting':
+        return 'Connecting...';
+      case 'thinking':
+        return 'Coach is thinking...';
+      case 'reconnecting':
+        return `Reconnecting... (attempt ${retryCount + 1})`;
+      case 'streaming':
+        return isGrounding ? `Searching for "${groundingQuery}"...` : 'Responding...';
+      case 'validating':
+        return 'Validating your prompt...';
+      default:
+        return null;
+    }
+  }, [isStreaming, streamingStage, isGrounding, groundingQuery, retryCount]);
+
+  const streamingProgressMessage = getStreamingProgressMessage();
 
   return (
     <div
@@ -633,7 +819,10 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
           turnsUsed={turnsUsed}
           turnsRemaining={Math.max(0, 10 - turnsUsed)}
           totalTurns={10}
+          sessionStartTime={sessionStartTime || undefined}
+          isSessionExpired={isSessionExpired}
           onEndSession={handleEndSession}
+          onStartNewSession={handleStartNewSessionFromError}
           isCollapsed={isContextBarCollapsed}
           onToggleCollapse={() => setIsContextBarCollapsed(!isContextBarCollapsed)}
           testId={`${testId}-context-bar`}
@@ -768,8 +957,23 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         )}
       </div>
 
-      {/* Grounding Status */}
-      {isGrounding && (
+      {/* Streaming Progress Indicator */}
+      {streamingProgressMessage && (
+        <div
+          className="flex items-center gap-2 px-4 py-2 bg-accent-500/10 border-t border-accent-500/20 text-accent-400 text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <span>{streamingProgressMessage}</span>
+        </div>
+      )}
+
+      {/* Grounding Status (only show when not covered by streaming progress) */}
+      {isGrounding && !streamingProgressMessage && (
         <div
           className="flex items-center gap-2 px-4 py-2 bg-primary-500/10 border-t border-primary-500/20 text-primary-400 text-sm"
           role="status"
@@ -783,9 +987,16 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         </div>
       )}
 
-      {/* Error Banner */}
+      {/* Error Banner with Enterprise Recovery Actions */}
       {displayError && (
-        <ErrorBanner message={displayError} onDismiss={handleDismissError} />
+        <ErrorBanner 
+          error={displayError}
+          message={generationError || undefined}
+          onDismiss={handleDismissError}
+          onRetry={displayError.canRetry ? handleRetry : undefined}
+          onUpgrade={displayError.code === 'COACH_TIER_REQUIRED' ? handleUpgrade : undefined}
+          onStartNewSession={displayError.code === 'COACH_SESSION_EXPIRED' ? handleStartNewSessionFromError : undefined}
+        />
       )}
 
       {/* Input Area (Task 4) */}

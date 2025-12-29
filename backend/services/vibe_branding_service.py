@@ -64,11 +64,12 @@ class VibeAnalysis(BaseModel):
 # Constants
 # ============================================================================
 
-# Tier limits for vibe analyses per month
+# Note: Tier limits are now managed by usage_limit_service (migration 031)
+# These are kept for reference but the actual limits come from the database
 TIER_LIMITS = {
-    "free": 1,  # Free users get 1 analysis per 28 days via free_tier_service
-    "pro": 5,
-    "studio": 999999  # Effectively unlimited
+    "free": 1,   # 1/month
+    "pro": 10,   # 10/month
+    "studio": 10 # 10/month
 }
 
 VALID_TONES = ["competitive", "casual", "educational", "comedic", "professional"]

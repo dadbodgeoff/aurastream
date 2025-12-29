@@ -3,7 +3,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAuth, useEnterpriseAnalytics } from '@aurastream/shared';
+import { useAuth, useSimpleAnalytics } from '@aurastream/shared';
+import { FormErrorBoundary } from '@/components/ErrorBoundary';
+import { showErrorToast, getErrorFromApi } from '@/utils/errorMessages';
+import { useFormValidation, validationRules } from '@/hooks/useFormValidation';
 
 // OAuth provider icons
 const GoogleIcon = () => (
@@ -109,28 +112,35 @@ function calculatePasswordStrength(password: string): PasswordStrength {
 export default function SignupPage() {
   const router = useRouter();
   const { signup, isLoading, error, clearError } = useAuth();
-  const { trackFunnel } = useEnterpriseAnalytics();
+  const { trackSignup } = useSimpleAnalytics();
   const emailInputRef = useRef<HTMLInputElement>(null);
   
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<{
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    displayName?: string;
-    terms?: string;
-  }>({});
+  const [termsError, setTermsError] = useState<string | null>(null);
   
-  // Track signup_start funnel event on mount
+  // Enterprise form validation with inline feedback
+  const { fieldStates, setFieldValue, touchField, getFieldProps } = useFormValidation({
+    fields: {
+      email: [
+        validationRules.required('Email is required'),
+        validationRules.email('Please enter a valid email address', '✓ Valid email format'),
+      ],
+      displayName: [
+        validationRules.required('Display name is required'),
+        validationRules.displayName('Display name must be 2-50 characters', '✓ Great name!'),
+      ],
+    },
+    debounceMs: 300,
+  });
+  
+  // Track signup on mount (page view is automatic)
   useEffect(() => {
-    trackFunnel('signup_start');
-  }, [trackFunnel]);
+    // Signup tracking happens on successful signup
+  }, []);
   
   // Password strength calculation
   const passwordStrength = useMemo(() => {
@@ -145,45 +155,39 @@ export default function SignupPage() {
   // Clear errors when inputs change
   useEffect(() => {
     if (error) clearError();
-  }, [email, password, confirmPassword, displayName]);
+  }, [fieldStates.email?.value, fieldStates.displayName?.value, password, confirmPassword, error, clearError]);
   
   const validateForm = (): boolean => {
-    const errors: typeof validationErrors = {};
+    let isValid = true;
     
-    if (!email) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = 'Please enter a valid email address';
+    // Touch all fields to trigger validation
+    touchField('email');
+    touchField('displayName');
+    
+    // Check field validation
+    if (!fieldStates.email?.valid || !fieldStates.displayName?.valid) {
+      isValid = false;
     }
     
-    if (!displayName) {
-      errors.displayName = 'Display name is required';
-    } else if (displayName.length < 2) {
-      errors.displayName = 'Display name must be at least 2 characters';
-    } else if (displayName.length > 50) {
-      errors.displayName = 'Display name must be less than 50 characters';
+    // Password validation
+    if (!password || password.length < 8 || passwordStrength.score < 2) {
+      isValid = false;
     }
     
-    if (!password) {
-      errors.password = 'Password is required';
-    } else if (password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    } else if (passwordStrength.score < 2) {
-      errors.password = 'Password is too weak';
+    // Confirm password validation
+    if (!confirmPassword || password !== confirmPassword) {
+      isValid = false;
     }
     
-    if (!confirmPassword) {
-      errors.confirmPassword = 'Please confirm your password';
-    } else if (password !== confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-    
+    // Terms validation
     if (!acceptTerms) {
-      errors.terms = 'You must accept the terms of service';
+      setTermsError('You must accept the terms of service');
+      isValid = false;
+    } else {
+      setTermsError(null);
     }
     
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return isValid;
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,12 +197,19 @@ export default function SignupPage() {
     
     clearError();
     try {
-      await signup(email, password, displayName, acceptTerms);
-      // Track signup_complete funnel event
-      trackFunnel('signup_complete');
+      await signup(fieldStates.email.value, password, fieldStates.displayName.value, acceptTerms);
+      // Track signup_complete event
+      trackSignup();
       router.push('/login?registered=true');
     } catch (err) {
-      // Error is handled by the store
+      // Show enterprise error toast with recovery actions
+      showErrorToast(err, {
+        onNavigate: (path) => router.push(path),
+        onRetry: () => {
+          // Focus email field for retry
+          emailInputRef.current?.focus();
+        },
+      });
     }
   };
   
@@ -209,78 +220,111 @@ export default function SignupPage() {
   };
   
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-text-primary mb-2">Create an account</h2>
-      <p className="text-text-secondary mb-6">Start creating amazing streaming assets</p>
-      
-      {/* Error display */}
-      {error && (
-        <div 
-          className="mb-6 p-4 bg-error-dark/20 border border-error-main/30 rounded-lg text-error-light text-sm"
-          role="alert"
-          aria-live="polite"
-        >
-          {error}
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        {/* Email input */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1.5">
-            Email address
-          </label>
-          <input
-            ref={emailInputRef}
-            id="email"
-            name="email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={`w-full px-4 py-3 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
-              validationErrors.email ? 'border-error-main' : 'border-border-default'
-            }`}
-            placeholder="you@example.com"
-            aria-invalid={!!validationErrors.email}
-            aria-describedby={validationErrors.email ? 'email-error' : undefined}
-          />
-          {validationErrors.email && (
-            <p id="email-error" className="mt-1.5 text-sm text-error-light" role="alert">
-              {validationErrors.email}
-            </p>
-          )}
-        </div>
+    <FormErrorBoundary formName="SignupForm">
+      <div>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">Create an account</h2>
+        <p className="text-text-secondary mb-6">Start creating amazing streaming assets</p>
         
-        {/* Display name input */}
-        <div>
-          <label htmlFor="displayName" className="block text-sm font-medium text-text-primary mb-1.5">
-            Display name
-          </label>
-          <input
-            id="displayName"
-            name="displayName"
-            type="text"
-            inputMode="text"
-            autoComplete="name"
-            required
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className={`w-full px-4 py-3 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
-              validationErrors.displayName ? 'border-error-main' : 'border-border-default'
-            }`}
-            placeholder="Your display name"
-            aria-invalid={!!validationErrors.displayName}
-            aria-describedby={validationErrors.displayName ? 'displayName-error' : undefined}
-          />
-          {validationErrors.displayName && (
-            <p id="displayName-error" className="mt-1.5 text-sm text-error-light" role="alert">
-              {validationErrors.displayName}
-            </p>
-          )}
-        </div>
+        {/* Error display with enterprise pattern */}
+        {error && (
+          <div 
+            className="mb-6 p-4 bg-error-dark/20 border border-error-main/30 rounded-lg text-error-light text-sm"
+            role="alert"
+            aria-live="polite"
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-error-main">⚠️</span>
+              <div className="flex-1">
+                <p className="font-medium">{getErrorFromApi(error).title}</p>
+                {getErrorFromApi(error).suggestion && (
+                  <p className="text-xs mt-1 text-error-light/80">{getErrorFromApi(error).suggestion}</p>
+                )}
+              </div>
+              {getErrorFromApi(error).actionPath === '/auth/login' && (
+                <Link 
+                  href="/login" 
+                  className="text-xs underline hover:no-underline whitespace-nowrap font-medium"
+                >
+                  Go to Login
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          {/* Email input */}
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1.5">
+              Email address
+            </label>
+            <input
+              ref={emailInputRef}
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              required
+              {...getFieldProps('email')}
+              className={`w-full px-4 py-3 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
+                fieldStates.email?.touched && fieldStates.email?.error 
+                  ? 'border-error-main' 
+                  : fieldStates.email?.touched && fieldStates.email?.valid 
+                    ? 'border-success-main' 
+                    : 'border-border-default'
+              }`}
+              placeholder="you@example.com"
+              aria-invalid={!!(fieldStates.email?.touched && fieldStates.email?.error)}
+              aria-describedby={fieldStates.email?.error ? 'email-error' : fieldStates.email?.successMessage ? 'email-success' : undefined}
+            />
+            {fieldStates.email?.touched && fieldStates.email?.error && (
+              <p id="email-error" className="mt-1.5 text-sm text-error-light flex items-center gap-1" role="alert">
+                <span>✕</span> {fieldStates.email.error}
+              </p>
+            )}
+            {fieldStates.email?.touched && fieldStates.email?.valid && fieldStates.email?.successMessage && (
+              <p id="email-success" className="mt-1.5 text-sm text-success-light">
+                {fieldStates.email.successMessage}
+              </p>
+            )}
+          </div>
+          
+          {/* Display name input */}
+          <div>
+            <label htmlFor="displayName" className="block text-sm font-medium text-text-primary mb-1.5">
+              Display name
+            </label>
+            <input
+              id="displayName"
+              name="displayName"
+              type="text"
+              inputMode="text"
+              autoComplete="name"
+              required
+              {...getFieldProps('displayName')}
+              className={`w-full px-4 py-3 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
+                fieldStates.displayName?.touched && fieldStates.displayName?.error 
+                  ? 'border-error-main' 
+                  : fieldStates.displayName?.touched && fieldStates.displayName?.valid 
+                    ? 'border-success-main' 
+                    : 'border-border-default'
+              }`}
+              placeholder="Your display name"
+              aria-invalid={!!(fieldStates.displayName?.touched && fieldStates.displayName?.error)}
+              aria-describedby={fieldStates.displayName?.error ? 'displayName-error' : fieldStates.displayName?.successMessage ? 'displayName-success' : undefined}
+            />
+            {fieldStates.displayName?.touched && fieldStates.displayName?.error && (
+              <p id="displayName-error" className="mt-1.5 text-sm text-error-light flex items-center gap-1" role="alert">
+                <span>✕</span> {fieldStates.displayName.error}
+              </p>
+            )}
+            {fieldStates.displayName?.touched && fieldStates.displayName?.valid && fieldStates.displayName?.successMessage && (
+              <p id="displayName-success" className="mt-1.5 text-sm text-success-light">
+                {fieldStates.displayName.successMessage}
+              </p>
+            )}
+          </div>
         
         {/* Password input */}
         <div>
@@ -297,10 +341,11 @@ export default function SignupPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={`w-full px-4 py-3 pr-14 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
-                validationErrors.password ? 'border-error-main' : 'border-border-default'
+                password && passwordStrength.score < 2 ? 'border-error-main' : 
+                password && passwordStrength.score >= 3 ? 'border-success-main' :
+                'border-border-default'
               }`}
               placeholder="Create a strong password"
-              aria-invalid={!!validationErrors.password}
               aria-describedby="password-requirements"
             />
             <button
@@ -351,12 +396,6 @@ export default function SignupPage() {
               </ul>
             </div>
           )}
-          
-          {validationErrors.password && (
-            <p className="mt-1.5 text-sm text-error-light" role="alert">
-              {validationErrors.password}
-            </p>
-          )}
         </div>
         
         {/* Confirm password input */}
@@ -374,13 +413,13 @@ export default function SignupPage() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={`w-full px-4 py-3 pr-14 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
-                validationErrors.confirmPassword ? 'border-error-main' : 
+                confirmPassword && password !== confirmPassword ? 'border-error-main' : 
                 confirmPassword && password === confirmPassword ? 'border-success-main' :
                 'border-border-default'
               }`}
               placeholder="Confirm your password"
-              aria-invalid={!!validationErrors.confirmPassword}
-              aria-describedby={validationErrors.confirmPassword ? 'confirmPassword-error' : undefined}
+              aria-invalid={!!(confirmPassword && password !== confirmPassword)}
+              aria-describedby={confirmPassword && password !== confirmPassword ? 'confirmPassword-error' : confirmPassword && password === confirmPassword ? 'confirmPassword-success' : undefined}
             />
             <button
               type="button"
@@ -391,13 +430,13 @@ export default function SignupPage() {
               {showConfirmPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </div>
-          {validationErrors.confirmPassword && (
-            <p id="confirmPassword-error" className="mt-1.5 text-sm text-error-light" role="alert">
-              {validationErrors.confirmPassword}
+          {confirmPassword && password !== confirmPassword && (
+            <p id="confirmPassword-error" className="mt-1.5 text-sm text-error-light flex items-center gap-1" role="alert">
+              <span>✕</span> Passwords do not match
             </p>
           )}
-          {confirmPassword && password === confirmPassword && !validationErrors.confirmPassword && (
-            <p className="mt-1.5 text-sm text-success-light flex items-center gap-1">
+          {confirmPassword && password === confirmPassword && (
+            <p id="confirmPassword-success" className="mt-1.5 text-sm text-success-light flex items-center gap-1">
               <CheckIcon /> Passwords match
             </p>
           )}
@@ -411,15 +450,15 @@ export default function SignupPage() {
               checked={acceptTerms}
               onChange={(e) => {
                 setAcceptTerms(e.target.checked);
-                if (validationErrors.terms) {
-                  setValidationErrors(prev => ({ ...prev, terms: undefined }));
+                if (e.target.checked) {
+                  setTermsError(null);
                 }
               }}
               className={`mt-0.5 w-5 h-5 rounded border-border-default bg-background-elevated text-interactive-600 focus:ring-interactive-600 focus:ring-offset-0 cursor-pointer ${
-                validationErrors.terms ? 'border-error-main' : ''
+                termsError ? 'border-error-main' : ''
               }`}
-              aria-invalid={!!validationErrors.terms}
-              aria-describedby={validationErrors.terms ? 'terms-error' : undefined}
+              aria-invalid={!!termsError}
+              aria-describedby={termsError ? 'terms-error' : undefined}
             />
             <span className="ml-2 text-sm text-text-secondary">
               I agree to the{' '}
@@ -432,9 +471,9 @@ export default function SignupPage() {
               </Link>
             </span>
           </label>
-          {validationErrors.terms && (
-            <p id="terms-error" className="mt-1.5 text-sm text-error-light" role="alert">
-              {validationErrors.terms}
+          {termsError && (
+            <p id="terms-error" className="mt-1.5 text-sm text-error-light flex items-center gap-1" role="alert">
+              <span>✕</span> {termsError}
             </p>
           )}
         </div>
@@ -508,5 +547,6 @@ export default function SignupPage() {
         </Link>
       </p>
     </div>
+    </FormErrorBoundary>
   );
 }

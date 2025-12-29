@@ -69,7 +69,7 @@ class GeminiVisionClient:
     """
     
     BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-    MODEL = "gemini-1.5-flash"  # Vision-capable model for image parsing
+    MODEL = "gemini-2.0-flash"  # Vision-capable model for image parsing
     
     # Exponential backoff delays in seconds (longer delays for rate limits)
     RETRY_DELAYS = [2, 5, 10, 20, 30]

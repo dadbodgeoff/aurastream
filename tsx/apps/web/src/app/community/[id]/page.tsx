@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -12,6 +12,9 @@ import {
 } from '@aurastream/api-client';
 import { LikeButton, FollowButton, CommentSection } from '@/components/community';
 import { PageHeader } from '@/components/navigation';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorRecovery } from '@/components/ErrorRecovery';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 import { cn } from '@/lib/utils';
 
 function PostDetailSkeleton() {
@@ -38,12 +41,45 @@ function PostDetailSkeleton() {
 function NotFound() {
   return (
     <div className="min-h-screen bg-background-base flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-text-primary mb-2">Post Not Found</h1>
-        <p className="text-text-secondary mb-4">This post may have been removed or doesn't exist.</p>
-        <Link href="/community" className="text-interactive-500 hover:text-interactive-600 font-medium">
-          ← Back to Gallery
-        </Link>
+      <ErrorRecovery
+        error={{ code: 'COMMUNITY_POST_NOT_FOUND' }}
+        variant="fullscreen"
+        customActions={[
+          { label: 'Browse Community', onClick: () => window.location.href = '/community', variant: 'primary' },
+        ]}
+      />
+    </div>
+  );
+}
+
+function BannedUserNotice({ onContactSupport }: { onContactSupport: () => void }) {
+  return (
+    <div className="min-h-screen bg-background-base flex items-center justify-center p-4">
+      <div className="max-w-md text-center space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-semibold text-text-primary">Account Restricted</h2>
+        <p className="text-text-secondary">
+          Your community access has been restricted. If you believe this is an error, please contact our support team.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <button
+            onClick={onContactSupport}
+            className="px-6 py-2.5 rounded-lg font-medium bg-interactive-600 text-white hover:bg-interactive-500 transition-colors"
+          >
+            Contact Support
+          </button>
+          <Link
+            href="/dashboard"
+            className="px-6 py-2.5 rounded-lg font-medium border border-border-subtle text-text-secondary hover:bg-background-elevated transition-colors text-center"
+          >
+            Go to Dashboard
+          </Link>
+        </div>
       </div>
     </div>
   );
@@ -81,9 +117,10 @@ export default function PostDetailPage() {
   const postId = params.id as string;
   const { user } = useAuth();
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isBanned, setIsBanned] = useState(false);
 
-  const { data: post, isLoading: postLoading } = useCommunityPost(postId);
-  const { data: commentsData, isLoading: commentsLoading } = useComments(postId);
+  const { data: post, isLoading: postLoading, error: postError, refetch: refetchPost } = useCommunityPost(postId);
+  const { data: commentsData, isLoading: commentsLoading, refetch: refetchComments } = useComments(postId);
   const { data: authorProfile } = useCreatorProfile(post?.author?.id);
 
   const likeMutation = useLikePost();
@@ -94,33 +131,112 @@ export default function PostDetailPage() {
   const deleteCommentMutation = useDeleteComment();
   const reportMutation = useReportPost();
 
-  const handleLikeToggle = () => {
+  // Error handler for banned users
+  const handleBannedError = useCallback((error: any) => {
+    if (error?.code === 'COMMUNITY_USER_BANNED' || error?.message?.includes('banned')) {
+      setIsBanned(true);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const handleLikeToggle = useCallback(() => {
     if (!post) return;
-    if (post.isLiked) unlikeMutation.mutate(postId);
-    else likeMutation.mutate(postId);
-  };
-
-  const handleFollowToggle = () => {
-    if (!post?.author) return;
-    if (authorProfile?.isFollowing) unfollowMutation.mutate(post.author.id);
-    else followMutation.mutate(post.author.id);
-  };
-
-  const handleAddComment = (content: string) => {
-    createCommentMutation.mutate({ postId, data: { content } });
-  };
-
-  const handleDeleteComment = (commentId: string) => {
-    deleteCommentMutation.mutate({ commentId, postId });
-  };
-
-  const handleReport = (reason: string, details: string) => {
-    reportMutation.mutate({ postId, data: { reason: reason as any, details } }, {
-      onSuccess: () => setShowReportModal(false),
+    const mutation = post.isLiked ? unlikeMutation : likeMutation;
+    mutation.mutate(postId, {
+      onError: (error: any) => {
+        if (!handleBannedError(error)) {
+          showErrorToast(error, {
+            onRetry: () => mutation.mutate(postId),
+          });
+        }
+      },
     });
-  };
+  }, [post, postId, likeMutation, unlikeMutation, handleBannedError]);
+
+  const handleFollowToggle = useCallback(() => {
+    if (!post?.author) return;
+    const mutation = authorProfile?.isFollowing ? unfollowMutation : followMutation;
+    mutation.mutate(post.author.id, {
+      onSuccess: () => {
+        if (!authorProfile?.isFollowing) {
+          showSuccessToast('Following creator', {
+            description: 'You\'ll see their posts in your feed',
+          });
+        }
+      },
+      onError: (error: any) => {
+        if (!handleBannedError(error)) {
+          showErrorToast(error, {
+            onRetry: () => mutation.mutate(post.author.id),
+          });
+        }
+      },
+    });
+  }, [post?.author, authorProfile?.isFollowing, followMutation, unfollowMutation, handleBannedError]);
+
+  const handleAddComment = useCallback((content: string) => {
+    createCommentMutation.mutate({ postId, data: { content } }, {
+      onSuccess: () => {
+        showSuccessToast('Comment posted!');
+      },
+      onError: (error: any) => {
+        if (!handleBannedError(error)) {
+          showErrorToast(error, {
+            onRetry: () => createCommentMutation.mutate({ postId, data: { content } }),
+          });
+        }
+      },
+    });
+  }, [postId, createCommentMutation, handleBannedError]);
+
+  const handleDeleteComment = useCallback((commentId: string) => {
+    deleteCommentMutation.mutate({ commentId, postId }, {
+      onSuccess: () => {
+        showSuccessToast('Comment deleted');
+      },
+      onError: (error: any) => {
+        showErrorToast(error, {
+          onRetry: () => deleteCommentMutation.mutate({ commentId, postId }),
+        });
+      },
+    });
+  }, [postId, deleteCommentMutation]);
+
+  const handleReport = useCallback((reason: string, details: string) => {
+    reportMutation.mutate({ postId, data: { reason: reason as any, details } }, {
+      onSuccess: () => {
+        setShowReportModal(false);
+        showSuccessToast('Report submitted', {
+          description: 'Thank you for helping keep our community safe.',
+        });
+      },
+      onError: (error: any) => {
+        showErrorToast(error);
+      },
+    });
+  }, [postId, reportMutation]);
+
+  // Show banned user notice
+  if (isBanned) {
+    return <BannedUserNotice onContactSupport={() => router.push('/support')} />;
+  }
 
   if (postLoading) return <PostDetailSkeleton />;
+  
+  // Handle post fetch error
+  if (postError) {
+    return (
+      <div className="min-h-screen bg-background-base flex items-center justify-center p-4">
+        <ErrorRecovery
+          error={postError}
+          onRetry={() => { refetchPost(); }}
+          variant="card"
+        />
+      </div>
+    );
+  }
+  
   if (!post) return <NotFound />;
 
   const isOwnPost = user?.id === post.userId;
@@ -194,10 +310,24 @@ export default function PostDetailPage() {
           )}
         </div>
 
-        {/* Comments Section */}
+        {/* Comments Section with Error Boundary */}
         <div>
           <h2 className="text-lg font-semibold text-text-primary mb-4">Comments ({post.commentCount})</h2>
-          <CommentSection postId={postId} comments={comments} currentUserId={user?.id} onAddComment={handleAddComment} onDeleteComment={handleDeleteComment} isLoading={commentsLoading} isSubmitting={createCommentMutation.isPending} />
+          <AsyncErrorBoundary
+            resourceName="comments"
+            onRefetch={() => { refetchComments(); }}
+          >
+            <CommentSection 
+              postId={postId} 
+              comments={comments} 
+              currentUserId={user?.id} 
+              onAddComment={handleAddComment} 
+              onDeleteComment={handleDeleteComment} 
+              isLoading={commentsLoading} 
+              isSubmitting={createCommentMutation.isPending}
+              isDeleting={deleteCommentMutation.isPending}
+            />
+          </AsyncErrorBoundary>
         </div>
       </div>
 

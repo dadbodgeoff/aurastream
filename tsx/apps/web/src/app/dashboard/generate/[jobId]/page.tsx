@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@aurastream/api-client';
 import { useAuth, createDevLogger } from '@aurastream/shared';
 import { useGenerationCelebration } from '@/hooks/useGenerationCelebration';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
+import { ErrorRecovery } from '@/components/ErrorRecovery';
 
 // Dev logger for SSE debugging
 const log = createDevLogger({ prefix: '[SSE]' });
@@ -26,13 +28,25 @@ interface GenerationProgress {
   };
 }
 
+/**
+ * Progress stage configuration with user-friendly messages
+ */
+const PROGRESS_STAGES = [
+  { threshold: 0, label: 'Starting generation', message: 'Preparing your request...' },
+  { threshold: 10, label: 'Analyzing prompt', message: 'Understanding your creative vision...' },
+  { threshold: 30, label: 'Generating asset', message: 'AI is creating your masterpiece...' },
+  { threshold: 50, label: 'Applying brand elements', message: 'Adding your brand identity...' },
+  { threshold: 70, label: 'Uploading to storage', message: 'Saving your creation...' },
+  { threshold: 90, label: 'Finalizing', message: 'Almost there...' },
+];
+
 function getAccessToken(): string | null {
-  // Get token from the API client (stored in memory after login)
   return apiClient.getAccessToken();
 }
 
 export default function GenerationProgressPage() {
   const params = useParams();
+  const router = useRouter();
   const jobId = params.jobId as string;
   const { user } = useAuth();
 
@@ -40,126 +54,147 @@ export default function GenerationProgressPage() {
   const [status, setStatus] = useState<'connecting' | 'queued' | 'processing' | 'completed' | 'failed'>('connecting');
   const [message, setMessage] = useState('Connecting...');
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [asset, setAsset] = useState<GenerationProgress['asset'] | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   const { celebrateGeneration } = useGenerationCelebration();
   const celebrationTriggeredRef = useRef(false);
+  const maxRetries = 3;
 
-  const connectToStream = useCallback(() => {
+  // Polling fallback for job status (SSE often blocked by Cloudflare)
+  const pollJobStatus = useCallback(async () => {
     const accessToken = getAccessToken();
-    log.info('connectToStream called, jobId:', jobId, 'hasToken:', !!accessToken);
-    if (!accessToken || !jobId) {
-      log.debug('Missing token or jobId, aborting');
-      return;
-    }
+    if (!accessToken || !jobId) return;
 
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const url = `${apiBase}/api/v1/jobs/${jobId}/stream`;
-    log.info('Connecting to:', url);
-
-    // Use fetch with streaming for SSE with auth header
-    const controller = new AbortController();
     
-    // Set initial connecting state
-    setStatus('connecting');
-    setMessage('Connecting to generation service...');
-    
-    fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-      },
-      signal: controller.signal,
-    }).then(async (response) => {
-      log.info('Response received, status:', response.status);
+    try {
+      const response = await fetch(`${apiBase}/api/v1/jobs/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       
-      const reader = response.body?.getReader();
-      if (!reader) {
-        log.debug('No reader available');
+      const job = await response.json();
+      const jobStatus = job.status;
+      const jobProgress = job.progress || 0;
+      
+      // Update progress
+      setProgress(jobProgress);
+      setStatus(jobStatus);
+      setMessage(_getProgressMessage(jobProgress, jobStatus));
+      
+      // Check for completion
+      if (jobStatus === 'completed') {
+        // Fetch assets
+        const assetsResponse = await fetch(`${apiBase}/api/v1/jobs/${jobId}/assets`, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+        
+        if (assetsResponse.ok) {
+          const assets = await assetsResponse.json();
+          const firstAsset = assets[0];
+          if (firstAsset) {
+            setAsset({
+              id: firstAsset.id,
+              url: firstAsset.url,
+              asset_type: firstAsset.asset_type,
+              width: firstAsset.width,
+              height: firstAsset.height,
+              file_size: firstAsset.file_size,
+            });
+          }
+        }
+        setProgress(100);
+        showSuccessToast('Asset created successfully!', {
+          description: 'Your new asset is ready to download.',
+        });
+        return true; // Stop polling
+      }
+      
+      if (jobStatus === 'failed') {
+        setError(job.error_message || 'Generation failed');
+        setErrorCode('GENERATION_FAILED');
+        return true; // Stop polling
+      }
+      
+      return false; // Continue polling
+    } catch (err) {
+      log.error('Polling error:', err);
+      return false; // Continue polling on error
+    }
+  }, [jobId]);
+
+  const startPolling = useCallback(() => {
+    log.info('Starting polling for job:', jobId);
+    setStatus('processing');
+    setMessage('Starting generation...');
+    
+    let pollCount = 0;
+    const maxPolls = 120; // 2 minutes max (1 second intervals)
+    
+    const poll = async () => {
+      if (pollCount >= maxPolls) {
+        setError('Generation timed out. Please check your assets page.');
+        setErrorCode('GENERATION_TIMEOUT');
+        setStatus('failed');
         return;
       }
       
-      const decoder = new TextDecoder();
-      let buffer = '';
+      pollCount++;
+      const shouldStop = await pollJobStatus();
       
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          log.info('Stream ended');
-          break;
-        }
-        
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data: GenerationProgress = JSON.parse(line.slice(6));
-              log.debug('Event received:', data.type, data);
-              handleEvent(data);
-            } catch (e) {
-              log.error('Failed to parse SSE data:', e);
-            }
-          }
-        }
+      if (!shouldStop) {
+        setTimeout(poll, 1000); // Poll every second
       }
-    }).catch((err) => {
-      if (err.name !== 'AbortError') {
-        log.error('SSE connection error:', err);
-        setError('Connection lost. Please refresh the page.');
-        setStatus('failed');
-      }
-    });
+    };
+    
+    poll();
+  }, [jobId, pollJobStatus]);
 
-    return () => controller.abort();
-  }, [jobId]);
-
-  const handleEvent = (data: GenerationProgress) => {
-    switch (data.type) {
-      case 'progress':
-        setProgress(data.progress || 0);
-        setStatus(data.status as typeof status || 'processing');
-        setMessage(data.message || 'Processing...');
-        break;
-      case 'completed':
-        setProgress(100);
-        setStatus('completed');
-        setMessage('Your asset is ready!');
-        setAsset(data.asset || null);
-        break;
-      case 'failed':
-        setStatus('failed');
-        setError(data.error || 'Generation failed');
-        break;
-      case 'timeout':
-        setStatus('failed');
-        setError('Generation timed out. Please try again.');
-        break;
-      case 'error':
-        setStatus('failed');
-        setError(data.error || 'An error occurred');
-        break;
-      case 'heartbeat':
-        // Keep-alive, no action needed
-        break;
+  // Helper function for progress messages
+  const _getProgressMessage = (progress: number, status: string): string => {
+    if (status === 'queued') return 'Waiting in queue...';
+    if (status === 'processing') {
+      if (progress < 20) return 'Starting generation...';
+      if (progress < 50) return 'AI is creating your masterpiece...';
+      if (progress < 80) return 'Applying finishing touches...';
+      return 'Almost there...';
     }
+    return 'Processing...';
   };
+
+  // Handle retry
+  const handleRetry = useCallback(() => {
+    if (retryCount >= maxRetries) {
+      showErrorToast(
+        { code: 'GENERATION_FAILED', message: 'Maximum retry attempts reached' },
+        { onNavigate: (path) => router.push(path) }
+      );
+      return;
+    }
+    
+    setRetryCount(prev => prev + 1);
+    setError(null);
+    setErrorCode(null);
+    setProgress(0);
+    setStatus('connecting');
+    startPolling();
+  }, [retryCount, maxRetries, startPolling, router]);
 
   useEffect(() => {
     log.info('useEffect triggered, jobId:', jobId);
-    const cleanup = connectToStream();
-    return () => {
-      log.debug('Cleanup called');
-      cleanup?.();
-    };
-  }, [connectToStream]);
+    // Use polling instead of SSE (more reliable through Cloudflare)
+    startPolling();
+  }, [startPolling]);
 
   // Trigger celebration when generation completes
   useEffect(() => {
@@ -319,7 +354,7 @@ export default function GenerationProgressPage() {
             </>
           ) : status === 'failed' ? (
             <>
-              {/* Error State */}
+              {/* Enhanced Error State */}
               <div className="mb-6">
                 <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center mb-4">
                   <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -327,16 +362,49 @@ export default function GenerationProgressPage() {
                   </svg>
                 </div>
                 <h1 className="text-2xl font-bold text-text-primary mb-2">Generation Failed</h1>
-                <p className="text-red-500">{error}</p>
+                <p className="text-red-500 mb-2">{error}</p>
+                {errorCode === 'GENERATION_TIMEOUT' && (
+                  <p className="text-sm text-text-secondary">
+                    💡 Try a simpler prompt or try again later.
+                  </p>
+                )}
+                {errorCode === 'NETWORK_ERROR' && (
+                  <p className="text-sm text-text-secondary">
+                    💡 Check your internet connection and try again.
+                  </p>
+                )}
               </div>
+
+              {/* Retry count indicator */}
+              {retryCount > 0 && retryCount < maxRetries && (
+                <p className="text-xs text-text-tertiary mb-4">
+                  Retry attempt {retryCount} of {maxRetries}
+                </p>
+              )}
+              {retryCount >= maxRetries && (
+                <p className="text-xs text-red-500 mb-4">
+                  Maximum retry attempts reached. Please try a different approach.
+                </p>
+              )}
 
               {/* Retry Actions */}
               <div className="flex flex-col sm:flex-row gap-3">
+                {retryCount < maxRetries && (
+                  <button
+                    onClick={handleRetry}
+                    className="flex-1 px-4 py-3 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-xl transition-colors text-center flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Try Again
+                  </button>
+                )}
                 <Link
                   href="/dashboard/quick-create"
-                  className="flex-1 px-4 py-3 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-xl transition-colors text-center"
+                  className="flex-1 px-4 py-3 bg-background-elevated hover:bg-background-surface text-text-primary font-medium rounded-xl transition-colors text-center"
                 >
-                  Try Again
+                  New Creation
                 </Link>
                 <Link
                   href="/dashboard"
@@ -348,7 +416,7 @@ export default function GenerationProgressPage() {
             </>
           ) : (
             <>
-              {/* Loading State */}
+              {/* Loading State with Enhanced Progress Stages */}
               <div className="mb-8">
                 <div className="w-20 h-20 mx-auto mb-6 relative">
                   {/* Animated spinner */}
@@ -380,7 +448,7 @@ export default function GenerationProgressPage() {
                   </div>
                 </div>
                 <h1 className="text-2xl font-bold text-text-primary mb-2">Creating Your Asset</h1>
-                <p className="text-text-secondary">{message}</p>
+                <p className="text-text-secondary animate-pulse">{message}</p>
               </div>
 
               {/* Progress Bar */}
@@ -391,13 +459,17 @@ export default function GenerationProgressPage() {
                 />
               </div>
 
-              {/* Status Steps */}
+              {/* Status Steps with Enhanced Messaging */}
               <div className="mt-8 space-y-3 text-left">
-                <ProgressStep label="Starting generation" completed={progress >= 10} active={progress < 10} />
-                <ProgressStep label="Generating your asset" completed={progress >= 30} active={progress >= 10 && progress < 30} />
-                <ProgressStep label="Adding brand elements" completed={progress >= 50} active={progress >= 30 && progress < 50} />
-                <ProgressStep label="Uploading to storage" completed={progress >= 70} active={progress >= 50 && progress < 70} />
-                <ProgressStep label="Finalizing" completed={progress >= 100} active={progress >= 70 && progress < 100} />
+                {PROGRESS_STAGES.map((stage, index) => (
+                  <ProgressStep 
+                    key={stage.threshold}
+                    label={stage.label} 
+                    message={stage.message}
+                    completed={progress >= (PROGRESS_STAGES[index + 1]?.threshold || 100)} 
+                    active={progress >= stage.threshold && progress < (PROGRESS_STAGES[index + 1]?.threshold || 100)} 
+                  />
+                ))}
               </div>
             </>
           )}
@@ -407,10 +479,20 @@ export default function GenerationProgressPage() {
   );
 }
 
-function ProgressStep({ label, completed, active }: { label: string; completed: boolean; active: boolean }) {
+function ProgressStep({ 
+  label, 
+  message, 
+  completed, 
+  active 
+}: { 
+  label: string; 
+  message?: string;
+  completed: boolean; 
+  active: boolean;
+}) {
   return (
-    <div className="flex items-center gap-3">
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+    <div className="flex items-start gap-3">
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
         completed ? 'bg-emerald-500' : active ? 'bg-interactive-600' : 'bg-background-elevated'
       }`}>
         {completed ? (
@@ -421,9 +503,14 @@ function ProgressStep({ label, completed, active }: { label: string; completed: 
           <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
         ) : null}
       </div>
-      <span className={`text-sm ${completed ? 'text-text-primary' : active ? 'text-text-primary' : 'text-text-muted'}`}>
-        {label}
-      </span>
+      <div className="flex-1">
+        <span className={`text-sm font-medium ${completed ? 'text-text-primary' : active ? 'text-text-primary' : 'text-text-muted'}`}>
+          {label}
+        </span>
+        {active && message && (
+          <p className="text-xs text-text-tertiary mt-0.5 animate-pulse">{message}</p>
+        )}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useFriendsList } from '@aurastream/api-client/src/hooks/useFriends';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorRecovery } from '@/components/ErrorRecovery';
 import { FriendsList } from './FriendsList';
 import { FriendRequests } from './FriendRequests';
 import { UserSearch } from './UserSearch';
@@ -16,7 +18,7 @@ type Tab = 'friends' | 'requests' | 'search';
 
 export function FriendsPanel({ isOpen, onClose, onOpenChat }: FriendsPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('friends');
-  const { data, isLoading, refetch } = useFriendsList();
+  const { data, isLoading, error, refetch } = useFriendsList();
 
   useEffect(() => {
     if (isOpen) refetch();
@@ -36,8 +38,8 @@ export function FriendsPanel({ isOpen, onClose, onOpenChat }: FriendsPanelProps)
   const onlineCount = friends.filter(f => f.isOnline).length;
 
   const tabs = [
-    { id: 'friends' as Tab, label: 'Friends', count: friends.length },
-    { id: 'requests' as Tab, label: 'Requests', count: pendingRequests.length, hasNotification: pendingRequests.length > 0 },
+    { id: 'friends' as Tab, label: 'Friends', count: isLoading ? undefined : friends.length },
+    { id: 'requests' as Tab, label: 'Requests', count: isLoading ? undefined : pendingRequests.length, hasNotification: pendingRequests.length > 0 },
     { id: 'search' as Tab, label: 'Add' },
   ];
 
@@ -102,20 +104,24 @@ export function FriendsPanel({ isOpen, onClose, onOpenChat }: FriendsPanelProps)
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-48">
-              <div className="w-5 h-5 border-2 border-interactive-600/30 border-t-interactive-400 rounded-full animate-spin" />
+          {error ? (
+            <div className="p-4">
+              <ErrorRecovery
+                error={error}
+                onRetry={() => { refetch(); }}
+                variant="card"
+              />
             </div>
           ) : (
-            <>
+            <AsyncErrorBoundary resourceName="friends content" onRefetch={() => { refetch(); }}>
               {activeTab === 'friends' && (
-                <FriendsList friends={friends} onOpenChat={onOpenChat} />
+                <FriendsList friends={friends} isLoading={isLoading} onOpenChat={onOpenChat} />
               )}
               {activeTab === 'requests' && (
-                <FriendRequests pendingRequests={pendingRequests} sentRequests={sentRequests} />
+                <FriendRequests pendingRequests={pendingRequests} sentRequests={sentRequests} isLoading={isLoading} />
               )}
               {activeTab === 'search' && <UserSearch />}
-            </>
+            </AsyncErrorBoundary>
           )}
         </div>
       </div>

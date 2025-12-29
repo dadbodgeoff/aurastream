@@ -39,11 +39,24 @@ import {
   calculateCompletionStatus,
 } from './types';
 import { DEFAULT_IDENTITY } from './constants';
+import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorRecovery } from '@/components/ErrorRecovery';
+import { BrandKitCardSkeleton } from '@/components/ui/skeletons';
 
 interface BrandKitSuiteProps {
   brandKitId?: string;
 }
 
+/**
+ * Brand Kit Suite with Enterprise UX Patterns
+ * 
+ * Features:
+ * - AsyncErrorBoundary for error handling
+ * - Loading skeletons during data fetch
+ * - showSuccessToast/showErrorToast for user feedback
+ * - Proper error recovery with retry options
+ */
 export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,7 +67,7 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
   const [activePanel, setActivePanel] = useState<PanelId>(initialPanel);
 
   // API hooks
-  const { data: brandKit, isLoading } = useBrandKit(brandKitId || '');
+  const { data: brandKit, isLoading, error: loadError, refetch } = useBrandKit(brandKitId || '');
   const createMutation = useCreateBrandKit();
   const updateMutation = useUpdateBrandKit();
 
@@ -120,7 +133,7 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     window.history.replaceState({}, '', url.toString());
   }, []);
 
-  // Save handlers
+  // Save handlers with enterprise toast feedback
   const handleSaveIdentity = async () => {
     try {
       if (isNew) {
@@ -142,11 +155,28 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
               file: pendingLogoFile,
             });
           } catch (logoErr) {
-            console.error('Failed to upload logo:', logoErr);
-            // Continue anyway - brand kit was created
+            // Show warning but don't fail - brand kit was created
+            showErrorToast({ code: 'BRAND_KIT_UPLOAD_FAILED' }, {
+              onRetry: () => {
+                if (result.id) {
+                  uploadLogoMutation.mutate({
+                    brandKitId: result.id,
+                    logoType: 'primary',
+                    file: pendingLogoFile!,
+                  });
+                }
+              },
+            });
           }
           setPendingLogoFile(null);
         }
+        
+        // Show success toast with action
+        showSuccessToast('Brand kit created!', {
+          description: `"${result.name}" is ready to use`,
+          actionLabel: 'View Brand Kit',
+          onAction: () => router.push(`/dashboard/brand-kits?id=${result.id}&panel=overview`),
+        });
         
         // Redirect to edit mode with the new ID
         router.push(`/dashboard/brand-kits?id=${result.id}&panel=overview`);
@@ -162,9 +192,16 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
             style_reference: identity.styleReference,
           },
         });
+        
+        showSuccessToast('Brand kit updated!', {
+          description: 'Your changes have been saved',
+        });
       }
     } catch (err) {
-      console.error('Failed to save identity:', err);
+      showErrorToast(err, {
+        onRetry: handleSaveIdentity,
+        onNavigate: (path) => router.push(path),
+      });
     }
   };
 
@@ -172,8 +209,13 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     if (!brandKitId) return;
     try {
       await updateColorsMutation.mutateAsync({ brandKitId, colors });
+      showSuccessToast('Colors saved!', {
+        description: 'Your color palette has been updated',
+      });
     } catch (err) {
-      console.error('Failed to save colors:', err);
+      showErrorToast(err, {
+        onRetry: handleSaveColors,
+      });
     }
   };
 
@@ -181,8 +223,13 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     if (!brandKitId) return;
     try {
       await updateTypographyMutation.mutateAsync({ brandKitId, typography });
+      showSuccessToast('Typography saved!', {
+        description: 'Your font settings have been updated',
+      });
     } catch (err) {
-      console.error('Failed to save typography:', err);
+      showErrorToast(err, {
+        onRetry: handleSaveTypography,
+      });
     }
   };
 
@@ -190,8 +237,13 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     if (!brandKitId) return;
     try {
       await updateVoiceMutation.mutateAsync({ brandKitId, voice });
+      showSuccessToast('Brand voice saved!', {
+        description: 'Your tone and messaging settings have been updated',
+      });
     } catch (err) {
-      console.error('Failed to save voice:', err);
+      showErrorToast(err, {
+        onRetry: handleSaveVoice,
+      });
     }
   };
 
@@ -199,8 +251,13 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     if (!brandKitId) return;
     try {
       await updateGuidelinesMutation.mutateAsync({ brandKitId, guidelines });
+      showSuccessToast('Guidelines saved!', {
+        description: 'Your brand guidelines have been updated',
+      });
     } catch (err) {
-      console.error('Failed to save guidelines:', err);
+      showErrorToast(err, {
+        onRetry: handleSaveGuidelines,
+      });
     }
   };
 
@@ -219,115 +276,152 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
 
   const completionStatus = calculateCompletionStatus(state);
 
+  // Loading state with skeleton
   if (isLoading && brandKitId) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
-          <p className="text-text-secondary">Loading brand kit...</p>
+      <div className="flex h-[calc(100vh-4rem)] -m-8">
+        {/* Side Navigation Skeleton */}
+        <div className="w-64 border-r border-border-subtle bg-background-surface/50 p-4 space-y-4">
+          <div className="h-8 w-32 bg-background-surface/60 rounded-lg animate-pulse" />
+          <div className="space-y-2">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div key={i} className="h-10 bg-background-surface/60 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        </div>
+        
+        {/* Main Content Skeleton */}
+        <div className="flex-1 overflow-auto p-8">
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="h-8 w-48 bg-background-surface/60 rounded-lg animate-pulse" />
+            <div className="h-4 w-96 bg-background-surface/60 rounded-lg animate-pulse" />
+            <BrandKitCardSkeleton count={2} />
+          </div>
         </div>
       </div>
     );
   }
 
+  // Error state with recovery
+  if (loadError && brandKitId) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <ErrorRecovery
+          error={loadError}
+          onRetry={() => refetch()}
+          variant="card"
+          customActions={[
+            {
+              label: 'Back to Brand Kits',
+              onClick: () => router.push('/dashboard/brand-kits'),
+              variant: 'secondary',
+            },
+          ]}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] -m-8">
-      {/* Side Navigation */}
-      <BrandKitNav
-        activePanel={activePanel}
-        onNavigate={handleNavigate}
-        completionStatus={completionStatus}
-        brandKitName={identity.name}
-        isNew={isNew}
-      />
+    <AsyncErrorBoundary resourceName="Brand Kit Editor" onRefetch={() => refetch()}>
+      <div className="flex h-[calc(100vh-4rem)] -m-8">
+        {/* Side Navigation */}
+        <BrandKitNav
+          activePanel={activePanel}
+          onNavigate={handleNavigate}
+          completionStatus={completionStatus}
+          brandKitName={identity.name}
+          isNew={isNew}
+        />
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-4xl mx-auto p-8">
-          {/* Panel Content */}
-          {activePanel === 'overview' && (
-            <OverviewPanel
-              identity={identity}
-              completionStatus={completionStatus}
-              onNavigate={handleNavigate}
-              isNew={isNew}
-              isActive={brandKit?.is_active || false}
-              currentBrandKitId={brandKitId}
-            />
-          )}
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto">
+          <div className="max-w-4xl mx-auto p-8">
+            {/* Panel Content */}
+            {activePanel === 'overview' && (
+              <OverviewPanel
+                identity={identity}
+                completionStatus={completionStatus}
+                onNavigate={handleNavigate}
+                isNew={isNew}
+                isActive={brandKit?.is_active || false}
+                currentBrandKitId={brandKitId}
+              />
+            )}
 
-          {activePanel === 'identity' && (
-            <IdentityPanel
-              brandKitId={brandKitId || null}
-              isNew={isNew}
-              onNavigate={handleNavigate}
-              identity={identity}
-              onChange={setIdentity}
-              onSave={handleSaveIdentity}
-              isSaving={createMutation.isPending || updateMutation.isPending || uploadLogoMutation.isPending}
-              pendingLogoFile={pendingLogoFile}
-              onPendingLogoChange={setPendingLogoFile}
-            />
-          )}
+            {activePanel === 'identity' && (
+              <IdentityPanel
+                brandKitId={brandKitId || null}
+                isNew={isNew}
+                onNavigate={handleNavigate}
+                identity={identity}
+                onChange={setIdentity}
+                onSave={handleSaveIdentity}
+                isSaving={createMutation.isPending || updateMutation.isPending || uploadLogoMutation.isPending}
+                pendingLogoFile={pendingLogoFile}
+                onPendingLogoChange={setPendingLogoFile}
+              />
+            )}
 
-          {activePanel === 'logos' && (
-            <LogosPanel
-              brandKitId={brandKitId || null}
-              isNew={isNew}
-              onNavigate={handleNavigate}
-              logos={{ primary: null, secondary: null, icon: null, monochrome: null, watermark: null }}
-            />
-          )}
+            {activePanel === 'logos' && (
+              <LogosPanel
+                brandKitId={brandKitId || null}
+                isNew={isNew}
+                onNavigate={handleNavigate}
+                logos={{ primary: null, secondary: null, icon: null, monochrome: null, watermark: null }}
+              />
+            )}
 
-          {activePanel === 'colors' && (
-            <ColorsPanel
-              brandKitId={brandKitId || null}
-              isNew={isNew}
-              onNavigate={handleNavigate}
-              colors={colors}
-              onChange={setColors}
-              onSave={handleSaveColors}
-              isSaving={updateColorsMutation.isPending}
-            />
-          )}
+            {activePanel === 'colors' && (
+              <ColorsPanel
+                brandKitId={brandKitId || null}
+                isNew={isNew}
+                onNavigate={handleNavigate}
+                colors={colors}
+                onChange={setColors}
+                onSave={handleSaveColors}
+                isSaving={updateColorsMutation.isPending}
+              />
+            )}
 
-          {activePanel === 'typography' && (
-            <TypographyPanel
-              brandKitId={brandKitId || null}
-              isNew={isNew}
-              onNavigate={handleNavigate}
-              typography={typography}
-              onChange={setTypography}
-              onSave={handleSaveTypography}
-              isSaving={updateTypographyMutation.isPending}
-            />
-          )}
+            {activePanel === 'typography' && (
+              <TypographyPanel
+                brandKitId={brandKitId || null}
+                isNew={isNew}
+                onNavigate={handleNavigate}
+                typography={typography}
+                onChange={setTypography}
+                onSave={handleSaveTypography}
+                isSaving={updateTypographyMutation.isPending}
+              />
+            )}
 
-          {activePanel === 'voice' && (
-            <VoicePanel
-              brandKitId={brandKitId || null}
-              isNew={isNew}
-              onNavigate={handleNavigate}
-              voice={voice}
-              onChange={setVoice}
-              onSave={handleSaveVoice}
-              isSaving={updateVoiceMutation.isPending}
-            />
-          )}
+            {activePanel === 'voice' && (
+              <VoicePanel
+                brandKitId={brandKitId || null}
+                isNew={isNew}
+                onNavigate={handleNavigate}
+                voice={voice}
+                onChange={setVoice}
+                onSave={handleSaveVoice}
+                isSaving={updateVoiceMutation.isPending}
+              />
+            )}
 
-          {activePanel === 'guidelines' && (
-            <GuidelinesPanel
-              brandKitId={brandKitId || null}
-              isNew={isNew}
-              onNavigate={handleNavigate}
-              guidelines={guidelines}
-              onChange={setGuidelines}
-              onSave={handleSaveGuidelines}
-              isSaving={updateGuidelinesMutation.isPending}
-            />
-          )}
+            {activePanel === 'guidelines' && (
+              <GuidelinesPanel
+                brandKitId={brandKitId || null}
+                isNew={isNew}
+                onNavigate={handleNavigate}
+                guidelines={guidelines}
+                onChange={setGuidelines}
+                onSave={handleSaveGuidelines}
+                isSaving={updateGuidelinesMutation.isPending}
+              />
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </AsyncErrorBoundary>
   );
 }

@@ -2,6 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useMessageHistory, useSendMessage, useMarkAsRead, useLoadOlderMessages } from '@aurastream/api-client/src/hooks/useMessages';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
+import { useErrorRecovery } from '@/components/ErrorRecovery';
 
 interface ChatWindowProps {
   userId: string;
@@ -16,11 +19,14 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [failedMessages, setFailedMessages] = useState<Map<string, string>>(new Map());
+  const [pendingMessages, setPendingMessages] = useState<Set<string>>(new Set());
 
-  const { data, isLoading } = useMessageHistory(userId);
+  const { data, isLoading, error: historyError, refetch } = useMessageHistory(userId);
   const sendMessage = useSendMessage();
   const markAsRead = useMarkAsRead();
   const loadOlder = useLoadOlderMessages();
+  const { executeWithRetry } = useErrorRecovery({ showToast: false });
 
   const messages = data?.messages ?? [];
   const hasMore = data?.hasMore ?? false;
@@ -53,9 +59,61 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
   const handleSend = async () => {
     if (!message.trim() || sendMessage.isPending) return;
     const content = message.trim();
+    const tempId = `temp-${Date.now()}`;
+    
     setMessage('');
     setIsAtBottom(true);
-    await sendMessage.mutateAsync({ userId, content });
+    setPendingMessages(prev => new Set(prev).add(tempId));
+    
+    try {
+      await executeWithRetry(async () => {
+        await sendMessage.mutateAsync({ userId, content });
+      });
+      setPendingMessages(prev => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+    } catch (error) {
+      setPendingMessages(prev => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      setFailedMessages(prev => new Map(prev).set(tempId, content));
+      showErrorToast(error, {
+        onRetry: () => handleRetryMessage(tempId, content),
+      });
+    }
+  };
+
+  const handleRetryMessage = async (tempId: string, content: string) => {
+    setFailedMessages(prev => {
+      const next = new Map(prev);
+      next.delete(tempId);
+      return next;
+    });
+    setPendingMessages(prev => new Set(prev).add(tempId));
+    
+    try {
+      await executeWithRetry(async () => {
+        await sendMessage.mutateAsync({ userId, content });
+      });
+      setPendingMessages(prev => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      showSuccessToast('Message sent');
+    } catch (error) {
+      setPendingMessages(prev => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      setFailedMessages(prev => new Map(prev).set(tempId, content));
+      showErrorToast(error);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -103,8 +161,26 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
           className="flex-1 overflow-y-auto px-4 py-3 space-y-2"
         >
           {isLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="w-5 h-5 border-2 border-interactive-600/30 border-t-interactive-400 rounded-full animate-spin" />
+            <div className="space-y-3 py-4">
+              <MessageSkeleton isUser={false} />
+              <MessageSkeleton isUser={true} />
+              <MessageSkeleton isUser={false} />
+              <MessageSkeleton isUser={true} />
+            </div>
+          ) : historyError ? (
+            <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <p className="text-xs text-text-secondary mb-2">Failed to load messages</p>
+              <button
+                onClick={() => refetch()}
+                className="text-[10px] text-interactive-400 hover:text-interactive-300 underline"
+              >
+                Try again
+              </button>
             </div>
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
@@ -131,12 +207,36 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
                     }`}
                   >
                     <p className="text-xs whitespace-pre-wrap break-words">{msg.content}</p>
-                    <p className="text-[9px] text-text-tertiary mt-1 text-right">
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                      <p className="text-[9px] text-text-tertiary">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      {msg.senderId === currentUserId && (
+                        <MessageStatus status={msg.readAt ? 'read' : 'delivered'} />
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
+              
+              {/* Failed messages with retry */}
+              {Array.from(failedMessages.entries()).map(([tempId, content]) => (
+                <div key={tempId} className="flex justify-end">
+                  <div className="max-w-[75%] px-3 py-2 rounded-2xl bg-red-500/20 text-text-primary rounded-br-md border border-red-500/30">
+                    <p className="text-xs whitespace-pre-wrap break-words">{content}</p>
+                    <div className="flex items-center justify-end gap-2 mt-1">
+                      <span className="text-[9px] text-red-400">Failed to send</span>
+                      <button
+                        onClick={() => handleRetryMessage(tempId, content)}
+                        className="text-[9px] text-red-400 hover:text-red-300 underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
               <div ref={messagesEndRef} />
             </>
           )}
@@ -172,4 +272,52 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
       </div>
     </div>
   );
+}
+
+/**
+ * Message skeleton for loading state.
+ */
+function MessageSkeleton({ isUser }: { isUser: boolean }): JSX.Element {
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[75%] space-y-1.5 ${isUser ? 'items-end' : 'items-start'}`}>
+        <Skeleton 
+          className={`h-12 ${isUser ? 'w-40' : 'w-48'}`} 
+          rounded="xl" 
+          aria-label="" 
+        />
+        <Skeleton className="h-2 w-12" aria-label="" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Message delivery status indicator.
+ */
+function MessageStatus({ status }: { status: 'sending' | 'delivered' | 'read' | 'failed' }): JSX.Element {
+  switch (status) {
+    case 'sending':
+      return (
+        <div className="w-3 h-3 border border-text-tertiary/50 border-t-text-tertiary rounded-full animate-spin" />
+      );
+    case 'delivered':
+      return (
+        <svg className="w-3 h-3 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      );
+    case 'read':
+      return (
+        <svg className="w-3 h-3 text-interactive-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+      );
+    case 'failed':
+      return (
+        <svg className="w-3 h-3 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      );
+  }
 }

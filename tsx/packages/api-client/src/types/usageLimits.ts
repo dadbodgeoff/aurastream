@@ -128,3 +128,25 @@ export const FEATURE_CONFIG = {
 } as const;
 
 export type FeatureType = keyof typeof FEATURE_CONFIG;
+
+/**
+ * API Rate Limits (requests per minute)
+ */
+export const API_RATE_LIMITS = {
+  anonymous: 30,
+  free: 60,
+  pro: 120,
+  studio: 300,
+} as const;
+
+/**
+ * API rate limit status from response headers
+ */
+export interface ApiRateLimitStatus {
+  /** Maximum requests allowed per window */
+  limit: number;
+  /** Remaining requests in current window */
+  remaining: number;
+  /** Seconds until window resets */
+  reset: number;
+}

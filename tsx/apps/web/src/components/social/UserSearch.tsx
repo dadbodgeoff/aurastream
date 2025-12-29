@@ -3,20 +3,35 @@
 import { useState, useCallback } from 'react';
 import { useUserSearch, useSendFriendRequest } from '@aurastream/api-client/src/hooks/useFriends';
 import { useDebouncedValue } from '@aurastream/shared/src/hooks/useDebouncedValue';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
+import { ErrorRecovery } from '@/components/ErrorRecovery';
 
 export function UserSearch() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 300);
-  const { data, isLoading } = useUserSearch(debouncedQuery, debouncedQuery.length >= 2);
+  const { data, isLoading, error, refetch } = useUserSearch(debouncedQuery, debouncedQuery.length >= 2);
   const sendRequest = useSendFriendRequest();
   const [sentTo, setSentTo] = useState<Set<string>>(new Set());
+  const [sendingTo, setSendingTo] = useState<Set<string>>(new Set());
 
-  const handleSendRequest = useCallback(async (userId: string) => {
+  const handleSendRequest = useCallback(async (userId: string, displayName: string | null) => {
+    setSendingTo(prev => new Set(prev).add(userId));
+    
     try {
       await sendRequest.mutateAsync(userId);
       setSentTo(prev => new Set(prev).add(userId));
+      showSuccessToast(`Friend request sent to ${displayName || 'user'}!`);
     } catch (error) {
-      // Error handled by mutation
+      showErrorToast(error, {
+        onRetry: () => handleSendRequest(userId, displayName),
+      });
+    } finally {
+      setSendingTo(prev => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
     }
   }, [sendRequest]);
 
@@ -49,11 +64,25 @@ export function UserSearch() {
           <p className="text-xs text-text-tertiary">Type at least 2 characters to search</p>
         </div>
       ) : isLoading ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-5 h-5 border-2 border-interactive-600/30 border-t-interactive-400 rounded-full animate-spin" />
+        <div className="space-y-1">
+          <UserSearchSkeleton />
+          <UserSearchSkeleton />
+          <UserSearchSkeleton />
         </div>
+      ) : error ? (
+        <ErrorRecovery
+          error={error}
+          onRetry={() => { refetch(); }}
+          variant="card"
+          className="mx-2"
+        />
       ) : users.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-40 text-center">
+          <div className="w-10 h-10 rounded-full bg-interactive-600/10 flex items-center justify-center mb-3">
+            <svg className="w-5 h-5 text-interactive-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <p className="text-xs text-text-secondary mb-1">No users found</p>
           <p className="text-[10px] text-text-tertiary">Try a different search term</p>
         </div>
@@ -61,6 +90,7 @@ export function UserSearch() {
         <div className="space-y-1">
           {users.map((user) => {
             const isSent = sentTo.has(user.id);
+            const isSending = sendingTo.has(user.id);
             const isPending = user.relationshipStatus === 'pending';
             const isFriend = user.relationshipStatus === 'accepted';
 
@@ -102,11 +132,15 @@ export function UserSearch() {
                   </span>
                 ) : (
                   <button
-                    onClick={() => handleSendRequest(user.id)}
-                    disabled={sendRequest.isPending}
-                    className="px-2.5 py-1 text-[10px] font-medium text-interactive-300 bg-interactive-600/20 hover:bg-interactive-600/30 rounded-md transition-colors disabled:opacity-50"
+                    onClick={() => handleSendRequest(user.id, user.displayName)}
+                    disabled={isSending}
+                    className="px-2.5 py-1 text-[10px] font-medium text-interactive-300 bg-interactive-600/20 hover:bg-interactive-600/30 rounded-md transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
                   >
-                    Add Friend
+                    {isSending ? (
+                      <div className="w-3 h-3 border-2 border-interactive-300/30 border-t-interactive-300 rounded-full animate-spin" />
+                    ) : (
+                      'Add Friend'
+                    )}
                   </button>
                 )}
               </div>
@@ -114,6 +148,21 @@ export function UserSearch() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Skeleton for user search results.
+ */
+function UserSearchSkeleton(): JSX.Element {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg">
+      <Skeleton width={36} height={36} rounded="full" aria-label="" />
+      <div className="flex-1">
+        <Skeleton className="h-3 w-24" aria-label="" />
+      </div>
+      <Skeleton className="h-6 w-16" rounded="md" aria-label="" />
     </div>
   );
 }

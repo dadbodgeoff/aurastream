@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { X } from 'lucide-react';
 
-import { analytics } from '@aurastream/shared';
 import { useAnalyzeImage, useVibeBrandingUsage } from '@aurastream/api-client';
 import { ResponsiveModal } from '@/components/ui/ResponsiveModal';
 import { UploadDropzone } from './UploadDropzone';
@@ -34,13 +33,6 @@ export function VibeBrandingModal({
   const { data: usage } = useVibeBrandingUsage();
   const analyzeMutation = useAnalyzeImage();
   
-  // Track when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      analytics.track('vibe_branding_started', {}, 'feature');
-    }
-  }, [isOpen]);
-  
   const handleDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (!file) return;
@@ -65,18 +57,6 @@ export function VibeBrandingModal({
       setBrandKitId(result.brandKitId);
       setStep('success');
       
-      // Track successful analysis
-      analytics.track('vibe_branding_completed', {
-        confidence: result.analysis.confidence,
-      }, 'feature');
-      
-      // Track brand kit creation if one was created
-      if (result.brandKitId) {
-        analytics.track('vibe_branding_kit_created', {
-          brandKitId: result.brandKitId,
-        }, 'feature');
-      }
-      
       // Celebration!
       confetti({
         particleCount: 100,
@@ -91,11 +71,6 @@ export function VibeBrandingModal({
       const errorMessage = err instanceof Error ? err.message : 'Analysis failed';
       setError(errorMessage);
       setStep('error');
-      
-      // Track failed analysis
-      analytics.track('vibe_branding_failed', {
-        error: errorMessage,
-      }, 'feature');
     }
   }, [analyzeMutation, onKitCreated]);
   
@@ -128,7 +103,6 @@ export function VibeBrandingModal({
       className="max-w-2xl"
     >
       <div className="space-y-5">
-        {/* Form spacing: space-y-5 (20px) for consistent vertical rhythm */}
         {/* Usage indicator */}
         {usage && step === 'upload' && (
           <div className="px-4 py-2 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 bg-background-elevated/50 border-b border-border-subtle">

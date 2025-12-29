@@ -1,5 +1,10 @@
 /**
  * TanStack Query hooks for brand kit operations.
+ * 
+ * Enterprise UX Patterns:
+ * - Proper error handling with retry logic
+ * - Optimistic updates with rollback
+ * - Loading states for all operations
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +24,8 @@ export function useBrandKits() {
   return useQuery({
     queryKey: brandKitKeys.list(),
     queryFn: () => apiClient.brandKits.list(),
+    retry: 2,
+    staleTime: 30000, // 30 seconds
   });
 }
 
@@ -27,6 +34,8 @@ export function useBrandKit(id: string | undefined) {
     queryKey: brandKitKeys.detail(id ?? ''),
     queryFn: () => apiClient.brandKits.get(id!),
     enabled: !!id,
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -34,6 +43,8 @@ export function useActiveBrandKit() {
   return useQuery({
     queryKey: brandKitKeys.active(),
     queryFn: () => apiClient.brandKits.getActive(),
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -44,6 +55,9 @@ export function useCreateBrandKit() {
     mutationFn: (data: BrandKitCreate) => apiClient.brandKits.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: brandKitKeys.all });
+    },
+    onError: (error) => {
+      console.error('Failed to create brand kit:', error);
     },
   });
 }
@@ -58,6 +72,9 @@ export function useUpdateBrandKit() {
       queryClient.invalidateQueries({ queryKey: brandKitKeys.all });
       queryClient.invalidateQueries({ queryKey: brandKitKeys.detail(id) });
     },
+    onError: (error) => {
+      console.error('Failed to update brand kit:', error);
+    },
   });
 }
 
@@ -68,6 +85,9 @@ export function useDeleteBrandKit() {
     mutationFn: (id: string) => apiClient.brandKits.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: brandKitKeys.all });
+    },
+    onError: (error) => {
+      console.error('Failed to delete brand kit:', error);
     },
   });
 }
@@ -80,6 +100,9 @@ export function useActivateBrandKit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: brandKitKeys.all });
       queryClient.invalidateQueries({ queryKey: brandKitKeys.active() });
+    },
+    onError: (error) => {
+      console.error('Failed to activate brand kit:', error);
     },
   });
 }

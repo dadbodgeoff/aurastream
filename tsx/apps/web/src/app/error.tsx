@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { analytics } from '@aurastream/shared';
 
 export default function Error({
   error,
@@ -10,13 +9,9 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  // Track error in analytics
+  // Log error to console in development
   useEffect(() => {
-    analytics.error(error, {
-      digest: error.digest,
-      context: 'error_boundary',
-      url: typeof window !== 'undefined' ? window.location.href : undefined,
-    });
+    console.error('App error:', error);
   }, [error]);
 
   return (

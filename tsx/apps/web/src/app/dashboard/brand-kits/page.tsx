@@ -13,19 +13,29 @@ import {
   BrandKitCard,
   SearchInput,
   EmptyState,
-  ErrorState,
   ConfirmDialog,
   PlusIcon,
 } from '@/components/dashboard';
 import { BrandKitsEmptyState } from '@/components/empty-states';
 import { BrandKitCardSkeleton } from '@/components/ui/skeletons';
-import { toast } from '@/components/ui/Toast';
+import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
 import { VibeBrandingModal } from '@/components/vibe-branding';
 import { BrandKitSuite } from '@/components/brand-kit';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorRecovery } from '@/components/ErrorRecovery';
 import { Sparkles, ArrowLeft } from 'lucide-react';
 import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
 
+/**
+ * Brand Kits Page with Enterprise UX Patterns
+ * 
+ * Features:
+ * - AsyncErrorBoundary for error handling
+ * - BrandKitCardSkeleton for loading states
+ * - showSuccessToast/showErrorToast for user feedback
+ * - Optimistic updates with rollback
+ */
 export default function BrandKitsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -37,15 +47,25 @@ export default function BrandKitsPage() {
   const isCreating = searchParams.get('new') === 'true';
   const showSuite = editingId || isCreating;
   
-  // Optimistic mutations with toast feedback
+  // Optimistic mutations with enterprise toast feedback
   const activateMutation = useOptimisticBrandKitActivation({
-    onError: () => toast.error('Failed to activate brand kit'),
-    onSuccess: (kit) => toast.success(`${kit.name} is now active`),
+    onError: (err) => showErrorToast(err, {
+      onRetry: () => activateMutation.reset(),
+    }),
+    onSuccess: (kit) => showSuccessToast(`${kit.name} is now active`, {
+      description: 'This brand kit will be used for new asset generations',
+      actionLabel: 'Generate Asset',
+      onAction: () => router.push('/dashboard/create'),
+    }),
   });
   
   const deleteMutation = useOptimisticBrandKitDeletion({
-    onError: () => toast.error('Failed to delete brand kit'),
-    onSuccess: () => toast.success('Brand kit deleted'),
+    onError: (err) => showErrorToast(err, {
+      onRetry: () => deleteMutation.reset(),
+    }),
+    onSuccess: () => showSuccessToast('Brand kit deleted', {
+      description: 'The brand kit has been permanently removed',
+    }),
   });
   
   const [search, setSearch] = useState('');
@@ -77,6 +97,13 @@ export default function BrandKitsPage() {
   }, [deleteConfirm, deleteMutation]);
 
   const handleCreateNew = () => {
+    // Check brand kit limit before navigating
+    if (brandKits.length >= 10) {
+      showErrorToast({ code: 'BRAND_KIT_LIMIT_EXCEEDED' }, {
+        onNavigate: (path) => router.push(path),
+      });
+      return;
+    }
     router.push('/dashboard/brand-kits?new=true');
   };
 
@@ -91,45 +118,62 @@ export default function BrandKitsPage() {
   // Show the full Brand Kit Suite when editing or creating
   if (showSuite) {
     return (
-      <div className="min-h-screen bg-background-base">
-        {/* Back button header */}
-        <div className="border-b border-border-subtle bg-background-surface/50">
-          <div className="max-w-7xl mx-auto px-4 py-3">
-            <button
-              onClick={handleBackToList}
-              className="flex items-center gap-2 text-text-secondary hover:text-text-primary text-sm transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Brand Kits
-            </button>
+      <AsyncErrorBoundary 
+        resourceName="Brand Kit Editor" 
+        onRefetch={() => router.push('/dashboard/brand-kits')}
+      >
+        <div className="min-h-screen bg-background-base">
+          {/* Back button header */}
+          <div className="border-b border-border-subtle bg-background-surface/50">
+            <div className="max-w-7xl mx-auto px-4 py-3">
+              <button
+                onClick={handleBackToList}
+                className="flex items-center gap-2 text-text-secondary hover:text-text-primary text-sm transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Brand Kits
+              </button>
+            </div>
+          </div>
+          
+          {/* Brand Kit Suite */}
+          <div className="p-8">
+            <BrandKitSuite brandKitId={editingId || undefined} />
           </div>
         </div>
-        
-        {/* Brand Kit Suite */}
-        <div className="p-8">
-          <BrandKitSuite brandKitId={editingId || undefined} />
-        </div>
-      </div>
+      </AsyncErrorBoundary>
     );
   }
 
-  // Loading state
+  // Loading state with skeleton
   if (isLoading) {
     return (
       <PageContainer title="Brand Studio">
-        <div className="h-10 w-64 bg-white/5 rounded-lg skeleton-shimmer" />
-        <BrandKitCardSkeleton count={6} />
+        <div className="space-y-6">
+          {/* Search skeleton */}
+          <div className="h-10 w-64 bg-background-surface/60 rounded-lg animate-pulse" />
+          {/* Brand kit cards skeleton */}
+          <BrandKitCardSkeleton count={6} />
+        </div>
       </PageContainer>
     );
   }
 
-  // Error state
+  // Error state with recovery options
   if (error) {
     return (
       <PageContainer title="Brand Studio">
-        <ErrorState
-          message="Failed to load brand kits. Please try again."
-          onRetry={() => refetch()}
+        <ErrorRecovery
+          error={error}
+          onRetry={() => { refetch(); }}
+          variant="card"
+          customActions={[
+            {
+              label: 'Create New Brand Kit',
+              onClick: handleCreateNew,
+              variant: 'secondary',
+            },
+          ]}
         />
       </PageContainer>
     );
@@ -222,7 +266,17 @@ export default function BrandKitsPage() {
         onClose={() => setShowVibeBranding(false)}
         onKitCreated={() => {
           refetch();
-          toast.success('Brand kit created from image!');
+          showSuccessToast('Brand kit created from image!', {
+            description: 'Your brand colors and style have been extracted',
+            actionLabel: 'View Brand Kit',
+            onAction: () => {
+              // Navigate to the newly created brand kit
+              const newKit = data?.brandKits?.[data.brandKits.length - 1];
+              if (newKit?.id) {
+                router.push(`/dashboard/brand-kits?id=${newKit.id}`);
+              }
+            },
+          });
         }}
       />
     </PageContainer>

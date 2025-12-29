@@ -381,7 +381,7 @@ async def generate_from_session(
     )
     
     # Enqueue for processing
-    await enqueue_generation_job(job.id)
+    enqueue_generation_job(job.id, current_user.sub)
     
     # Audit log
     audit_service = get_audit_service()
@@ -442,6 +442,8 @@ async def get_gallery(
     
     items = []
     for row in result.data:
+        # Handle None generation_params safely
+        gen_params = row.get("generation_params") or {}
         items.append(GalleryItemResponse(
             id=row["id"],
             creation_type=row["asset_type"],
@@ -449,7 +451,7 @@ async def get_gallery(
             thumbnail_url=row.get("thumbnail_url"),
             width=row.get("width", 512),
             height=row.get("height", 512),
-            style_preset=row.get("generation_params", {}).get("style_preset"),
+            style_preset=gen_params.get("style_preset") if isinstance(gen_params, dict) else None,
             prompt_used=row.get("prompt_used"),
             created_at=row["created_at"],
         ))

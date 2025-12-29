@@ -25,6 +25,7 @@ import {
 } from '@/components/dashboard';
 import { AssetsEmptyState } from '@/components/empty-states';
 import { AssetGridSkeleton } from '@/components/ui/skeletons';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
 import { toast } from '@/components/ui/Toast';
 import { downloadAsset, getAssetFilename } from '@/utils/download';
 import type { ViewMode } from '@/components/dashboard';
@@ -51,6 +52,17 @@ const ASSET_TYPE_OPTIONS = [
 // =============================================================================
 
 export default function AssetsPage() {
+  return (
+    <AsyncErrorBoundary 
+      resourceName="assets"
+      onRefetch={() => window.location.reload()}
+    >
+      <AssetsPageContent />
+    </AsyncErrorBoundary>
+  );
+}
+
+function AssetsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const jobIdParam = searchParams.get('job');

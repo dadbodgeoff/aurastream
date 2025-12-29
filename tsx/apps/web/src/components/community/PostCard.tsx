@@ -13,6 +13,7 @@ export interface PostCardProps {
   tags: string[];
   isFeatured: boolean;
   isLiked: boolean;
+  isLiking?: boolean;
   onClick?: () => void;
   onLike?: () => void;
   onAuthorClick?: () => void;
@@ -46,6 +47,7 @@ export function PostCard({
   tags,
   isFeatured,
   isLiked,
+  isLiking,
   onClick,
   onLike,
   onAuthorClick,
@@ -124,10 +126,13 @@ export function PostCard({
         <div className="flex items-center gap-4 pt-3 border-t border-border-subtle">
           <button
             onClick={(e) => { e.stopPropagation(); onLike?.(); }}
+            disabled={isLiking}
             className={cn(
-              'flex items-center gap-1.5 text-sm transition-colors',
-              isLiked ? 'text-rose-500' : 'text-text-muted hover:text-rose-500'
+              'flex items-center gap-1.5 text-sm transition-all',
+              isLiked ? 'text-rose-500' : 'text-text-muted hover:text-rose-500',
+              isLiking && 'opacity-50 cursor-not-allowed'
             )}
+            aria-label={isLiked ? 'Unlike post' : 'Like post'}
           >
             <HeartIcon filled={isLiked} />
             <span>{likeCount}</span>

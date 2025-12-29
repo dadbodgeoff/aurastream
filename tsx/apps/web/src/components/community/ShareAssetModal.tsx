@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
+import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
 
 export interface ShareAssetModalProps {
   isOpen: boolean;
@@ -18,8 +19,9 @@ export interface ShareAssetModalProps {
     description?: string;
     tags: string[];
     showPrompt: boolean;
-  }) => void;
+  }) => Promise<void> | void;
   isSubmitting?: boolean;
+  onViewPost?: (postId: string) => void;
 }
 
 function CloseIcon() {
@@ -67,12 +69,14 @@ export function ShareAssetModal({
   asset,
   onSubmit,
   isSubmitting = false,
+  onViewPost,
 }: ShareAssetModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [showPrompt, setShowPrompt] = useState(false);
   const [errors, setErrors] = useState<{ title?: string }>({});
+  const [validationState, setValidationState] = useState<{ title?: 'valid' | 'invalid' | null }>({});
 
   // Reset form when modal opens with new asset
   useEffect(() => {
@@ -82,6 +86,7 @@ export function ShareAssetModal({
       setTagsInput('');
       setShowPrompt(false);
       setErrors({});
+      setValidationState({});
     }
   }, [isOpen, asset?.id]);
 
@@ -102,32 +107,76 @@ export function ShareAssetModal({
     }
   }, [isSubmitting, onClose]);
 
-  const validate = (): boolean => {
-    const newErrors: { title?: string } = {};
-    
-    if (!title.trim()) {
-      newErrors.title = 'Title is required';
-    } else if (title.length > 100) {
-      newErrors.title = 'Title must be 100 characters or less';
+  // Inline validation with debounce
+  const validateTitle = useCallback((value: string) => {
+    if (!value.trim()) {
+      setErrors({ title: 'Title is required' });
+      setValidationState({ title: 'invalid' });
+      return false;
+    } else if (value.length > 100) {
+      setErrors({ title: 'Title must be 100 characters or less' });
+      setValidationState({ title: 'invalid' });
+      return false;
+    } else if (value.trim().length >= 3) {
+      setErrors({});
+      setValidationState({ title: 'valid' });
+      return true;
     }
+    setErrors({});
+    setValidationState({ title: null });
+    return true;
+  }, []);
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // Debounced title validation
+  useEffect(() => {
+    if (!title) {
+      setValidationState({ title: null });
+      return;
+    }
+    const timer = setTimeout(() => {
+      validateTitle(title);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [title, validateTitle]);
+
+  const validate = (): boolean => {
+    return validateTitle(title);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!asset || isSubmitting) return;
 
     if (!validate()) return;
 
-    onSubmit({
-      assetId: asset.id,
-      title: title.trim(),
-      description: description.trim() || undefined,
-      tags: parseTags(tagsInput),
-      showPrompt,
-    });
+    try {
+      await onSubmit({
+        assetId: asset.id,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        tags: parseTags(tagsInput),
+        showPrompt,
+      });
+      
+      // Show success toast with "View Post" action
+      showSuccessToast('Shared to community!', {
+        description: 'Your asset is now visible to the community.',
+        actionLabel: onViewPost ? 'View Post' : undefined,
+        onAction: onViewPost ? () => onViewPost(asset.id) : undefined,
+      });
+      
+      onClose();
+    } catch (error: any) {
+      // Handle specific community errors
+      if (error?.code === 'COMMUNITY_USER_BANNED') {
+        showErrorToast({ code: 'COMMUNITY_USER_BANNED' });
+        onClose();
+      } else {
+        showErrorToast(error, {
+          onRetry: () => handleSubmit(e),
+        });
+      }
+    }
   };
 
   if (!isOpen || !asset) return null;
@@ -162,29 +211,50 @@ export function ShareAssetModal({
           </div>
           <p className="text-center text-sm text-text-muted capitalize">{asset.assetType.replace('_', ' ')}</p>
 
-          {/* Title Input */}
+          {/* Title Input with inline validation */}
           <div className="space-y-1.5">
             <label htmlFor="share-title" className="block text-sm font-medium text-text-primary">
               Title <span className="text-red-500">*</span>
             </label>
-            <input
-              id="share-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={100}
-              placeholder="Give your asset a title"
-              disabled={isSubmitting}
-              className={cn(
-                'w-full px-3 py-2 rounded-lg border bg-background-surface text-text-primary placeholder:text-text-muted',
-                'focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:border-transparent',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                errors.title ? 'border-red-500' : 'border-border-subtle'
+            <div className="relative">
+              <input
+                id="share-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={100}
+                placeholder="Give your asset a title"
+                disabled={isSubmitting}
+                className={cn(
+                  'w-full px-3 py-2 pr-10 rounded-lg border bg-background-surface text-text-primary placeholder:text-text-muted',
+                  'focus:outline-none focus:ring-2 focus:ring-interactive-500 focus:border-transparent',
+                  'disabled:opacity-50 disabled:cursor-not-allowed',
+                  errors.title ? 'border-red-500' : validationState.title === 'valid' ? 'border-green-500' : 'border-border-subtle'
+                )}
+              />
+              {/* Validation indicator */}
+              {validationState.title === 'valid' && (
+                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-500">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
               )}
-            />
+              {validationState.title === 'invalid' && (
+                <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="15" y1="9" x2="9" y2="15" />
+                    <line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                </div>
+              )}
+            </div>
             <div className="flex justify-between text-xs">
               {errors.title ? (
                 <span className="text-red-500">{errors.title}</span>
+              ) : validationState.title === 'valid' ? (
+                <span className="text-green-500">✓ Looks good!</span>
               ) : (
                 <span className="text-text-muted">&nbsp;</span>
               )}

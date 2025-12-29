@@ -5,6 +5,11 @@
  * select their context (brand kit, asset type, mood, game, description)
  * before starting a coaching session.
  * 
+ * Enterprise UX Features:
+ * - Loading skeletons during data fetch
+ * - Tier-specific upgrade CTAs
+ * - Clear error states with recovery actions
+ * 
  * @module CoachContextForm
  */
 
@@ -20,6 +25,7 @@ import {
   MAX_CUSTOM_MOOD_LENGTH,
 } from '../../hooks/useCoachContext';
 import { useCoachAccess } from '../../hooks/useCoachAccess';
+import { Skeleton, SkeletonText } from '../ui/Skeleton';
 import type { 
   StartCoachRequest, 
   AssetType, 
@@ -113,6 +119,74 @@ const GiftIcon = () => (
   </svg>
 );
 
+const LockIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+  </svg>
+);
+
+// ============================================================================
+// Loading Skeleton Component
+// ============================================================================
+
+/**
+ * Loading skeleton for the coach context form.
+ */
+function CoachContextFormSkeleton() {
+  return (
+    <div className="max-w-4xl mx-auto" role="status" aria-label="Loading coach form...">
+      {/* Header skeleton */}
+      <div className="mb-8">
+        <Skeleton className="h-8 w-48 mb-2" />
+        <Skeleton className="h-4 w-96" />
+      </div>
+
+      {/* Step 1: Brand Kit skeleton */}
+      <section className="mb-8">
+        <Skeleton className="h-6 w-40 mb-4" />
+        <Skeleton className="h-11 w-full rounded-lg" />
+      </section>
+
+      {/* Step 2: Asset Type skeleton */}
+      <section className="mb-8">
+        <Skeleton className="h-6 w-36 mb-4" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
+        </div>
+      </section>
+
+      {/* Step 3: Mood skeleton */}
+      <section className="mb-8">
+        <Skeleton className="h-6 w-28 mb-4" />
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-24 rounded-lg" />
+          ))}
+        </div>
+      </section>
+
+      {/* Step 4: Game skeleton */}
+      <section className="mb-8">
+        <Skeleton className="h-6 w-20 mb-4" />
+        <Skeleton className="h-10 w-full rounded-lg" />
+      </section>
+
+      {/* Step 5: Description skeleton */}
+      <section className="mb-8">
+        <Skeleton className="h-6 w-44 mb-4" />
+        <Skeleton className="h-32 w-full rounded-lg" />
+      </section>
+
+      {/* Button skeleton */}
+      <div className="flex justify-end">
+        <Skeleton className="h-12 w-36 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // Trial Banner Component
 // ============================================================================
@@ -168,6 +242,77 @@ function TrialBanner({ trialAvailable, trialUsed, upgradeMessage }: TrialBannerP
   }
 
   return null;
+}
+
+// ============================================================================
+// Tier Required Banner Component
+// ============================================================================
+
+interface TierRequiredBannerProps {
+  upgradeMessage?: string;
+}
+
+/**
+ * Banner shown when user doesn't have access to Prompt Coach.
+ * Provides clear upgrade CTA with tier-specific messaging.
+ */
+function TierRequiredBanner({ upgradeMessage }: TierRequiredBannerProps) {
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-text-primary">Prompt Coach</h1>
+        <p className="mt-1 text-text-secondary">
+          AI-powered prompt refinement for stunning assets.
+        </p>
+      </div>
+      
+      <div className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-xl">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 flex-shrink-0">
+            <LockIcon />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-semibold text-text-primary mb-2">
+              Studio Tier Required
+            </h3>
+            <p className="text-text-secondary mb-4">
+              {upgradeMessage || "The Prompt Coach is available for Studio tier subscribers. Upgrade to unlock AI-powered coaching that helps you create better prompts for stunning assets."}
+            </p>
+            
+            <div className="space-y-3 mb-6">
+              <h4 className="text-sm font-medium text-text-primary">What you&apos;ll get:</h4>
+              <ul className="space-y-2 text-sm text-text-secondary">
+                <li className="flex items-center gap-2">
+                  <CheckIcon />
+                  <span>AI-powered prompt refinement</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon />
+                  <span>Game context integration for better results</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon />
+                  <span>Unlimited coaching sessions</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon />
+                  <span>Priority asset generation</span>
+                </li>
+              </ul>
+            </div>
+            
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-accent-600 text-white font-medium rounded-lg hover:bg-accent-500 transition-colors"
+            >
+              <SparklesIcon />
+              Upgrade to Studio
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ============================================================================
@@ -611,29 +756,14 @@ export function CoachContextForm({ onStartChat, isLoading = false }: CoachContex
     }
   };
 
-  // Show loading state while checking access
+  // Show loading skeleton while checking access
   if (isAccessLoading) {
-    return (
-      <div className="max-w-4xl mx-auto flex items-center justify-center py-12">
-        <LoadingSpinner />
-        <span className="ml-2 text-text-secondary">Loading...</span>
-      </div>
-    );
+    return <CoachContextFormSkeleton />;
   }
 
-  // Show upgrade prompt if no access (trial used and not premium)
+  // Show tier required banner if no access (trial used and not premium)
   if (!hasAccess && trialUsed) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-text-primary">Prompt Coach</h1>
-          <p className="mt-1 text-text-secondary">
-            AI-powered prompt refinement for stunning assets.
-          </p>
-        </div>
-        <TrialBanner trialAvailable={false} trialUsed={true} upgradeMessage={upgradeMessage} />
-      </div>
-    );
+    return <TierRequiredBanner upgradeMessage={upgradeMessage} />;
   }
 
   return (

@@ -124,10 +124,10 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
               } else if (data.type === 'intent_ready') {
                 setIsReady(true);
-                setRefinedDescription(data.metadata?.refinedDescription || null);
+                setRefinedDescription(data.metadata?.refinedDescription || data.metadata?.refined_description || null);
                 setConfidence(data.metadata?.confidence || 0);
               } else if (data.type === 'done') {
-                setSessionId(data.metadata?.sessionId || null);
+                setSessionId(data.metadata?.sessionId || data.metadata?.session_id || null);
               } else if (data.type === 'error') {
                 setError(data.content || 'An error occurred');
               }
@@ -193,7 +193,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
               } else if (data.type === 'intent_ready') {
                 setIsReady(true);
-                setRefinedDescription(data.metadata?.refinedDescription || null);
+                setRefinedDescription(data.metadata?.refinedDescription || data.metadata?.refined_description || null);
                 setConfidence(data.metadata?.confidence || 0);
               }
             } catch (e) {}

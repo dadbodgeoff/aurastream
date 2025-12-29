@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { PostCard, PostCardProps } from './PostCard';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 type GalleryTab = 'all' | 'featured' | 'following' | 'trending' | 'new';
 
@@ -18,6 +19,7 @@ interface InspirationGalleryProps {
   onPostClick: (postId: string) => void;
   onLike: (postId: string) => void;
   onAuthorClick: (authorId: string) => void;
+  isLiking?: boolean;
   className?: string;
 }
 
@@ -47,21 +49,135 @@ function SearchIcon() {
   );
 }
 
+/**
+ * Enterprise-grade post skeleton with shimmer animation
+ */
 function PostSkeleton() {
   return (
-    <div className="rounded-2xl border border-border-subtle overflow-hidden bg-background-surface animate-pulse">
-      <div className="aspect-square bg-background-elevated" />
+    <div 
+      className="rounded-2xl border border-border-subtle overflow-hidden bg-background-surface"
+      role="status"
+      aria-label="Loading post..."
+    >
+      <Skeleton className="aspect-square w-full" rounded="none" />
       <div className="p-4 space-y-3">
-        <div className="h-4 bg-background-elevated rounded w-3/4" />
+        <Skeleton className="h-4 w-3/4" />
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-background-elevated" />
-          <div className="h-3 bg-background-elevated rounded w-20" />
+          <Skeleton width={24} height={24} rounded="full" />
+          <Skeleton className="h-3 w-20" />
         </div>
         <div className="flex gap-2">
-          <div className="h-5 bg-background-elevated rounded-full w-12" />
-          <div className="h-5 bg-background-elevated rounded-full w-16" />
+          <Skeleton className="h-5 w-12" rounded="full" />
+          <Skeleton className="h-5 w-16" rounded="full" />
+        </div>
+        <div className="flex items-center gap-4 pt-3 border-t border-border-subtle">
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-12" />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Empty state component with context-aware messaging
+ */
+function EmptyState({ 
+  activeTab, 
+  searchQuery 
+}: { 
+  activeTab: GalleryTab; 
+  searchQuery?: string;
+}) {
+  const getEmptyStateContent = () => {
+    if (searchQuery) {
+      return {
+        icon: (
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
+        ),
+        title: 'No results found',
+        description: `No posts match "${searchQuery}". Try a different search term.`,
+        cta: null,
+      };
+    }
+
+    switch (activeTab) {
+      case 'following':
+        return {
+          icon: (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          ),
+          title: 'Follow creators to see their posts',
+          description: 'When you follow creators, their posts will appear here.',
+          cta: { label: 'Discover Creators', href: '#spotlight' },
+        };
+      case 'featured':
+        return {
+          icon: (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          ),
+          title: 'No featured posts yet',
+          description: 'Check back soon for hand-picked community highlights.',
+          cta: { label: 'Browse All Posts', action: 'all' },
+        };
+      case 'trending':
+        return {
+          icon: (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+              <polyline points="17 6 23 6 23 12" />
+            </svg>
+          ),
+          title: 'No trending posts right now',
+          description: 'Be the first to share something amazing!',
+          cta: { label: 'Share Your Work', href: '/dashboard/assets' },
+        };
+      default:
+        return {
+          icon: (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+          ),
+          title: 'No posts yet',
+          description: 'Be the first to share your creations with the community!',
+          cta: { label: 'Create Your First Asset', href: '/dashboard/create' },
+        };
+    }
+  };
+
+  const content = getEmptyStateContent();
+
+  return (
+    <div className="py-16 text-center">
+      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-background-elevated flex items-center justify-center">
+        {content.icon}
+      </div>
+      <h3 className="text-lg font-medium text-text-primary mb-2">{content.title}</h3>
+      <p className="text-text-muted mb-6 max-w-md mx-auto">{content.description}</p>
+      {content.cta && (
+        <a
+          href={content.cta.href || '#'}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-interactive-600 text-white font-medium text-sm hover:bg-interactive-500 transition-colors"
+        >
+          {content.cta.label}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </a>
+      )}
     </div>
   );
 }
@@ -78,6 +194,7 @@ export function InspirationGallery({
   onPostClick,
   onLike,
   onAuthorClick,
+  isLiking,
   className,
 }: InspirationGalleryProps) {
   return (
@@ -169,7 +286,11 @@ export function InspirationGallery({
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div 
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+          role="status"
+          aria-label="Loading community posts..."
+        >
           {Array.from({ length: 10 }).map((_, i) => (
             <PostSkeleton key={i} />
           ))}
@@ -183,20 +304,12 @@ export function InspirationGallery({
               onClick={() => onPostClick(post.id)}
               onLike={() => onLike(post.id)}
               onAuthorClick={() => onAuthorClick(post.author.id)}
+              isLiking={isLiking}
             />
           ))}
         </div>
       ) : (
-        <div className="py-16 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-background-elevated flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-text-muted">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <path d="M21 15l-5-5L5 21" />
-            </svg>
-          </div>
-          <p className="text-text-muted">No posts found. Be the first to share your creations!</p>
-        </div>
+        <EmptyState activeTab={activeTab} searchQuery={searchQuery} />
       )}
     </section>
   );

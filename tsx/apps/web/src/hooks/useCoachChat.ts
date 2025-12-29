@@ -4,6 +4,12 @@
  * This hook manages Phase 2 of the Prompt Coach flow - the chat interface
  * where users interact with the AI coach to refine their prompts.
  * 
+ * Enterprise UX Features:
+ * - Connection loss recovery with auto-reconnect
+ * - Streaming progress feedback (Thinking, Searching, Responding)
+ * - Session timeout recovery
+ * - Rate limit handling with countdown
+ * 
  * @module useCoachChat
  */
 
@@ -101,6 +107,7 @@ export interface ChatMessage {
  * - On validation event: 'streaming' → 'validating'
  * - On done: 'validating' → 'complete'
  * - On error: any → 'error'
+ * - On reconnect: 'error' → 'reconnecting' → 'connecting'
  */
 export type StreamingStage =
   | 'idle'
@@ -109,7 +116,25 @@ export type StreamingStage =
   | 'streaming'
   | 'validating'
   | 'complete'
-  | 'error';
+  | 'error'
+  | 'reconnecting';
+
+/** Error codes for coach-specific errors */
+export type CoachErrorCode =
+  | 'COACH_SESSION_EXPIRED'
+  | 'COACH_RATE_LIMIT'
+  | 'COACH_TIER_REQUIRED'
+  | 'COACH_CONNECTION_LOST'
+  | 'COACH_GROUNDING_FAILED'
+  | 'UNKNOWN_ERROR';
+
+/** Structured error with code and retry info */
+export interface CoachError {
+  code: CoachErrorCode;
+  message: string;
+  retryAfter?: number; // seconds until retry is allowed
+  canRetry: boolean;
+}
 
 /** State returned by the useCoachChat hook */
 export interface UseCoachChatState {
@@ -127,12 +152,20 @@ export interface UseCoachChatState {
   isGenerationReady: boolean;
   /** Confidence score (0-1) */
   confidence: number;
-  /** Any error that occurred */
-  error: string | null;
+  /** Any error that occurred (structured) */
+  error: CoachError | null;
+  /** Legacy error string for backward compatibility */
+  errorMessage: string | null;
   /** Whether grounding is currently in progress */
   isGrounding: boolean;
   /** What the grounding is searching for */
   groundingQuery: string | null;
+  /** Whether session has timed out */
+  isSessionExpired: boolean;
+  /** Session start time for timeout tracking */
+  sessionStartTime: Date | null;
+  /** Connection retry count */
+  retryCount: number;
 }
 
 /** Return type for the useCoachChat hook */
@@ -145,6 +178,12 @@ export interface UseCoachChatReturn extends UseCoachChatState {
   endSession: () => Promise<void>;
   /** Clear all messages and reset state */
   reset: () => void;
+  /** Retry the last failed operation */
+  retry: () => Promise<void>;
+  /** Clear the current error */
+  clearError: () => void;
+  /** Start a new session after timeout */
+  startNewSession: () => void;
 }
 
 // ============================================================================
@@ -152,6 +191,9 @@ export interface UseCoachChatReturn extends UseCoachChatState {
 // ============================================================================
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const MAX_RETRY_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 1000;
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 // ============================================================================
 // Helper Functions
@@ -162,6 +204,88 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
  */
 function generateId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
+
+/**
+ * Parse error response to extract error code and details.
+ */
+function parseErrorResponse(error: unknown, status?: number): CoachError {
+  // Check for rate limit (429)
+  if (status === 429) {
+    const retryAfter = typeof error === 'object' && error !== null 
+      ? (error as Record<string, unknown>).retry_after as number 
+      : 60;
+    return {
+      code: 'COACH_RATE_LIMIT',
+      message: 'You\'ve sent too many messages. Please wait before sending another.',
+      retryAfter: retryAfter || 60,
+      canRetry: true,
+    };
+  }
+
+  // Check for session expired (401 or specific error)
+  if (status === 401) {
+    return {
+      code: 'COACH_SESSION_EXPIRED',
+      message: 'Your coaching session has timed out.',
+      canRetry: false,
+    };
+  }
+
+  // Check for tier required (403)
+  if (status === 403) {
+    return {
+      code: 'COACH_TIER_REQUIRED',
+      message: 'The Prompt Coach is available for Studio tier subscribers.',
+      canRetry: false,
+    };
+  }
+
+  // Parse error message for specific codes
+  const errorMessage = error instanceof Error 
+    ? error.message 
+    : typeof error === 'string' 
+      ? error 
+      : 'An error occurred';
+
+  if (errorMessage.toLowerCase().includes('session') && errorMessage.toLowerCase().includes('expired')) {
+    return {
+      code: 'COACH_SESSION_EXPIRED',
+      message: errorMessage,
+      canRetry: false,
+    };
+  }
+
+  if (errorMessage.toLowerCase().includes('rate') || errorMessage.toLowerCase().includes('limit')) {
+    return {
+      code: 'COACH_RATE_LIMIT',
+      message: errorMessage,
+      retryAfter: 60,
+      canRetry: true,
+    };
+  }
+
+  if (errorMessage.toLowerCase().includes('grounding') || errorMessage.toLowerCase().includes('search')) {
+    return {
+      code: 'COACH_GROUNDING_FAILED',
+      message: 'Web search failed. Continuing without game context.',
+      canRetry: true,
+    };
+  }
+
+  if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('connection')) {
+    return {
+      code: 'COACH_CONNECTION_LOST',
+      message: 'Connection lost. Attempting to reconnect...',
+      canRetry: true,
+    };
+  }
+
+  return {
+    code: 'UNKNOWN_ERROR',
+    message: errorMessage,
+    canRetry: true,
+  };
 }
 
 /**
@@ -293,15 +417,21 @@ export function useCoachChat(): UseCoachChatReturn {
   const [refinedDescription, setRefinedDescription] = useState<string | null>(null);
   const [isGenerationReady, setIsGenerationReady] = useState(false);
   const [confidence, setConfidence] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CoachError | null>(null);
   const [isGrounding, setIsGrounding] = useState(false);
   const [groundingQuery, setGroundingQuery] = useState<string | null>(null);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Track if we've received the first token (for stage transitions)
   const hasReceivedFirstTokenRef = useRef(false);
 
   // Refs for abort controller
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Ref for last request (for retry functionality)
+  const lastRequestRef = useRef<{ type: 'start' | 'message'; data: StartCoachRequest | string } | null>(null);
 
   // Token batching refs to reduce re-renders during streaming
   // Instead of updating on every token, we batch updates every 100ms
@@ -309,6 +439,12 @@ export function useCoachChat(): UseCoachChatReturn {
   const flushIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentMessageIdRef = useRef<string | null>(null);
   const accumulatedContentRef = useRef<string>('');
+  
+  // Session timeout check interval
+  const sessionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Legacy error string for backward compatibility
+  const errorMessage = error?.message ?? null;
 
   // Get access token from apiClient (following existing pattern)
   const getAccessToken = useCallback((): string | null => {
@@ -316,6 +452,49 @@ export function useCoachChat(): UseCoachChatReturn {
     // The apiClient stores tokens in memory after login
     return apiClient.getAccessToken();
   }, []);
+
+  /**
+   * Clear the current error.
+   */
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  /**
+   * Check if session has timed out.
+   */
+  const checkSessionTimeout = useCallback(() => {
+    if (sessionStartTime) {
+      const elapsed = Date.now() - sessionStartTime.getTime();
+      if (elapsed >= SESSION_TIMEOUT_MS) {
+        setIsSessionExpired(true);
+        setError({
+          code: 'COACH_SESSION_EXPIRED',
+          message: 'Your coaching session has timed out.',
+          canRetry: false,
+        });
+        // Clear the timeout interval
+        if (sessionTimeoutRef.current) {
+          clearInterval(sessionTimeoutRef.current);
+          sessionTimeoutRef.current = null;
+        }
+      }
+    }
+  }, [sessionStartTime]);
+
+  // Set up session timeout checking
+  useEffect(() => {
+    if (sessionId && sessionStartTime && !isSessionExpired) {
+      // Check every minute
+      sessionTimeoutRef.current = setInterval(checkSessionTimeout, 60 * 1000);
+      return () => {
+        if (sessionTimeoutRef.current) {
+          clearInterval(sessionTimeoutRef.current);
+          sessionTimeoutRef.current = null;
+        }
+      };
+    }
+  }, [sessionId, sessionStartTime, isSessionExpired, checkSessionTimeout]);
 
   /**
    * Flush the token buffer and update the message with accumulated content.
@@ -458,8 +637,15 @@ export function useCoachChat(): UseCoachChatReturn {
               // Flush any remaining tokens before handling error
               stopFlushInterval();
               
-              setError(chunk.content || 'An error occurred');
+              const errorInfo = parseErrorResponse(chunk.content || 'An error occurred');
+              setError(errorInfo);
               setStreamingStage('error');
+              
+              // For grounding errors, we can continue - just log and move on
+              if (errorInfo.code === 'COACH_GROUNDING_FAILED') {
+                // Don't break the stream for grounding errors
+                console.warn('Grounding failed, continuing without game context');
+              }
               break;
 
             case 'redirect':
@@ -504,8 +690,8 @@ export function useCoachChat(): UseCoachChatReturn {
         // Stop flush interval on error
         stopFlushInterval();
         
-        const errorMessage = err instanceof Error ? err.message : 'Stream error occurred';
-        setError(errorMessage);
+        const errorInfo = parseErrorResponse(err);
+        setError(errorInfo);
         setStreamingStage('error');
         setMessages((prev) =>
           prev.map((msg) =>
@@ -536,9 +722,14 @@ export function useCoachChat(): UseCoachChatReturn {
       }
       abortControllerRef.current = new AbortController();
 
+      // Store request for retry
+      lastRequestRef.current = { type: 'start', data: request };
+
       setError(null);
       setIsStreaming(true);
       setStreamingStage('connecting');
+      setIsSessionExpired(false);
+      setRetryCount(0);
 
       // Add user message (the initial description)
       const userMessage: ChatMessage = {
@@ -571,9 +762,12 @@ export function useCoachChat(): UseCoachChatReturn {
           accessToken
         );
         await processStream(stream, assistantMessage.id);
+        
+        // Set session start time on successful start
+        setSessionStartTime(new Date());
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to start session';
-        setError(errorMessage);
+        const errorInfo = parseErrorResponse(err);
+        setError(errorInfo);
         setIsStreaming(false);
         setStreamingStage('error');
         // Remove the placeholder assistant message on error
@@ -589,12 +783,26 @@ export function useCoachChat(): UseCoachChatReturn {
   const sendMessage = useCallback(
     async (message: string): Promise<void> => {
       if (!sessionId) {
-        setError('No active session. Please start a session first.');
+        setError({
+          code: 'COACH_SESSION_EXPIRED',
+          message: 'No active session. Please start a session first.',
+          canRetry: false,
+        });
         return;
       }
 
       if (isStreaming) {
         return; // Don't allow sending while streaming
+      }
+      
+      // Check if session has expired
+      if (isSessionExpired) {
+        setError({
+          code: 'COACH_SESSION_EXPIRED',
+          message: 'Your coaching session has timed out. Please start a new session.',
+          canRetry: false,
+        });
+        return;
       }
 
       // Cancel any existing stream
@@ -602,6 +810,9 @@ export function useCoachChat(): UseCoachChatReturn {
         abortControllerRef.current.abort();
       }
       abortControllerRef.current = new AbortController();
+
+      // Store message for retry
+      lastRequestRef.current = { type: 'message', data: message };
 
       setError(null);
       setIsStreaming(true);
@@ -639,15 +850,15 @@ export function useCoachChat(): UseCoachChatReturn {
         );
         await processStream(stream, assistantMessage.id);
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
-        setError(errorMessage);
+        const errorInfo = parseErrorResponse(err);
+        setError(errorInfo);
         setIsStreaming(false);
         setStreamingStage('error');
         // Remove the placeholder assistant message on error
         setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessage.id));
       }
     },
-    [sessionId, isStreaming, getAccessToken, processStream]
+    [sessionId, isStreaming, isSessionExpired, getAccessToken, processStream]
   );
 
   /**
@@ -699,6 +910,12 @@ export function useCoachChat(): UseCoachChatReturn {
       clearInterval(flushIntervalRef.current);
       flushIntervalRef.current = null;
     }
+    
+    // Clean up session timeout interval
+    if (sessionTimeoutRef.current) {
+      clearInterval(sessionTimeoutRef.current);
+      sessionTimeoutRef.current = null;
+    }
 
     setMessages([]);
     setIsStreaming(false);
@@ -710,11 +927,60 @@ export function useCoachChat(): UseCoachChatReturn {
     setError(null);
     setIsGrounding(false);
     setGroundingQuery(null);
+    setIsSessionExpired(false);
+    setSessionStartTime(null);
+    setRetryCount(0);
     hasReceivedFirstTokenRef.current = false;
     tokenBufferRef.current = '';
     accumulatedContentRef.current = '';
     currentMessageIdRef.current = null;
+    lastRequestRef.current = null;
   }, []);
+
+  /**
+   * Retry the last failed operation with exponential backoff.
+   */
+  const retry = useCallback(async (): Promise<void> => {
+    if (!lastRequestRef.current || !error?.canRetry) {
+      return;
+    }
+
+    // Check retry count
+    if (retryCount >= MAX_RETRY_ATTEMPTS) {
+      setError({
+        code: error.code,
+        message: 'Maximum retry attempts reached. Please try again later.',
+        canRetry: false,
+      });
+      return;
+    }
+
+    // Check rate limit countdown
+    if (error.code === 'COACH_RATE_LIMIT' && error.retryAfter && error.retryAfter > 0) {
+      return; // Don't retry until countdown is complete
+    }
+
+    setStreamingStage('reconnecting');
+    setRetryCount((prev) => prev + 1);
+
+    // Exponential backoff delay
+    const delay = RETRY_DELAY_MS * Math.pow(2, retryCount);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    const lastRequest = lastRequestRef.current;
+    if (lastRequest.type === 'start') {
+      await startSession(lastRequest.data as StartCoachRequest);
+    } else {
+      await sendMessage(lastRequest.data as string);
+    }
+  }, [error, retryCount, startSession, sendMessage]);
+
+  /**
+   * Start a new session after timeout (clears state and allows fresh start).
+   */
+  const startNewSession = useCallback((): void => {
+    reset();
+  }, [reset]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -726,6 +992,11 @@ export function useCoachChat(): UseCoachChatReturn {
       if (flushIntervalRef.current) {
         clearInterval(flushIntervalRef.current);
         flushIntervalRef.current = null;
+      }
+      // Clean up session timeout interval on unmount
+      if (sessionTimeoutRef.current) {
+        clearInterval(sessionTimeoutRef.current);
+        sessionTimeoutRef.current = null;
       }
     };
   }, []);
@@ -740,13 +1011,20 @@ export function useCoachChat(): UseCoachChatReturn {
     isGenerationReady,
     confidence,
     error,
+    errorMessage, // Legacy compatibility
     isGrounding,
     groundingQuery,
+    isSessionExpired,
+    sessionStartTime,
+    retryCount,
     // Actions
     startSession,
     sendMessage,
     endSession,
     reset,
+    retry,
+    clearError,
+    startNewSession,
   };
 }
 

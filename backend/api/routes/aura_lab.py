@@ -427,33 +427,23 @@ async def get_usage(
     and when the counter resets.
     
     **Tier Limits:**
-    - Free: 1 fusion per 28 days
-    - Pro: 20 fusions/day
-    - Studio: Unlimited (999999)
+    - Free: 2 fusions/month
+    - Pro: 25 fusions/month
+    - Studio: 25 fusions/month
     
     **Returns:** Usage statistics and reset time.
     """
-    from backend.services.free_tier_service import get_free_tier_service
+    from backend.services.usage_limit_service import get_usage_limit_service
     
-    tier = current_user.tier or "free"
+    usage_service = get_usage_limit_service()
+    usage = await usage_service.check_limit(current_user.sub, "aura_lab")
     
-    # For free tier, use the 28-day cooldown system
-    if tier == "free":
-        free_tier_service = get_free_tier_service()
-        usage = await free_tier_service.check_usage(current_user.sub, "aura_lab")
-        
-        return UsageResponse(
-            used_today=0 if usage.can_use else 1,
-            limit=1,
-            remaining=1 if usage.can_use else 0,
-            resets_at=usage.next_available.isoformat() + "Z" if usage.next_available else None
-        )
-    
-    # For paid tiers, use the daily limit system
-    service = AuraLabService()
-    result = await service.get_usage(current_user.sub, tier)
-    
-    return UsageResponse(**result)
+    return UsageResponse(
+        used_today=usage.used,  # Actually monthly, but keeping field name for compat
+        limit=usage.limit,
+        remaining=usage.remaining,
+        resets_at=usage.resets_at.isoformat() + "Z" if usage.resets_at else None
+    )
 
 
 # ============================================================================

@@ -25,6 +25,8 @@ import {
 } from '@/components/community';
 import { PageHeader } from '@/components/navigation';
 import { PullToRefresh } from '@/components/ui/PullToRefresh';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
+import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 
 type GalleryTab = 'all' | 'featured' | 'following' | 'trending' | 'new';
 
@@ -96,11 +98,14 @@ export default function CommunityPage() {
   // Spotlight creators always load (shown on all tabs)
   const { data: spotlightCreators, isLoading: creatorsLoading } = useSpotlightCreators(10);
 
-  // Mutations
+  // Mutations with error handling
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
   const followMutation = useFollowUser();
   const unfollowMutation = useUnfollowUser();
+
+  // Error state for banned users
+  const [isBanned, setIsBanned] = useState(false);
 
   // Get posts based on active tab
   const { posts, isLoading } = useMemo(() => {
@@ -130,17 +135,63 @@ export default function CommunityPage() {
     );
   }, [posts, searchQuery]);
 
-  // Handlers
+  // Handlers with enterprise error handling
   const handlePostClick = (postId: string) => router.push(`/community/${postId}`);
   const handleAuthorClick = (authorId: string) => router.push(`/community/creators/${authorId}`);
-  const handleLike = (postId: string) => {
+  
+  const handleLike = useCallback((postId: string) => {
     const post = posts.find((p) => p.id === postId);
     if (!post) return;
-    if (post.isLiked) unlikeMutation.mutate(postId);
-    else likeMutation.mutate(postId);
-  };
-  const handleFollow = (userId: string) => followMutation.mutate(userId);
-  const handleUnfollow = (userId: string) => unfollowMutation.mutate(userId);
+    
+    const mutation = post.isLiked ? unlikeMutation : likeMutation;
+    mutation.mutate(postId, {
+      onError: (error: any) => {
+        // Check for banned user error
+        if (error?.code === 'COMMUNITY_USER_BANNED' || error?.message?.includes('banned')) {
+          setIsBanned(true);
+          showErrorToast({ code: 'COMMUNITY_USER_BANNED' }, {
+            onContact: () => router.push('/support'),
+          });
+        } else {
+          showErrorToast(error, {
+            onRetry: () => mutation.mutate(postId),
+          });
+        }
+      },
+    });
+  }, [posts, likeMutation, unlikeMutation, router]);
+
+  const handleFollow = useCallback((userId: string) => {
+    followMutation.mutate(userId, {
+      onSuccess: () => {
+        showSuccessToast('Following creator', {
+          description: 'You\'ll see their posts in your feed',
+        });
+      },
+      onError: (error: any) => {
+        if (error?.code === 'COMMUNITY_USER_BANNED') {
+          setIsBanned(true);
+          showErrorToast({ code: 'COMMUNITY_USER_BANNED' }, {
+            onContact: () => router.push('/support'),
+          });
+        } else {
+          showErrorToast(error, {
+            onRetry: () => followMutation.mutate(userId),
+          });
+        }
+      },
+    });
+  }, [followMutation, router]);
+
+  const handleUnfollow = useCallback((userId: string) => {
+    unfollowMutation.mutate(userId, {
+      onError: (error: any) => {
+        showErrorToast(error, {
+          onRetry: () => unfollowMutation.mutate(userId),
+        });
+      },
+    });
+  }, [unfollowMutation]);
 
   // Pull-to-refresh handler - invalidates queries based on active tab
   const handleRefresh = useCallback(async () => {
@@ -166,6 +217,40 @@ export default function CommunityPage() {
     }
   }, [queryClient, activeTab, assetType]);
 
+  // Banned user UI
+  if (isBanned) {
+    return (
+      <div className="min-h-screen bg-background-base flex items-center justify-center p-4">
+        <div className="max-w-md text-center space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-red-500">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-text-primary">Account Restricted</h2>
+          <p className="text-text-secondary">
+            Your community access has been restricted. If you believe this is an error, please contact our support team.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+            <button
+              onClick={() => router.push('/support')}
+              className="px-6 py-2.5 rounded-lg font-medium bg-interactive-600 text-white hover:bg-interactive-500 transition-colors"
+            >
+              Contact Support
+            </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="px-6 py-2.5 rounded-lg font-medium border border-border-subtle text-text-secondary hover:bg-background-elevated transition-colors"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background-base">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 space-y-4">
@@ -187,40 +272,51 @@ export default function CommunityPage() {
             <QuickActionCards />
           </section>
 
-          {/* Creator Spotlight */}
-          <CreatorSpotlight
-            creators={spotlightCreators ?? []}
-            isLoading={creatorsLoading}
-            onFollow={handleFollow}
-            onUnfollow={handleUnfollow}
-          />
-
-          {/* Inspiration Gallery */}
-          <div id="gallery">
-            <InspirationGallery
-              posts={filteredPosts.map((post) => ({
-                id: post.id,
-                title: post.title,
-                assetUrl: post.assetUrl,
-                assetType: post.assetType,
-                author: post.author,
-                likeCount: post.likeCount,
-                commentCount: post.commentCount,
-                tags: post.tags,
-                isFeatured: post.isFeatured,
-                isLiked: post.isLiked,
-              }))}
-              isLoading={isLoading}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              assetTypeFilter={assetType}
-              onAssetTypeChange={setAssetType}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              onPostClick={handlePostClick}
-              onLike={handleLike}
-              onAuthorClick={handleAuthorClick}
+          {/* Creator Spotlight with Error Boundary */}
+          <AsyncErrorBoundary
+            resourceName="spotlight creators"
+            onRefetch={() => queryClient.invalidateQueries({ queryKey: communityKeys.spotlightCreators() })}
+          >
+            <CreatorSpotlight
+              creators={spotlightCreators ?? []}
+              isLoading={creatorsLoading}
+              onFollow={handleFollow}
+              onUnfollow={handleUnfollow}
             />
+          </AsyncErrorBoundary>
+
+          {/* Inspiration Gallery with Error Boundary */}
+          <div id="gallery">
+            <AsyncErrorBoundary
+              resourceName="community posts"
+              onRefetch={handleRefresh}
+            >
+              <InspirationGallery
+                posts={filteredPosts.map((post) => ({
+                  id: post.id,
+                  title: post.title,
+                  assetUrl: post.assetUrl,
+                  assetType: post.assetType,
+                  author: post.author,
+                  likeCount: post.likeCount,
+                  commentCount: post.commentCount,
+                  tags: post.tags,
+                  isFeatured: post.isFeatured,
+                  isLiked: post.isLiked,
+                }))}
+                isLoading={isLoading}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                assetTypeFilter={assetType}
+                onAssetTypeChange={setAssetType}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onPostClick={handlePostClick}
+                onLike={handleLike}
+                onAuthorClick={handleAuthorClick}
+                isLiking={likeMutation.isPending || unlikeMutation.isPending}
+              />
+            </AsyncErrorBoundary>
           </div>
         </PullToRefresh>
       </div>

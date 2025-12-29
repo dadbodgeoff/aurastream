@@ -9,9 +9,10 @@
  * @module usage/UsageIndicator
  */
 
-import React, { memo } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useUsageLimits, type FeatureType, FEATURE_CONFIG } from '@aurastream/api-client';
+import { toast } from '@/components/ui/Toast';
 
 export interface UsageIndicatorProps {
   /** Which feature to show usage for */
@@ -20,6 +21,10 @@ export interface UsageIndicatorProps {
   variant?: 'badge' | 'inline' | 'bar';
   /** Additional CSS classes */
   className?: string;
+  /** Show warning toast when near limit (default: true) */
+  showWarningToast?: boolean;
+  /** Callback when upgrade is clicked */
+  onUpgrade?: () => void;
 }
 
 const InfinityIcon = ({ className }: { className?: string }) => (
@@ -30,6 +35,7 @@ const InfinityIcon = ({ className }: { className?: string }) => (
 
 /**
  * Small usage indicator for individual features.
+ * Shows warning toast at 80% usage and upgrade CTA when limit reached.
  * 
  * @example
  * ```tsx
@@ -38,14 +44,58 @@ const InfinityIcon = ({ className }: { className?: string }) => (
  * 
  * // In Aura Lab page header
  * <UsageIndicator feature="auraLab" variant="inline" />
+ * 
+ * // With upgrade callback
+ * <UsageIndicator 
+ *   feature="creations" 
+ *   variant="bar" 
+ *   onUpgrade={() => router.push('/pricing')} 
+ * />
  * ```
  */
 export const UsageIndicator = memo(function UsageIndicator({
   feature,
   variant = 'badge',
   className,
+  showWarningToast = true,
+  onUpgrade,
 }: UsageIndicatorProps) {
   const { data, isLoading } = useUsageLimits();
+  const warningShownRef = useRef<string | null>(null);
+  const limitShownRef = useRef<string | null>(null);
+
+  // Show warning toast at 80% usage
+  useEffect(() => {
+    if (!showWarningToast || !data) return;
+
+    const featureData = data[feature];
+    const config = FEATURE_CONFIG[feature];
+    const { used, limit, unlimited, remaining } = featureData;
+    
+    if (unlimited) return;
+
+    const percentage = limit > 0 ? (used / limit) * 100 : 0;
+    const warningKey = `${feature}-${used}`;
+    const limitKey = `${feature}-limit`;
+
+    // Show warning at 80% usage (only once per threshold)
+    if (percentage >= 80 && percentage < 100 && warningShownRef.current !== warningKey) {
+      warningShownRef.current = warningKey;
+      toast.warning(`${config.label} usage at ${Math.round(percentage)}%`, {
+        description: `You have ${remaining} ${config.label.toLowerCase()} remaining this month.`,
+        action: onUpgrade ? { label: 'Upgrade', onClick: onUpgrade } : undefined,
+      });
+    }
+
+    // Show limit reached toast (only once)
+    if (remaining === 0 && limitShownRef.current !== limitKey) {
+      limitShownRef.current = limitKey;
+      toast.error(`${config.label} limit reached`, {
+        description: 'Upgrade your plan for more usage.',
+        action: onUpgrade ? { label: 'Upgrade Now', onClick: onUpgrade } : undefined,
+      });
+    }
+  }, [data, feature, showWarningToast, onUpgrade]);
 
   if (isLoading || !data) {
     return (
@@ -145,6 +195,15 @@ export const UsageIndicator = memo(function UsageIndicator({
           style={{ width: `${percentage}%` }}
         />
       </div>
+      {/* Upgrade CTA when at limit */}
+      {isAtLimit && onUpgrade && (
+        <button
+          onClick={onUpgrade}
+          className="text-xs text-accent-400 hover:text-accent-300 font-medium mt-1"
+        >
+          Upgrade for more →
+        </button>
+      )}
     </div>
   );
 });

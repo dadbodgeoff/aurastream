@@ -8,6 +8,11 @@
  * and session timeout countdown.
  * Supports expanded and collapsed states for mobile responsiveness.
  * 
+ * Enterprise UX Features:
+ * - Session timeout recovery prompt with "Start New Session" button
+ * - Clear session state indicators
+ * - Warning states for low turns and approaching timeout
+ * 
  * @module coach/context/SessionContextBar
  */
 
@@ -37,10 +42,14 @@ export interface SessionContextBarProps {
   sessionStartTime?: Date;
   /** Session timeout in minutes (default: 30) */
   sessionTimeoutMinutes?: number;
+  /** Whether the session has expired */
+  isSessionExpired?: boolean;
   /** Callback when End Session is clicked */
   onEndSession?: () => void;
   /** Callback when View History is clicked */
   onViewHistory?: () => void;
+  /** Callback when Start New Session is clicked (for expired sessions) */
+  onStartNewSession?: () => void;
   /** Whether the bar is collapsed (mobile mode) */
   isCollapsed?: boolean;
   /** Callback to toggle collapsed state */
@@ -234,6 +243,70 @@ const SessionTimeoutDisplay = memo(function SessionTimeoutDisplay({
 SessionTimeoutDisplay.displayName = 'SessionTimeoutDisplay';
 
 // ============================================================================
+// Session Expired Banner Component
+// ============================================================================
+
+interface SessionExpiredBannerProps {
+  onStartNewSession?: () => void;
+  testId?: string;
+}
+
+/**
+ * Banner shown when the session has expired.
+ * Provides clear recovery action with "Start New Session" button.
+ */
+const SessionExpiredBanner = memo(function SessionExpiredBanner({
+  onStartNewSession,
+  testId,
+}: SessionExpiredBannerProps) {
+  return (
+    <div
+      data-testid={testId}
+      className={cn(
+        'flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3',
+        'bg-yellow-500/10 border-b border-yellow-500/20',
+        'text-yellow-400'
+      )}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="flex items-center gap-2">
+        <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div>
+          <span className="font-medium">Session Expired</span>
+          <span className="text-yellow-400/80 ml-2 text-sm">
+            Your coaching session has timed out.
+          </span>
+        </div>
+      </div>
+      {onStartNewSession && (
+        <button
+          type="button"
+          onClick={onStartNewSession}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg',
+            'text-sm font-medium',
+            'bg-yellow-500/20 hover:bg-yellow-500/30',
+            'text-yellow-300',
+            'transition-colors',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-base'
+          )}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Start New Session
+        </button>
+      )}
+    </div>
+  );
+});
+
+SessionExpiredBanner.displayName = 'SessionExpiredBanner';
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -289,8 +362,10 @@ export const SessionContextBar = memo(function SessionContextBar({
   totalTurns = 10,
   sessionStartTime,
   sessionTimeoutMinutes = 30,
+  isSessionExpired = false,
   onEndSession,
   onViewHistory,
+  onStartNewSession,
   isCollapsed = false,
   onToggleCollapse,
   className,
@@ -307,6 +382,16 @@ export const SessionContextBar = memo(function SessionContextBar({
   const handleToggleCollapse = useCallback(() => {
     onToggleCollapse?.();
   }, [onToggleCollapse]);
+
+  // Show expired banner if session has expired
+  if (isSessionExpired || minutesRemaining === 0) {
+    return (
+      <SessionExpiredBanner
+        onStartNewSession={onStartNewSession}
+        testId={`${testId}-expired`}
+      />
+    );
+  }
 
   // Collapsed view
   if (isCollapsed) {

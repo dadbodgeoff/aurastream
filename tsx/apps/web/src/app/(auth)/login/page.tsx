@@ -4,6 +4,10 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@aurastream/shared';
+import { FormErrorBoundary } from '@/components/ErrorBoundary';
+import { showErrorToast, getErrorFromApi } from '@/utils/errorMessages';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { useFormValidation, validationRules } from '@/hooks/useFormValidation';
 
 // OAuth provider icons
 const GoogleIcon = () => (
@@ -47,15 +51,27 @@ function LoginForm() {
   const { login, isLoading, error, clearError } = useAuth();
   const emailInputRef = useRef<HTMLInputElement>(null);
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<{ email?: string; password?: string }>({});
   
   // Check for registration success message
   const registered = searchParams.get('registered') === 'true';
   const returnUrl = searchParams.get('returnUrl') || '/dashboard';
+  
+  // Enterprise form validation with inline feedback
+  const { fieldStates, setFieldValue, touchField, isFormValid, getFieldProps } = useFormValidation({
+    fields: {
+      email: [
+        validationRules.required('Email is required'),
+        validationRules.email('Please enter a valid email address', 'Valid email format'),
+      ],
+      password: [
+        validationRules.required('Password is required'),
+        validationRules.minLength(8, 'Password must be at least 8 characters'),
+      ],
+    },
+    debounceMs: 300,
+  });
   
   // Auto-focus email field on mount
   useEffect(() => {
@@ -65,39 +81,30 @@ function LoginForm() {
   // Clear errors when inputs change
   useEffect(() => {
     if (error) clearError();
-    setValidationErrors({});
-  }, [email, password, error, clearError]);
-  
-  const validateForm = (): boolean => {
-    const errors: { email?: string; password?: string } = {};
-    
-    if (!email) {
-      errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-    
-    if (!password) {
-      errors.password = 'Password is required';
-    } else if (password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    }
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
+  }, [fieldStates.email?.value, fieldStates.password?.value, error, clearError]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    // Touch all fields to show validation errors
+    touchField('email');
+    touchField('password');
+    
+    if (!isFormValid) return;
     
     clearError();
     try {
-      await login(email, password, rememberMe);
+      await login(fieldStates.email.value, fieldStates.password.value, rememberMe);
       router.push(decodeURIComponent(returnUrl));
     } catch (err) {
-      // Error is handled by the store
+      // Show enterprise error toast with recovery actions
+      showErrorToast(err, {
+        onNavigate: (path) => router.push(path),
+        onRetry: () => {
+          // Focus email field for retry
+          emailInputRef.current?.focus();
+        },
+      });
     }
   };
   
@@ -107,126 +114,184 @@ function LoginForm() {
   };
   
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-text-primary mb-2">Welcome back</h2>
-      <p className="text-text-secondary mb-6">Sign in to your account to continue</p>
-      
-      {registered && (
-        <div className="mb-6 p-4 bg-success-dark/20 border border-success-main/30 rounded-lg text-success-light text-sm" role="alert">
-          Account created successfully! Please sign in.
-        </div>
-      )}
-      
-      {error && (
-        <div className="mb-6 p-4 bg-error-dark/20 border border-error-main/30 rounded-lg text-error-light text-sm" role="alert" aria-live="polite">
-          {error}
-        </div>
-      )}
-      
-      <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1.5">Email address</label>
-          <input
-            ref={emailInputRef}
-            id="email"
-            name="email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={`w-full px-4 py-3 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${validationErrors.email ? 'border-error-main' : 'border-border-default'}`}
-            placeholder="you@example.com"
-            aria-invalid={!!validationErrors.email}
-            aria-describedby={validationErrors.email ? 'email-error' : undefined}
-          />
-          {validationErrors.email && <p id="email-error" className="mt-1.5 text-sm text-error-light" role="alert">{validationErrors.email}</p>}
-        </div>
+    <FormErrorBoundary formName="LoginForm">
+      <div>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">Welcome back</h2>
+        <p className="text-text-secondary mb-6">Sign in to your account to continue</p>
         
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-1.5">Password</label>
-          <div className="relative">
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={`w-full px-4 py-3 pr-14 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${validationErrors.password ? 'border-error-main' : 'border-border-default'}`}
-              placeholder="Enter your password"
-              aria-invalid={!!validationErrors.password}
-              aria-describedby={validationErrors.password ? 'password-error' : undefined}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-text-tertiary hover:text-text-secondary active:text-text-primary transition-colors"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-            >
-              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
-            </button>
+        {registered && (
+          <div className="mb-6 p-4 bg-success-dark/20 border border-success-main/30 rounded-lg text-success-light text-sm" role="alert">
+            Account created successfully! Please sign in.
           </div>
-          {validationErrors.password && <p id="password-error" className="mt-1.5 text-sm text-error-light" role="alert">{validationErrors.password}</p>}
-        </div>
+        )}
         
-        <div className="flex items-center justify-between">
-          <label className="flex items-center cursor-pointer min-h-[44px]">
+        {error && (
+          <div className="mb-6 p-4 bg-error-dark/20 border border-error-main/30 rounded-lg text-error-light text-sm" role="alert" aria-live="polite">
+            <div className="flex items-start gap-3">
+              <span className="text-error-main">⚠️</span>
+              <div className="flex-1">
+                <p>{getErrorFromApi(error).title}</p>
+                {getErrorFromApi(error).suggestion && (
+                  <p className="text-xs mt-1 text-error-light/80">{getErrorFromApi(error).suggestion}</p>
+                )}
+              </div>
+              <Link 
+                href="/forgot-password" 
+                className="text-xs underline hover:no-underline whitespace-nowrap"
+              >
+                Forgot Password?
+              </Link>
+            </div>
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-text-primary mb-1.5">Email address</label>
             <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-5 h-5 rounded border-border-default bg-background-elevated text-interactive-600 focus:ring-interactive-600 focus:ring-offset-0 cursor-pointer"
+              ref={emailInputRef}
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              required
+              {...getFieldProps('email')}
+              className={`w-full px-4 py-3 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
+                fieldStates.email?.touched && fieldStates.email?.error 
+                  ? 'border-error-main' 
+                  : fieldStates.email?.touched && fieldStates.email?.valid 
+                    ? 'border-success-main' 
+                    : 'border-border-default'
+              }`}
+              placeholder="you@example.com"
+              aria-invalid={!!(fieldStates.email?.touched && fieldStates.email?.error)}
+              aria-describedby={fieldStates.email?.error ? 'email-error' : fieldStates.email?.successMessage ? 'email-success' : undefined}
             />
-            <span className="ml-2 text-sm text-text-secondary">Remember me</span>
-          </label>
-          <Link href="/forgot-password" className="text-sm text-interactive-600 hover:text-interactive-500 active:text-interactive-700 transition-colors py-2">Forgot password?</Link>
+            {fieldStates.email?.touched && fieldStates.email?.error && (
+              <p id="email-error" className="mt-1.5 text-sm text-error-light flex items-center gap-1" role="alert">
+                <span>✕</span> {fieldStates.email.error}
+              </p>
+            )}
+            {fieldStates.email?.touched && fieldStates.email?.valid && fieldStates.email?.successMessage && (
+              <p id="email-success" className="mt-1.5 text-sm text-success-light flex items-center gap-1">
+                <span>✓</span> {fieldStates.email.successMessage}
+              </p>
+            )}
+          </div>
+          
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-text-primary mb-1.5">Password</label>
+            <div className="relative">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                {...getFieldProps('password')}
+                className={`w-full px-4 py-3 pr-14 min-h-[44px] bg-background-elevated border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:border-transparent transition-all ${
+                  fieldStates.password?.touched && fieldStates.password?.error 
+                    ? 'border-error-main' 
+                    : fieldStates.password?.touched && fieldStates.password?.valid 
+                      ? 'border-success-main' 
+                      : 'border-border-default'
+                }`}
+                placeholder="Enter your password"
+                aria-invalid={!!(fieldStates.password?.touched && fieldStates.password?.error)}
+                aria-describedby={fieldStates.password?.error ? 'password-error' : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-text-tertiary hover:text-text-secondary active:text-text-primary transition-colors"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
+            {fieldStates.password?.touched && fieldStates.password?.error && (
+              <p id="password-error" className="mt-1.5 text-sm text-error-light flex items-center gap-1" role="alert">
+                <span>✕</span> {fieldStates.password.error}
+              </p>
+            )}
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <label className="flex items-center cursor-pointer min-h-[44px]">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-5 h-5 rounded border-border-default bg-background-elevated text-interactive-600 focus:ring-interactive-600 focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="ml-2 text-sm text-text-secondary">Remember me</span>
+            </label>
+            <Link href="/forgot-password" className="text-sm text-interactive-600 hover:text-interactive-500 active:text-interactive-700 transition-colors py-2">Forgot password?</Link>
+          </div>
+          
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 min-h-[44px] bg-interactive-600 hover:bg-interactive-500 active:bg-interactive-700 disabled:bg-interactive-600/50 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:ring-offset-2 focus:ring-offset-background-surface disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Signing in...
+              </span>
+            ) : 'Sign in'}
+          </button>
+        </form>
+        
+        {/* OAuth temporarily disabled
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border-default" /></div>
+          <div className="relative flex justify-center text-sm"><span className="px-4 bg-background-surface text-text-tertiary">Or continue with</span></div>
         </div>
         
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-3 px-4 min-h-[44px] bg-interactive-600 hover:bg-interactive-500 active:bg-interactive-700 disabled:bg-interactive-600/50 text-white font-medium rounded-lg shadow-md hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-interactive-600 focus:ring-offset-2 focus:ring-offset-background-surface disabled:cursor-not-allowed"
-        >
-          {isLoading ? (
-            <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              Signing in...
-            </span>
-          ) : 'Sign in'}
-        </button>
-      </form>
-      
-      {/* OAuth temporarily disabled
-      <div className="relative my-6">
-        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border-default" /></div>
-        <div className="relative flex justify-center text-sm"><span className="px-4 bg-background-surface text-text-tertiary">Or continue with</span></div>
+        <div className="grid grid-cols-3 gap-3">
+          <button type="button" onClick={() => handleOAuthLogin('google')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Google"><GoogleIcon /></button>
+          <button type="button" onClick={() => handleOAuthLogin('twitch')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Twitch"><TwitchIcon /></button>
+          <button type="button" onClick={() => handleOAuthLogin('discord')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Discord"><DiscordIcon /></button>
+        </div>
+        */}
+        
+        <p className="mt-6 text-center text-sm text-text-secondary">
+          Don&apos;t have an account?{' '}
+          <Link href="/signup" className="text-interactive-600 hover:text-interactive-500 active:text-interactive-700 font-medium transition-colors">Create one</Link>
+        </p>
       </div>
-      
-      <div className="grid grid-cols-3 gap-3">
-        <button type="button" onClick={() => handleOAuthLogin('google')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Google"><GoogleIcon /></button>
-        <button type="button" onClick={() => handleOAuthLogin('twitch')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Twitch"><TwitchIcon /></button>
-        <button type="button" onClick={() => handleOAuthLogin('discord')} className="flex items-center justify-center py-2.5 px-4 min-h-[44px] bg-background-elevated border border-border-default rounded-lg hover:bg-background-card hover:border-border-focus active:bg-background-surface transition-all focus:outline-none focus:ring-2 focus:ring-interactive-600" aria-label="Sign in with Discord"><DiscordIcon /></button>
-      </div>
-      */}
-      
-      <p className="mt-6 text-center text-sm text-text-secondary">
-        Don&apos;t have an account?{' '}
-        <Link href="/signup" className="text-interactive-600 hover:text-interactive-500 active:text-interactive-700 font-medium transition-colors">Create one</Link>
-      </p>
-    </div>
+    </FormErrorBoundary>
   );
 }
 
 function LoginFallback() {
   return (
-    <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-interactive-600" />
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48" aria-label="Loading title" />
+        <Skeleton className="h-4 w-64" aria-label="Loading subtitle" />
+      </div>
+      <div className="space-y-5">
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-24" aria-label="Loading label" />
+          <Skeleton className="h-12 w-full" rounded="lg" aria-label="Loading input" />
+        </div>
+        <div className="space-y-1.5">
+          <Skeleton className="h-4 w-20" aria-label="Loading label" />
+          <Skeleton className="h-12 w-full" rounded="lg" aria-label="Loading input" />
+        </div>
+        <div className="flex justify-between">
+          <Skeleton className="h-5 w-28" aria-label="Loading checkbox" />
+          <Skeleton className="h-5 w-32" aria-label="Loading link" />
+        </div>
+        <Skeleton className="h-12 w-full" rounded="lg" aria-label="Loading button" />
+      </div>
+      <Skeleton className="h-4 w-48 mx-auto" aria-label="Loading footer" />
     </div>
   );
 }

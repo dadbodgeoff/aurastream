@@ -176,6 +176,7 @@ class LogoService:
         user_id: str,
         brand_kit_id: str,
         logo_type: LogoType,
+        existing_files: Optional[list] = None,
     ) -> Optional[str]:
         """
         Get signed URL for a logo.
@@ -184,11 +185,39 @@ class LogoService:
             user_id: Authenticated user's ID
             brand_kit_id: Brand kit UUID
             logo_type: Type of logo
+            existing_files: Optional list of existing files (optimization)
             
         Returns:
             Signed URL or None if logo doesn't exist
         """
-        # Try each possible extension
+        # If we have a list of existing files, check against it first
+        if existing_files is not None:
+            matching_file = None
+            for f in existing_files:
+                name = f.get("name", "")
+                # Check if this file matches the logo type
+                for extension in ALLOWED_LOGO_TYPES.values():
+                    if name == f"{logo_type}{extension}":
+                        matching_file = name
+                        break
+                if matching_file:
+                    break
+            
+            if not matching_file:
+                return None
+            
+            # Generate signed URL for the matching file
+            storage_path = f"{user_id}/{brand_kit_id}/{matching_file}"
+            try:
+                url_result = self.db.storage.from_(self.BUCKET_NAME).create_signed_url(
+                    path=storage_path,
+                    expires_in=31536000  # 1 year
+                )
+                return url_result.get("signedURL") or url_result.get("signedUrl")
+            except Exception:
+                return None
+        
+        # Fallback: Try each possible extension (slower)
         for extension in ALLOWED_LOGO_TYPES.values():
             storage_path = self._get_storage_path(user_id, brand_kit_id, logo_type, extension)
             
@@ -214,6 +243,8 @@ class LogoService:
         """
         List all logos for a brand kit.
         
+        Optimized to list files first, then only generate signed URLs for existing files.
+        
         Args:
             user_id: Authenticated user's ID
             brand_kit_id: Brand kit UUID
@@ -221,10 +252,24 @@ class LogoService:
         Returns:
             Dictionary mapping logo types to URLs (None if not uploaded)
         """
-        logos: Dict[LogoType, Optional[str]] = {}
+        logos: Dict[LogoType, Optional[str]] = {logo_type: None for logo_type in LOGO_TYPES}
         
+        # First, list all files in the brand kit's folder (single API call)
+        folder_path = f"{user_id}/{brand_kit_id}"
+        try:
+            result = self.db.storage.from_(self.BUCKET_NAME).list(folder_path)
+            existing_files = result if result else []
+        except Exception as e:
+            logger.warning(f"Failed to list logos folder: {e}")
+            existing_files = []
+        
+        # If no files exist, return empty logos immediately
+        if not existing_files:
+            return logos
+        
+        # Only generate signed URLs for files that exist
         for logo_type in LOGO_TYPES:
-            url = await self.get_logo_url(user_id, brand_kit_id, logo_type)
+            url = await self.get_logo_url(user_id, brand_kit_id, logo_type, existing_files)
             logos[logo_type] = url
         
         return logos

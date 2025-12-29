@@ -1,16 +1,29 @@
 """
 Rate Limiting Middleware for Aurastream.
 
-This module provides rate limiting functionality to protect authentication endpoints
+This module provides rate limiting functionality to protect endpoints
 from brute force attacks and abuse:
+
+Authentication:
 - Login: 5 attempts per email per 15 minutes
 - Signup: 10 attempts per IP per hour
+
+Coach:
+- Messages: 10 per user per minute
+- Sessions: 20 per user per hour
+
+Global API (tier-based, requests per minute):
+- anonymous: 30/min (by IP)
+- free: 60/min (by user ID)
+- pro: 120/min (by user ID)
+- studio: 300/min (by user ID)
 
 Features:
 - Thread-safe in-memory storage with TTL
 - Configurable limits via environment variables
 - Returns 429 with Retry-After header when limit exceeded
 - Decorator for easy application to routes
+- Rate limit headers on all API responses
 
 Security Notes:
 - Rate limits are per-email for login (prevents credential stuffing)
@@ -47,6 +60,19 @@ COACH_MESSAGE_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_COACH_MESSAGE_WINDOW_SE
 # Coach session start rate limiting: sessions per user per hour
 COACH_SESSION_MAX_ATTEMPTS = int(os.getenv("RATE_LIMIT_COACH_SESSION_MAX_ATTEMPTS", "20"))
 COACH_SESSION_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_COACH_SESSION_WINDOW_SECONDS", str(60 * 60)))  # 1 hour
+
+# =============================================================================
+# Global API Rate Limiting (per user/IP)
+# =============================================================================
+
+# Tier-based API rate limits (requests per minute)
+API_RATE_LIMITS = {
+    "free": int(os.getenv("RATE_LIMIT_API_FREE", "60")),      # 60 req/min
+    "pro": int(os.getenv("RATE_LIMIT_API_PRO", "120")),       # 120 req/min
+    "studio": int(os.getenv("RATE_LIMIT_API_STUDIO", "300")), # 300 req/min
+    "anonymous": int(os.getenv("RATE_LIMIT_API_ANON", "30")), # 30 req/min (unauthenticated)
+}
+API_RATE_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_API_WINDOW_SECONDS", "60"))  # 1 minute
 
 # Enable/disable rate limiting (useful for testing)
 RATE_LIMITING_ENABLED = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
@@ -591,6 +617,91 @@ def get_coach_rate_limit_status(user_id: str) -> dict:
     }
 
 
+# =============================================================================
+# Global API Rate Limiting
+# =============================================================================
+
+async def check_api_rate_limit(
+    request: Request,
+    user_id: Optional[str] = None,
+    tier: str = "anonymous"
+) -> None:
+    """
+    Check global API rate limit based on user tier.
+    
+    Rate limits (requests per minute):
+    - anonymous: 30/min (by IP)
+    - free: 60/min (by user ID)
+    - pro: 120/min (by user ID)
+    - studio: 300/min (by user ID)
+    
+    Args:
+        request: FastAPI request object
+        user_id: Authenticated user ID (None for anonymous)
+        tier: User's subscription tier
+        
+    Raises:
+        HTTPException: 429 if rate limit exceeded
+    """
+    if not RATE_LIMITING_ENABLED:
+        return
+    
+    # Determine rate limit key and max attempts
+    if user_id:
+        key = f"api:user:{user_id}"
+        max_attempts = API_RATE_LIMITS.get(tier, API_RATE_LIMITS["free"])
+    else:
+        client_ip = get_client_ip(request)
+        key = f"api:ip:{client_ip}"
+        max_attempts = API_RATE_LIMITS["anonymous"]
+    
+    store = get_rate_limit_store()
+    is_allowed, retry_after = store.check_and_increment(
+        key=key,
+        max_attempts=max_attempts,
+        window_seconds=API_RATE_WINDOW_SECONDS
+    )
+    
+    if not is_allowed:
+        raise create_rate_limit_response(retry_after)
+
+
+def get_api_rate_limit_status(
+    request: Request,
+    user_id: Optional[str] = None,
+    tier: str = "anonymous"
+) -> dict:
+    """
+    Get current API rate limit status.
+    
+    Args:
+        request: FastAPI request object
+        user_id: Authenticated user ID (None for anonymous)
+        tier: User's subscription tier
+        
+    Returns:
+        Dict with remaining requests and limit info
+    """
+    store = get_rate_limit_store()
+    
+    if user_id:
+        key = f"api:user:{user_id}"
+        max_attempts = API_RATE_LIMITS.get(tier, API_RATE_LIMITS["free"])
+    else:
+        client_ip = get_client_ip(request)
+        key = f"api:ip:{client_ip}"
+        max_attempts = API_RATE_LIMITS["anonymous"]
+    
+    remaining = store.get_remaining(key, max_attempts)
+    
+    return {
+        "remaining": remaining,
+        "limit": max_attempts,
+        "window_seconds": API_RATE_WINDOW_SECONDS,
+        "tier": tier if user_id else "anonymous",
+    }
+
+
 __all__ = [
     # Configuration
     "LOGIN_MAX_ATTEMPTS",
@@ -601,6 +712,8 @@ __all__ = [
     "COACH_MESSAGE_WINDOW_SECONDS",
     "COACH_SESSION_MAX_ATTEMPTS",
     "COACH_SESSION_WINDOW_SECONDS",
+    "API_RATE_LIMITS",
+    "API_RATE_WINDOW_SECONDS",
     "RATE_LIMITING_ENABLED",
     # Store
     "RateLimitStore",
@@ -621,4 +734,7 @@ __all__ = [
     "check_coach_message_rate_limit",
     "check_coach_session_rate_limit",
     "get_coach_rate_limit_status",
+    # Global API Rate Limiting
+    "check_api_rate_limit",
+    "get_api_rate_limit_status",
 ]

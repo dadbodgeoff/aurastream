@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Beaker, Package, Zap, AlertCircle, Clock } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { analytics, useMobileDetection } from '@aurastream/shared';
+import { useMobileDetection } from '@aurastream/shared';
 import { toast } from '@/components/ui/Toast';
 import { downloadAsset, getAssetFilename } from '@/utils/download';
 import { PageHeader } from '@/components/navigation';
@@ -76,18 +76,6 @@ export default function AuraLabPage() {
   const elements: Element[] = elementsData?.elements ?? ELEMENTS;
   const premiumLocked = elementsData?.premiumLocked ?? false;
 
-  // Track page view on mount
-  useEffect(() => {
-    analytics.page('aura_lab', { tab: 'lab' });
-  }, []);
-
-  // Track tab changes
-  useEffect(() => {
-    if (activeTab === 'inventory') {
-      analytics.page('aura_lab_inventory', { totalFusions: inventory?.total ?? 0 });
-    }
-  }, [activeTab, inventory?.total]);
-
   // Get selected element
   const selectedElement = useMemo(() => {
     if (!selectedElementId) return null;
@@ -108,12 +96,6 @@ export default function AuraLabPage() {
         subjectImageUrl: result.imageUrl,
         error: null,
       }));
-      
-      // Track subject upload
-      analytics.track('aura_lab_subject_set', {
-        fileSize: file.size,
-        fileType: file.type,
-      }, 'feature');
       
       toast.success('Subject uploaded!', {
         description: 'Now lock it in to start experimenting.',
@@ -162,13 +144,6 @@ export default function AuraLabPage() {
     }
 
     setLabState((prev) => ({ ...prev, step: 'fusing' }));
-    
-    // Track fusion started
-    analytics.track('aura_lab_fusion_started', {
-      elementId: selectedElementId,
-      elementName: selectedElement?.name ?? 'unknown',
-      isPremium: selectedElement?.premium ?? false,
-    }, 'feature');
 
     try {
       const result = await fuseMutation.mutateAsync({
@@ -182,25 +157,6 @@ export default function AuraLabPage() {
         currentFusion: result,
         error: null,
       }));
-      
-      // Track fusion completed
-      analytics.track('aura_lab_fusion_completed', {
-        elementId: selectedElementId,
-        rarity: result.rarity,
-        isFirstDiscovery: result.isFirstDiscovery,
-        visualImpact: result.scores.visualImpact,
-        creativity: result.scores.creativity,
-        memePotential: result.scores.memePotential,
-        technicalQuality: result.scores.technicalQuality,
-      }, 'feature');
-      
-      // Track first discovery separately
-      if (result.isFirstDiscovery) {
-        analytics.track('aura_lab_first_discovery', {
-          elementId: selectedElementId,
-          rarity: result.rarity,
-        }, 'feature');
-      }
 
       // Show appropriate toast based on rarity
       if (result.rarity === 'mythic') {
@@ -223,12 +179,6 @@ export default function AuraLabPage() {
         step: 'select',
         error: message,
       }));
-      
-      // Track fusion failed
-      analytics.track('aura_lab_fusion_failed', {
-        elementId: selectedElementId,
-        error: message,
-      }, 'error');
     }
   }, [labState.subjectId, selectedElementId, selectedElement, fuseMutation, usage]);
 
@@ -238,13 +188,6 @@ export default function AuraLabPage() {
 
     try {
       await keepFusionMutation.mutateAsync(labState.currentFusion.fusionId);
-      
-      // Track fusion kept
-      analytics.track('aura_lab_fusion_kept', {
-        fusionId: labState.currentFusion.fusionId,
-        rarity: labState.currentFusion.rarity,
-        elementId: selectedElementId,
-      }, 'feature');
       
       toast.success('Fusion saved!', {
         description: 'Added to your inventory.',
@@ -269,13 +212,6 @@ export default function AuraLabPage() {
 
     try {
       await trashFusionMutation.mutateAsync(labState.currentFusion.fusionId);
-      
-      // Track fusion trashed
-      analytics.track('aura_lab_fusion_trashed', {
-        fusionId: labState.currentFusion.fusionId,
-        rarity: labState.currentFusion.rarity,
-        elementId: selectedElementId,
-      }, 'feature');
       
       toast.info('Fusion discarded');
       

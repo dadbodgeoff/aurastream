@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useUnreadCount } from '@aurastream/api-client/src/hooks/useMessages';
 import { useFriendsList } from '@aurastream/api-client/src/hooks/useFriends';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
 import { FriendsPanel } from './FriendsPanel';
 import { MessagesPanel } from './MessagesPanel';
 import { ChatWindow } from './ChatWindow';
@@ -76,27 +77,33 @@ export function SocialHub({ currentUserId }: SocialHubProps) {
       </div>
 
       {/* Panels */}
-      <FriendsPanel
-        isOpen={friendsPanelOpen}
-        onClose={() => setFriendsPanelOpen(false)}
-        onOpenChat={handleOpenChat}
-      />
+      <AsyncErrorBoundary resourceName="friends panel">
+        <FriendsPanel
+          isOpen={friendsPanelOpen}
+          onClose={() => setFriendsPanelOpen(false)}
+          onOpenChat={handleOpenChat}
+        />
+      </AsyncErrorBoundary>
 
-      <MessagesPanel
-        isOpen={messagesPanelOpen}
-        onClose={() => setMessagesPanelOpen(false)}
-        onOpenChat={handleOpenChat}
-      />
+      <AsyncErrorBoundary resourceName="messages panel">
+        <MessagesPanel
+          isOpen={messagesPanelOpen}
+          onClose={() => setMessagesPanelOpen(false)}
+          onOpenChat={handleOpenChat}
+        />
+      </AsyncErrorBoundary>
 
       {/* Chat Window */}
       {chatTarget && (
-        <ChatWindow
-          userId={chatTarget.userId}
-          displayName={chatTarget.displayName}
-          avatarUrl={chatTarget.avatarUrl}
-          currentUserId={currentUserId}
-          onClose={handleCloseChat}
-        />
+        <AsyncErrorBoundary resourceName="chat window">
+          <ChatWindow
+            userId={chatTarget.userId}
+            displayName={chatTarget.displayName}
+            avatarUrl={chatTarget.avatarUrl}
+            currentUserId={currentUserId}
+            onClose={handleCloseChat}
+          />
+        </AsyncErrorBoundary>
       )}
     </>
   );

@@ -235,7 +235,6 @@ class ProfileCreatorService:
             asset_type=creation_type,  # Use creation_type as asset_type
             brand_context=brand_context or {},
             mood=style_preset or "custom",
-            initial_description=initial_description,
         )
         
         session_id = session.session_id
@@ -260,8 +259,13 @@ class ProfileCreatorService:
                 full_response += token
                 yield StreamChunk(type="token", content=token)
             
-            # Extract intent from response
-            intent = self._intent_extractor.extract(full_response)
+            # Extract intent from response using the correct method
+            intent = self._intent_extractor.extract_from_response(
+                response=full_response,
+                original_description=initial_description or "",
+                mood=style_preset,
+            )
+            is_ready = self._intent_extractor.check_intent_ready(full_response)
             
             # Update session
             await self.session_manager.add_message(
@@ -281,7 +285,7 @@ class ProfileCreatorService:
                 )
             )
             
-            if intent.is_ready:
+            if is_ready:
                 await self.session_manager.update_session_metadata(
                     session_id,
                     {
@@ -380,8 +384,13 @@ class ProfileCreatorService:
                 full_response += token
                 yield StreamChunk(type="token", content=token)
             
-            # Extract intent
-            intent = self._intent_extractor.extract(full_response)
+            # Extract intent using the correct method
+            intent = self._intent_extractor.extract_from_response(
+                response=full_response,
+                original_description=message,
+                mood=session.mood,
+            )
+            is_ready = self._intent_extractor.check_intent_ready(full_response)
             
             # Update session
             await self.session_manager.add_message(
@@ -403,7 +412,7 @@ class ProfileCreatorService:
             
             new_turns_used = turns_used + 1
             
-            if intent.is_ready:
+            if is_ready:
                 await self.session_manager.update_session_metadata(
                     session_id,
                     {
