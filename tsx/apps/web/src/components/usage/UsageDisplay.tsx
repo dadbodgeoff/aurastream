@@ -113,7 +113,7 @@ interface TierBadgeProps {
 
 const TierBadge = memo(function TierBadge({ tier }: TierBadgeProps) {
   const colors: Record<string, string> = {
-    free: 'bg-gray-500/10 text-gray-400 border-gray-500/30',
+    free: 'bg-text-muted/10 text-text-muted border-text-muted/30',
     pro: 'bg-interactive-600/10 text-interactive-400 border-interactive-500/30',
     studio: 'bg-accent-600/10 text-accent-400 border-accent-500/30',
   };
@@ -122,7 +122,7 @@ const TierBadge = memo(function TierBadge({ tier }: TierBadgeProps) {
 
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border',
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-medium border',
       colors[tier] || colors.free
     )}>
       {tier === 'studio' && <SparklesIcon className="w-2.5 h-2.5" />}
@@ -219,7 +219,7 @@ const CompactFeature = memo(function CompactFeature({
       <div className={cn('w-4 h-4 rounded flex items-center justify-center', colors.bg)}>
         <Icon className={cn('w-2.5 h-2.5', colors.text)} />
       </div>
-      <span className={cn('text-[10px] font-medium', isAtLimit ? 'text-red-400' : 'text-text-primary')}>
+      <span className={cn('text-micro font-medium', isAtLimit ? 'text-red-400' : 'text-text-primary')}>
         {unlimited ? (
           <InfinityIcon className="w-2.5 h-2.5 inline text-accent-400" />
         ) : (
@@ -366,13 +366,13 @@ export const UsageDisplay = memo(function UsageDisplay({
         <div>
           <TierBadge tier={data.tier} />
           {data.resetsAt && (
-            <p className="text-[10px] text-text-tertiary mt-1.5">
+            <p className="text-micro text-text-tertiary mt-1.5">
               Resets {new Date(data.resetsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </p>
           )}
         </div>
         {isPro && (
-          <span className="text-[10px] text-accent-400 font-medium">
+          <span className="text-micro text-accent-400 font-medium">
             ✨ Pro Active
           </span>
         )}
@@ -392,7 +392,7 @@ export const UsageDisplay = memo(function UsageDisplay({
           <p className="text-xs font-medium text-red-400">
             You've reached a limit
           </p>
-          <p className="text-[10px] text-text-tertiary mt-0.5">
+          <p className="text-micro text-text-tertiary mt-0.5">
             {canUpgrade 
               ? 'Upgrade to Pro for more usage'
               : 'Resets at start of next month'
@@ -422,10 +422,10 @@ export const UsageDisplay = memo(function UsageDisplay({
       {/* Pro Benefits */}
       {showUpgrade && canUpgrade && (
         <div className="mt-3 pt-3 border-t border-border-default">
-          <p className="text-[10px] font-medium text-text-secondary mb-1.5">
+          <p className="text-micro font-medium text-text-secondary mb-1.5">
             Pro includes:
           </p>
-          <ul className="grid grid-cols-2 gap-1 text-[10px] text-text-tertiary">
+          <ul className="grid grid-cols-2 gap-1 text-micro text-text-tertiary">
             <li className="flex items-center gap-1">
               <PaletteIcon className="w-2.5 h-2.5 text-purple-400" />
               10 Vibe Branding

@@ -258,7 +258,7 @@ export function IntelOnboarding() {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', delay: 0.2 }}
-          className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-interactive-500/20 to-accent-500/20 flex items-center justify-center"
+          className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-interactive-500/20 flex items-center justify-center"
         >
           <Sparkles className="w-10 h-10 text-interactive-400" />
         </motion.div>

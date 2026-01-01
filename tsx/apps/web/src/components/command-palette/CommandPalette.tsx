@@ -288,15 +288,15 @@ export function CommandPalette() {
           <div className="flex items-center justify-between px-4 py-2 border-t border-border-subtle bg-background-elevated/50">
             <div className="flex items-center gap-4 text-xs text-text-muted">
               <span className="flex items-center gap-1">
-                <kbd className="px-1 py-0.5 bg-background-elevated border border-border-subtle rounded text-[10px]">↑↓</kbd>
+                <kbd className="px-1 py-0.5 bg-background-elevated border border-border-subtle rounded text-micro">↑↓</kbd>
                 <span>Navigate</span>
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="px-1 py-0.5 bg-background-elevated border border-border-subtle rounded text-[10px]">↵</kbd>
+                <kbd className="px-1 py-0.5 bg-background-elevated border border-border-subtle rounded text-micro">↵</kbd>
                 <span>Select</span>
               </span>
               <span className="flex items-center gap-1">
-                <kbd className="px-1 py-0.5 bg-background-elevated border border-border-subtle rounded text-[10px]">Esc</kbd>
+                <kbd className="px-1 py-0.5 bg-background-elevated border border-border-subtle rounded text-micro">Esc</kbd>
                 <span>Close</span>
               </span>
             </div>

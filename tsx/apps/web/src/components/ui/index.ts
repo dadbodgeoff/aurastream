@@ -5,6 +5,43 @@
  * Re-exports all UI components for convenient importing.
  */
 
+// Typography components
+export {
+  Text,
+  Heading,
+  Body,
+  Caption,
+  Label,
+  Overline,
+  Micro,
+} from './Typography';
+
+export type {
+  TypographyProps,
+  TypographyVariant,
+  TypographyColor,
+} from './Typography';
+
+// Badge, Tag, Pill components
+export {
+  Badge,
+  Tag,
+  Pill,
+  StatusDot,
+} from './Badge';
+
+export type {
+  BadgeProps,
+  BadgeVariant,
+  BadgeSize,
+  TagProps,
+  TagVariant,
+  PillProps,
+  PillVariant,
+  StatusDotProps,
+  StatusDotVariant,
+} from './Badge';
+
 // ButtonGroup component
 export { ButtonGroup, ButtonGroupItem } from './ButtonGroup';
 export type {

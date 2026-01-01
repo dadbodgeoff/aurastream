@@ -218,12 +218,12 @@ export default function DailyBriefPage() {
 
         <div className="flex items-center gap-2">
           {subscribedCategories.slice(0, 2).map(cat => (
-            <span key={cat.key} className="px-2 py-1 bg-white/5 text-text-tertiary text-[10px] rounded-full">
+            <span key={cat.key} className="px-2 py-1 bg-white/5 text-text-tertiary text-micro rounded-full">
               {cat.name}
             </span>
           ))}
           {subscribedCategories.length > 2 && (
-            <span className="text-[10px] text-text-tertiary">+{subscribedCategories.length - 2}</span>
+            <span className="text-micro text-text-tertiary">+{subscribedCategories.length - 2}</span>
           )}
           <Link 
             href="/intel/settings"
@@ -278,7 +278,7 @@ export default function DailyBriefPage() {
       {/* ================================================================== */}
       {/* MINIMAL FOOTER */}
       {/* ================================================================== */}
-      <footer className="flex items-center justify-between py-3 text-[10px] text-text-tertiary">
+      <footer className="flex items-center justify-between py-3 text-micro text-text-tertiary">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3 h-3" />
           <span>Refreshes every 30 min</span>

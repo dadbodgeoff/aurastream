@@ -69,7 +69,7 @@ export function CTASection() {
         <div 
           className={cn(
             "relative p-8 sm:p-12 rounded-3xl overflow-hidden",
-            "bg-gradient-to-br from-interactive-600/10 via-background-surface to-accent-600/10",
+            "bg-interactive-600/10",
             "border border-border-subtle",
             "transition-all duration-700 ease-out",
             isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"

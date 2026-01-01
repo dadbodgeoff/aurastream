@@ -158,7 +158,7 @@ export function IntelEmptyState({
         transition={{ duration: 0.3, delay: 0.1 }}
         className={cn(
           'relative w-20 h-20 rounded-2xl mb-6',
-          'bg-gradient-to-br from-interactive-600/20 to-interactive-600/5',
+          'bg-interactive-600/15',
           'border border-interactive-500/20',
           'flex items-center justify-center'
         )}

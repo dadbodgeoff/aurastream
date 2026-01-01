@@ -40,12 +40,12 @@ export function StyleSelector({ selected, onSelect }: StyleSelectorProps) {
 
             <div className="flex items-center gap-1.5">
               <span className="text-sm">{preset.icon}</span>
-              <h3 className={cn("font-medium text-[11px]", isSelected ? "text-interactive-400" : "text-text-primary")}>
+              <h3 className={cn("font-medium text-micro", isSelected ? "text-interactive-400" : "text-text-primary")}>
                 {preset.name}
               </h3>
             </div>
 
-            <p className="text-[9px] text-text-tertiary mt-0.5 line-clamp-1">
+            <p className="text-micro text-text-tertiary mt-0.5 line-clamp-1">
               {preset.description}
             </p>
           </button>

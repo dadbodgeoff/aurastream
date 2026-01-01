@@ -38,7 +38,7 @@ export function ToneSelector({ value, onChange }: ToneSelectorProps) {
               {tone.label}
             </p>
           </div>
-          <p className="text-[11px] text-text-tertiary mt-1 line-clamp-1">{tone.description}</p>
+          <p className="text-micro text-text-tertiary mt-1 line-clamp-1">{tone.description}</p>
         </button>
       ))}
     </div>

@@ -50,7 +50,7 @@ export function BriefHero({
   const moreCount = subscribedCategories.length - 3;
 
   return (
-    <div className="bg-gradient-to-r from-interactive-600/10 via-interactive-600/5 to-transparent border border-interactive-600/20 rounded-2xl p-6">
+    <div className="bg-interactive-600/10 border border-interactive-600/20 rounded-2xl p-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary">

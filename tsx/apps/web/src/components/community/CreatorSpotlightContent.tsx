@@ -149,7 +149,7 @@ function CreatorCard({ creator, onFollow, onUnfollow, isFollowPending }: Creator
             />
           ) : (
             <div 
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-interactive-500 to-accent-500 flex items-center justify-center text-lg font-bold text-white"
+              className="w-12 h-12 rounded-full bg-interactive-500 flex items-center justify-center text-lg font-bold text-white"
               aria-hidden="true"
             >
               {creator.displayName.charAt(0).toUpperCase()}

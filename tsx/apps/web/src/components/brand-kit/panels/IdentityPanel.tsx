@@ -463,7 +463,7 @@ export function IdentityPanel({
                 </div>
                 <div className="text-center">
                   <p className="text-xs font-medium text-text-primary">Click to upload logo</p>
-                  <p className="text-[10px] text-text-muted mt-0.5">PNG, JPEG, WebP, SVG • Max 10MB</p>
+                  <p className="text-micro text-text-muted mt-0.5">PNG, JPEG, WebP, SVG • Max 10MB</p>
                 </div>
               </>
             )}

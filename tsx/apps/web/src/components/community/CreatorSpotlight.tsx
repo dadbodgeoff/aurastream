@@ -48,7 +48,7 @@ function CreatorCard({ creator, onFollow, onUnfollow }: CreatorCardProps) {
           </h3>
           
           {/* Stats */}
-          <div className="text-[10px] text-text-muted">
+          <div className="text-micro text-text-muted">
             {creator.followerCount.toLocaleString()} followers
           </div>
         </div>
@@ -137,7 +137,7 @@ export function CreatorSpotlight({
       <div className="flex items-center justify-between mb-2">
         <div>
           <h2 className="text-sm font-semibold text-text-primary">Community Spotlight</h2>
-          <p className="text-[11px] text-text-muted">Discover talented creators</p>
+          <p className="text-micro text-text-muted">Discover talented creators</p>
         </div>
         
         {/* Scroll Buttons */}

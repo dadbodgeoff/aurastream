@@ -58,7 +58,7 @@ interface AvatarProps {
 }
 
 function Avatar({ url, name, size = 'md', isKing = false }: AvatarProps) {
-  const sizeClasses = { sm: 'w-7 h-7 text-[10px]', md: 'w-8 h-8 text-xs' };
+  const sizeClasses = { sm: 'w-7 h-7 text-micro', md: 'w-8 h-8 text-xs' };
   return (
     <div className="relative">
       {url ? (
@@ -70,7 +70,7 @@ function Avatar({ url, name, size = 'md', isKing = false }: AvatarProps) {
           decoding="async"
         />
       ) : (
-        <div className={cn(sizeClasses[size], 'rounded-full bg-gradient-to-br from-interactive-500 to-accent-500 flex items-center justify-center text-white font-semibold')}>
+        <div className={cn(sizeClasses[size], 'rounded-full bg-interactive-500 flex items-center justify-center text-white font-semibold')}>
           {name.charAt(0).toUpperCase()}
         </div>
       )}
@@ -87,15 +87,15 @@ function UserBadgeDisplay({ badges }: { badges: UserBadges }) {
   return (
     <div className="flex items-center gap-0.5">
       {badges.isKing && (
-        <span className="px-1 py-px bg-accent-500/20 text-accent-400 text-[9px] font-bold rounded flex items-center gap-0.5">
+        <span className="px-1 py-px bg-accent-500/20 text-accent-400 text-micro font-bold rounded flex items-center gap-0.5">
           <Crown className="w-2 h-2" /> KING
         </span>
       )}
       {badges.isTopTen && !badges.isKing && (
-        <span className="px-1 py-px bg-interactive-500/20 text-interactive-400 text-[9px] font-bold rounded">TOP 10</span>
+        <span className="px-1 py-px bg-interactive-500/20 text-interactive-400 text-micro font-bold rounded">TOP 10</span>
       )}
       {badges.tier === 'pro' && (
-        <span className="px-1 py-px bg-green-500/20 text-green-400 text-[9px] font-bold rounded flex items-center gap-0.5">
+        <span className="px-1 py-px bg-green-500/20 text-green-400 text-micro font-bold rounded flex items-center gap-0.5">
           <Zap className="w-2 h-2" /> PRO
         </span>
       )}
@@ -119,7 +119,7 @@ function ChatMessage({ message, isKingMessage = false }: ChatMessageProps) {
             {author.displayName}
           </span>
           <UserBadgeDisplay badges={author.badges} />
-          <span className="text-[10px] text-text-tertiary flex items-center gap-0.5">
+          <span className="text-micro text-text-tertiary flex items-center gap-0.5">
             <Clock className="w-2.5 h-2.5" />{formatRelativeTime(createdAt)}
           </span>
         </div>
@@ -142,12 +142,12 @@ function ChatMessage({ message, isKingMessage = false }: ChatMessageProps) {
                 />
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 text-interactive-400 text-[11px] font-medium">
+                <div className="flex items-center gap-1 text-interactive-400 text-micro font-medium">
                   <ExternalLink className="w-3 h-3 flex-shrink-0" />
                   <span className="truncate">{linkPreview?.title || new URL(linkUrl).hostname}</span>
                 </div>
                 {linkPreview?.description && (
-                  <p className="text-[10px] text-text-tertiary mt-0.5 line-clamp-1">{linkPreview.description}</p>
+                  <p className="text-micro text-text-tertiary mt-0.5 line-clamp-1">{linkPreview.description}</p>
                 )}
               </div>
             </div>
@@ -160,13 +160,13 @@ function ChatMessage({ message, isKingMessage = false }: ChatMessageProps) {
 
 function KingBanner({ message }: { message: PromoMessage }) {
   return (
-    <div className="relative overflow-hidden rounded-lg bg-gradient-to-r from-accent-600/10 via-accent-500/5 to-accent-600/10 border border-accent-500/20 p-3">
+    <div className="relative overflow-hidden rounded-lg bg-accent-600/10 border border-accent-500/20 p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <div className="w-5 h-5 rounded-full bg-accent-500 flex items-center justify-center">
           <Crown className="w-3 h-3 text-white" />
         </div>
         <div>
-          <h3 className="text-[11px] font-bold text-accent-400">King of the Hill</h3>
+          <h3 className="text-micro font-bold text-accent-400">King of the Hill</h3>
         </div>
       </div>
       <ChatMessage message={message} isKingMessage />
@@ -180,7 +180,7 @@ interface LeaderboardCardProps {
 }
 
 function LeaderboardCard({ entry, index }: LeaderboardCardProps) {
-  const rankColors = ['from-accent-500 to-yellow-500', 'from-slate-400 to-slate-300', 'from-amber-700 to-amber-600'];
+  const rankColors = ['bg-accent-500', 'bg-slate-400', 'bg-amber-700'];
   const isTopThree = index < 3;
   return (
     <div className={cn(
@@ -188,18 +188,18 @@ function LeaderboardCard({ entry, index }: LeaderboardCardProps) {
       isTopThree ? 'bg-background-elevated/50' : 'hover:bg-background-elevated/30'
     )}>
       <div className={cn(
-        'w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold',
-        isTopThree ? `bg-gradient-to-br ${rankColors[index]} text-white` : 'bg-background-elevated text-text-tertiary'
+        'w-5 h-5 rounded-full flex items-center justify-center text-micro font-bold',
+        isTopThree ? `${rankColors[index]} text-white` : 'bg-background-elevated text-text-tertiary'
       )}>
         {entry.rank}
       </div>
       <Avatar url={entry.avatarUrl} name={entry.displayName} size="sm" isKing={entry.isKing} />
       <div className="flex-1 min-w-0">
-        <p className={cn('text-[11px] font-medium truncate', entry.isKing ? 'text-accent-400' : 'text-text-primary')}>
+        <p className={cn('text-micro font-medium truncate', entry.isKing ? 'text-accent-400' : 'text-text-primary')}>
           {entry.displayName}
         </p>
       </div>
-      <p className={cn('text-[11px] font-bold', isTopThree ? 'text-accent-400' : 'text-text-tertiary')}>
+      <p className={cn('text-micro font-bold', isTopThree ? 'text-accent-400' : 'text-text-tertiary')}>
         {formatCurrency(entry.totalDonationsCents)}
       </p>
     </div>
@@ -280,18 +280,18 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-interactive-600 to-accent-600 flex items-center justify-center shadow-md shadow-interactive-600/25">
+            <div className="w-8 h-8 rounded-lg bg-interactive-600 flex items-center justify-center shadow-md shadow-interactive-600/25">
               <MessageSquare className="w-4 h-4 text-white" />
             </div>
             <div>
               <h2 className="text-base font-bold text-text-primary">Promo Board</h2>
-              <p className="text-[11px] text-text-secondary">Community Spotlight • $1/message</p>
+              <p className="text-micro text-text-secondary">Community Spotlight • $1/message</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Desktop Stats */}
-            <div className="hidden md:flex items-center gap-4 text-[11px]">
+            <div className="hidden md:flex items-center gap-4 text-micro">
               <div className="flex items-center gap-1 text-text-tertiary">
                 <Users className="w-3.5 h-3.5" />
                 <span>{leaderboard?.entries.length ?? 0} donors</span>
@@ -308,7 +308,7 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
 
             <button
               onClick={() => setShowCompose(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-interactive-600 to-accent-600 hover:from-interactive-500 hover:to-accent-500 text-white text-xs font-semibold rounded-lg shadow-lg shadow-interactive-500/25 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-interactive-600 hover:bg-interactive-500 text-white text-xs font-semibold rounded-lg shadow-lg shadow-interactive-500/25 transition-all"
             >
               <Send className="w-3.5 h-3.5" />
               Post Message
@@ -331,9 +331,9 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
               <div className="px-3 py-2 border-b border-border-subtle bg-background-surface/80 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-success-muted animate-pulse" />
-                  <span className="text-[11px] font-medium text-text-secondary">Live Feed</span>
+                  <span className="text-micro font-medium text-text-secondary">Live Feed</span>
                 </div>
-                <span className="text-[10px] text-text-tertiary">
+                <span className="text-micro text-text-tertiary">
                   {totalMessages} message{totalMessages !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -366,7 +366,7 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
                   <button 
                     onClick={() => fetchNextPage()} 
                     disabled={isFetchingNextPage} 
-                    className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-1 py-1.5 text-micro text-text-tertiary hover:text-text-secondary transition-colors disabled:opacity-50"
                   >
                     <ChevronDown className="w-3.5 h-3.5" />
                     {isFetchingNextPage ? 'Loading...' : 'Load more'}
@@ -379,15 +379,15 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
             <div className="grid grid-cols-3 gap-2 lg:hidden">
               <div className="p-2 rounded-lg bg-background-surface border border-border-subtle text-center">
                 <p className="text-sm font-bold text-text-primary">{leaderboard?.entries.length ?? 0}</p>
-                <p className="text-[10px] text-text-tertiary">Donors</p>
+                <p className="text-micro text-text-tertiary">Donors</p>
               </div>
               <div className="p-2 rounded-lg bg-background-surface border border-border-subtle text-center">
                 <p className="text-sm font-bold text-text-primary">{totalMessages}</p>
-                <p className="text-[10px] text-text-tertiary">Messages</p>
+                <p className="text-micro text-text-tertiary">Messages</p>
               </div>
               <div className="p-2 rounded-lg bg-background-surface border border-border-subtle text-center">
                 <p className="text-sm font-bold text-success-muted">{formatCurrency(totalDonations)}</p>
-                <p className="text-[10px] text-text-tertiary">Raised</p>
+                <p className="text-micro text-text-tertiary">Raised</p>
               </div>
             </div>
           </div>
@@ -410,8 +410,8 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
                 ) : leaderboard?.entries.length === 0 ? (
                   <div className="py-6 text-center">
                     <Trophy className="w-8 h-8 text-text-disabled mx-auto mb-2" />
-                    <p className="text-[11px] text-text-tertiary">No donors yet</p>
-                    <p className="text-[10px] text-text-disabled">Be the first!</p>
+                    <p className="text-micro text-text-tertiary">No donors yet</p>
+                    <p className="text-micro text-text-disabled">Be the first!</p>
                   </div>
                 ) : (
                   <div className="space-y-0.5">
@@ -429,17 +429,17 @@ export function PromoBoardContent({ className }: PromoBoardContentProps) {
                 <Sparkles className="w-4 h-4 text-interactive-400" />
                 <h3 className="text-xs font-semibold text-text-primary">How It Works</h3>
               </div>
-              <ul className="space-y-2 text-[11px] text-text-secondary">
+              <ul className="space-y-2 text-micro text-text-secondary">
                 <li className="flex items-start gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-[9px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                  <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-micro flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
                   <span>Post a message for $1 to promote your content</span>
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-[9px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                  <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-micro flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
                   <span>Top donor becomes King of the Hill</span>
                 </li>
                 <li className="flex items-start gap-1.5">
-                  <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-[9px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                  <span className="w-4 h-4 rounded-full bg-interactive-500/20 text-interactive-400 text-micro flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
                   <span>King's message stays pinned at the top</span>
                 </li>
               </ul>

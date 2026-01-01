@@ -56,7 +56,7 @@ export function MessagesPanel({ isOpen, onClose, onOpenChat }: MessagesPanelProp
             <div>
               <h2 className="text-base font-semibold text-text-primary">Messages</h2>
               {totalUnread > 0 && (
-                <p className="text-[10px] text-interactive-400">{totalUnread} unread</p>
+                <p className="text-micro text-interactive-400">{totalUnread} unread</p>
               )}
             </div>
             <button
@@ -87,7 +87,7 @@ export function MessagesPanel({ isOpen, onClose, onOpenChat }: MessagesPanelProp
                 </svg>
               </div>
               <p className="text-xs text-text-secondary mb-1">No conversations yet</p>
-              <p className="text-[10px] text-text-tertiary">Start a chat from your friends list</p>
+              <p className="text-micro text-text-tertiary">Start a chat from your friends list</p>
             </div>
           ) : (
             <div className="p-2 space-y-1">
@@ -126,7 +126,7 @@ function ConversationItem({ conversation, formatTime, onClick }: ConversationIte
         {otherUserAvatarUrl ? (
           <img src={otherUserAvatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full bg-interactive-500/20 flex items-center justify-center">
             <span className="text-sm font-medium text-text-secondary">
               {(otherUserDisplayName || '?')[0].toUpperCase()}
             </span>
@@ -140,12 +140,12 @@ function ConversationItem({ conversation, formatTime, onClick }: ConversationIte
           <p className={`text-xs truncate ${unreadCount > 0 ? 'font-semibold text-text-primary' : 'font-medium text-text-primary'}`}>
             {otherUserDisplayName || 'Unknown'}
           </p>
-          <span className="text-[9px] text-text-tertiary flex-shrink-0">
+          <span className="text-micro text-text-tertiary flex-shrink-0">
             {formatTime(updatedAt)}
           </span>
         </div>
         {lastMessage && (
-          <p className={`text-[10px] truncate ${unreadCount > 0 ? 'text-text-secondary' : 'text-text-tertiary'}`}>
+          <p className={`text-micro truncate ${unreadCount > 0 ? 'text-text-secondary' : 'text-text-tertiary'}`}>
             {lastMessage.content}
           </p>
         )}
@@ -153,7 +153,7 @@ function ConversationItem({ conversation, formatTime, onClick }: ConversationIte
 
       {/* Unread badge */}
       {unreadCount > 0 && (
-        <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[9px] font-medium text-white bg-interactive-600 rounded-full">
+        <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-micro font-medium text-white bg-interactive-600 rounded-full">
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}

@@ -28,7 +28,7 @@ export function ColorPalettePreview({
     <div className="space-y-3">
       {/* Primary colors */}
       <div>
-        <p className="text-xs text-zinc-500 uppercase font-bold mb-2">Primary Colors</p>
+        <p className="text-xs text-text-tertiary uppercase font-bold mb-2">Primary Colors</p>
         <div className="flex rounded-lg overflow-hidden h-12">
           {primaryColors.map((color, i) => (
             <motion.button
@@ -54,7 +54,7 @@ export function ColorPalettePreview({
       
       {/* Accent colors */}
       <div>
-        <p className="text-xs text-zinc-500 uppercase font-bold mb-2">Accent Colors</p>
+        <p className="text-xs text-text-tertiary uppercase font-bold mb-2">Accent Colors</p>
         <div className="flex gap-2">
           {accentColors.map((color, i) => (
             <motion.button
@@ -67,9 +67,8 @@ export function ColorPalettePreview({
               style={{ backgroundColor: color }}
               title={`Click to copy ${color}`}
             >
-              {/* Hover overlay with hex */}
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40 rounded-lg">
-                <span className="text-[10px] font-mono text-white font-bold">
+                <span className="text-micro font-mono text-white font-bold">
                   {copiedColor === color ? '✓' : color.slice(1, 4)}
                 </span>
               </div>

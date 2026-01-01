@@ -42,7 +42,7 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
           </svg>
         </div>
         <p className="text-xs text-text-secondary mb-1">No pending requests</p>
-        <p className="text-[10px] text-text-tertiary">Friend requests will appear here</p>
+        <p className="text-micro text-text-tertiary">Friend requests will appear here</p>
       </div>
     );
   }
@@ -90,7 +90,7 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
       {/* Pending Requests */}
       {pendingRequests.length > 0 && (
         <div>
-          <h3 className="px-2 mb-2 text-[10px] font-medium text-text-tertiary uppercase tracking-wider">
+          <h3 className="px-2 mb-2 text-micro font-medium text-text-tertiary uppercase tracking-wider">
             Pending ({pendingRequests.length})
           </h3>
           <div className="space-y-1">
@@ -114,7 +114,7 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
                       className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-interactive-500/20 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium text-text-secondary">
                         {(request.displayName || '?')[0].toUpperCase()}
                       </span>
@@ -126,7 +126,7 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
                     <p className="text-xs font-medium text-text-primary truncate">
                       {request.displayName || 'Unknown'}
                     </p>
-                    <p className="text-[10px] text-text-tertiary">Wants to be friends</p>
+                    <p className="text-micro text-text-tertiary">Wants to be friends</p>
                   </div>
 
                   {/* Actions */}
@@ -170,7 +170,7 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
       {/* Sent Requests */}
       {sentRequests.length > 0 && (
         <div>
-          <h3 className="px-2 mb-2 text-[10px] font-medium text-text-tertiary uppercase tracking-wider">
+          <h3 className="px-2 mb-2 text-micro font-medium text-text-tertiary uppercase tracking-wider">
             Sent ({sentRequests.length})
           </h3>
           <div className="space-y-1">
@@ -187,7 +187,7 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
                     className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-interactive-500/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-xs font-medium text-text-secondary">
                       {(request.displayName || '?')[0].toUpperCase()}
                     </span>
@@ -199,11 +199,11 @@ export function FriendRequests({ pendingRequests, sentRequests, isLoading }: Fri
                   <p className="text-xs font-medium text-text-primary truncate">
                     {request.displayName || 'Unknown'}
                   </p>
-                  <p className="text-[10px] text-text-tertiary">Request pending</p>
+                  <p className="text-micro text-text-tertiary">Request pending</p>
                 </div>
 
                 {/* Status */}
-                <span className="px-2 py-0.5 text-[9px] font-medium text-warning-main bg-warning-main/10 rounded-full">
+                <span className="px-2 py-0.5 text-micro font-medium text-warning-main bg-warning-main/10 rounded-full">
                   Pending
                 </span>
               </div>

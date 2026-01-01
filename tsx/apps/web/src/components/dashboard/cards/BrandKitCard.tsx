@@ -140,7 +140,7 @@ export function BrandKitCard({
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-text-primary truncate">{name}</h3>
               {isActive && (
-                <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 rounded-full uppercase tracking-wide">
+                <span className="flex items-center gap-1 px-2 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded-full uppercase tracking-wide">
                   <CheckIcon size="sm" />
                   Active
                 </span>

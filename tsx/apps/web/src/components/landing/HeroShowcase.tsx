@@ -87,7 +87,7 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
             <div className="w-3 h-3 rounded-full bg-[#27CA40] shadow-inner" />
           </div>
           <div className="flex-1 flex justify-center">
-            <div className="px-4 py-1 rounded-md bg-background-base/80 text-[11px] text-text-tertiary font-medium">
+            <div className="px-4 py-1 rounded-md bg-background-base/80 text-micro text-text-tertiary font-medium">
               aurastream.app/create
             </div>
           </div>
@@ -97,7 +97,7 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
         <div className="p-6 space-y-4">
           {/* Prompt input mockup */}
           <div className="space-y-2">
-            <label className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider">
+            <label className="text-micro font-semibold text-text-tertiary uppercase tracking-wider">
               Describe your asset
             </label>
             <div className="relative">
@@ -169,7 +169,7 @@ export function HeroShowcase({ className }: HeroShowcaseProps) {
             
             {/* Asset type badge with slide-in */}
             {showResult && (
-              <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-black/70 backdrop-blur-sm text-[11px] font-semibold text-white animate-slide-in-left">
+              <div className="absolute top-3 left-3 px-2 py-1 rounded-md bg-black/70 backdrop-blur-sm text-micro font-semibold text-white animate-slide-in-left">
                 {currentAsset?.label}
               </div>
             )}

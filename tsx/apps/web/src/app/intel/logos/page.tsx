@@ -36,7 +36,7 @@ export default function IntelLogosPage() {
       {/* Header - Refined */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 via-violet-600 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-600/25 ring-1 ring-white/10">
+          <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-600/25 ring-1 ring-white/10">
             <User className="w-6 h-6 text-white" />
           </div>
           <div>

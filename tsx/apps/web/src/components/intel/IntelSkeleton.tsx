@@ -76,7 +76,7 @@ function PanelSkeleton({
 
 function MissionSkeleton() {
   return (
-    <div className="rounded-xl border border-interactive-500/20 bg-gradient-to-br from-interactive-600/10 via-background-surface to-accent-500/5 p-6 md:p-8">
+    <div className="rounded-xl border border-interactive-500/20 bg-interactive-600/10 p-6 md:p-8">
       {/* Header */}
       <div className="flex items-center gap-2 mb-6">
         <Shimmer className="w-4 h-4 rounded" />

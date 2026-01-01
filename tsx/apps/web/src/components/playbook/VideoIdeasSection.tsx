@@ -97,7 +97,7 @@ function VideoIdeaCard({ idea, index }: VideoIdeaCardProps) {
         <div className="px-4 pb-4 space-y-4 border-t border-border-subtle pt-4">
           {/* Why This Works - Strategic Reasoning */}
           {idea.whyThisWorks && (
-            <div className="p-3 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/20">
+            <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
               <span className="text-xs font-medium text-green-400 block mb-1">🧠 Why This Works</span>
               <p className="text-sm text-text-primary">{idea.whyThisWorks}</p>
             </div>
@@ -121,7 +121,7 @@ function VideoIdeaCard({ idea, index }: VideoIdeaCardProps) {
           </div>
 
           {/* Hook */}
-          <div className="p-3 bg-gradient-to-r from-pink-500/10 to-purple-500/10 rounded-lg">
+          <div className="p-3 bg-pink-500/10 rounded-lg">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-pink-400">🎣 Opening Hook</span>
               <button
@@ -227,7 +227,7 @@ export function VideoIdeasSection({ ideas }: VideoIdeasSectionProps) {
   return (
     <div className="bg-background-surface border border-border-subtle rounded-xl p-6">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500/20 to-purple-500/20 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center">
           <span className="text-xl">💡</span>
         </div>
         <div>

@@ -84,7 +84,7 @@ export function UserSearch() {
             </svg>
           </div>
           <p className="text-xs text-text-secondary mb-1">No users found</p>
-          <p className="text-[10px] text-text-tertiary">Try a different search term</p>
+          <p className="text-micro text-text-tertiary">Try a different search term</p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -107,7 +107,7 @@ export function UserSearch() {
                     className="w-9 h-9 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-interactive-500/20 flex items-center justify-center flex-shrink-0">
                     <span className="text-xs font-medium text-text-secondary">
                       {(user.displayName || '?')[0].toUpperCase()}
                     </span>
@@ -123,18 +123,18 @@ export function UserSearch() {
 
                 {/* Action */}
                 {isFriend ? (
-                  <span className="px-2 py-0.5 text-[9px] font-medium text-success-main bg-success-main/10 rounded-full">
+                  <span className="px-2 py-0.5 text-micro font-medium text-success-main bg-success-main/10 rounded-full">
                     Friends
                   </span>
                 ) : isPending || isSent ? (
-                  <span className="px-2 py-0.5 text-[9px] font-medium text-warning-main bg-warning-main/10 rounded-full">
+                  <span className="px-2 py-0.5 text-micro font-medium text-warning-main bg-warning-main/10 rounded-full">
                     Pending
                   </span>
                 ) : (
                   <button
                     onClick={() => handleSendRequest(user.id, user.displayName)}
                     disabled={isSending}
-                    className="px-2.5 py-1 text-[10px] font-medium text-interactive-300 bg-interactive-600/20 hover:bg-interactive-600/30 rounded-md transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
+                    className="px-2.5 py-1 text-micro font-medium text-interactive-300 bg-interactive-600/20 hover:bg-interactive-600/30 rounded-md transition-colors disabled:opacity-50 min-w-[70px] flex items-center justify-center"
                   >
                     {isSending ? (
                       <div className="w-3 h-3 border-2 border-interactive-300/30 border-t-interactive-300 rounded-full animate-spin" />

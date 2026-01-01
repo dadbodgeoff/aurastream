@@ -84,7 +84,7 @@ function AssetTypeCard({
           </h3>
           <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{asset.description}</p>
           <p className={cn(
-            "text-[10px] font-mono mt-1",
+            "text-micro font-mono mt-1",
             selected ? "text-interactive-500" : "text-text-muted"
           )}>
             {asset.dimensions}

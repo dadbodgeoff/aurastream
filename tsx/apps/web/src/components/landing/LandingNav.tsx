@@ -47,7 +47,7 @@ export function LandingNav() {
             >
               {logoError ? (
                 <>
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-interactive-500 to-accent-500 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-interactive-500 flex items-center justify-center">
                     <span className="text-white font-bold text-lg">A</span>
                   </div>
                   <span className="font-bold text-xl text-text-primary">{AURASTREAM_BRANDING.name}</span>

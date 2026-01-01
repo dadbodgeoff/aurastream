@@ -83,7 +83,7 @@ const FactorBadge = memo(function FactorBadge({
   
   return (
     <span className={cn(
-      'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border',
+      'inline-flex items-center px-2 py-0.5 rounded-full text-micro font-medium border',
       variantStyles[variant]
     )}>
       {label}
@@ -150,7 +150,7 @@ const ConfidenceIndicator = memo(function ConfidenceIndicator({ value }: Confide
         {/* Percentage text */}
         <span 
           className={cn(
-            'absolute inset-0 flex items-center justify-center text-[10px] font-bold',
+            'absolute inset-0 flex items-center justify-center text-micro font-bold',
             getColor()
           )}
           aria-hidden="true"
@@ -283,7 +283,7 @@ export const IntelPreview = memo(function IntelPreview({
             />
           ))}
           {mission.categoryName && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-white/5 text-text-muted border border-white/10">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-micro font-medium bg-white/5 text-text-muted border border-white/10">
               {mission.categoryName}
             </span>
           )}

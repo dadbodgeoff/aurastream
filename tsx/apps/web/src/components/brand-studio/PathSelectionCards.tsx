@@ -88,7 +88,7 @@ export function PathSelectionCards({
           disabled={vibeDisabled}
           className={cn(
             "group relative rounded-2xl border-2 text-left transition-all duration-300",
-            "bg-gradient-to-br from-purple-500/5 via-background-surface to-pink-500/5",
+            "bg-purple-500/5",
             isCompact ? "p-4" : "p-8",
             vibeDisabled
               ? "border-border-subtle opacity-60 cursor-not-allowed"
@@ -96,14 +96,14 @@ export function PathSelectionCards({
           )}
         >
           {/* Glow effect */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 rounded-2xl bg-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <div className="relative">
             {/* Header */}
             <div className={cn("flex items-start gap-4", isCompact ? "mb-2" : "mb-6")}>
               {/* Icon */}
               <div className={cn(
-                "rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0",
+                "rounded-xl bg-purple-500 flex items-center justify-center shadow-lg shadow-purple-500/20 flex-shrink-0",
                 isCompact ? "w-12 h-12" : "w-16 h-16"
               )}>
                 <Sparkles className={cn("text-white", isCompact ? "w-6 h-6" : "w-8 h-8")} />
@@ -224,7 +224,7 @@ export function PathSelectionCards({
           disabled={manualDisabled}
           className={cn(
             "group relative rounded-2xl border-2 text-left transition-all duration-300",
-            "bg-gradient-to-br from-interactive-600/5 via-background-surface to-teal-500/5",
+            "bg-interactive-600/5",
             isCompact ? "p-4" : "p-8",
             manualDisabled
               ? "border-border-subtle opacity-60 cursor-not-allowed"
@@ -232,14 +232,14 @@ export function PathSelectionCards({
           )}
         >
           {/* Glow effect */}
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-interactive-600/10 to-teal-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="absolute inset-0 rounded-2xl bg-interactive-600/10 opacity-0 group-hover:opacity-100 transition-opacity" />
           
           <div className="relative">
             {/* Header */}
             <div className={cn("flex items-start gap-4", isCompact ? "mb-2" : "mb-6")}>
               {/* Icon */}
               <div className={cn(
-                "rounded-xl bg-gradient-to-br from-interactive-600 to-teal-500 flex items-center justify-center shadow-lg shadow-interactive-600/20 flex-shrink-0",
+                "rounded-xl bg-interactive-600 flex items-center justify-center shadow-lg shadow-interactive-600/20 flex-shrink-0",
                 isCompact ? "w-12 h-12" : "w-16 h-16"
               )}>
                 <Palette className={cn("text-white", isCompact ? "w-6 h-6" : "w-8 h-8")} />

@@ -61,7 +61,7 @@ export function WeeklyHeatmap({ schedule, className }: WeeklyHeatmapProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-interactive-600/20 flex items-center justify-center">
             <span className="text-xl">📅</span>
           </div>
           <div>
@@ -95,7 +95,7 @@ export function WeeklyHeatmap({ schedule, className }: WeeklyHeatmapProps) {
             {DISPLAY_HOURS.map((hour) => (
               <div
                 key={hour}
-                className="flex-1 text-center text-[10px] text-text-muted"
+                className="flex-1 text-center text-micro text-text-muted"
               >
                 {hour % 3 === 0 ? formatHour(hour) : ''}
               </div>
@@ -138,7 +138,7 @@ export function WeeklyHeatmap({ schedule, className }: WeeklyHeatmapProps) {
                       >
                         {isBest && (
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-[8px]">⭐</span>
+                            <span className="text-micro">⭐</span>
                           </div>
                         )}
                       </div>
@@ -156,19 +156,19 @@ export function WeeklyHeatmap({ schedule, className }: WeeklyHeatmapProps) {
         <span className="text-xs text-text-muted">Opportunity:</span>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-sm bg-red-400/30" />
-          <span className="text-[10px] text-text-muted">Low</span>
+          <span className="text-micro text-text-muted">Low</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-sm bg-yellow-400/60" />
-          <span className="text-[10px] text-text-muted">Medium</span>
+          <span className="text-micro text-text-muted">Medium</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-sm bg-cyan-400" />
-          <span className="text-[10px] text-text-muted">Good</span>
+          <span className="text-micro text-text-muted">Good</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-sm bg-green-500" />
-          <span className="text-[10px] text-text-muted">Best</span>
+          <span className="text-micro text-text-muted">Best</span>
         </div>
       </div>
     </div>

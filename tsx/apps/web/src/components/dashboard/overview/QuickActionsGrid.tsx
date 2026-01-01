@@ -110,12 +110,12 @@ const QuickActionCard = memo(function QuickActionCard({ action }: QuickActionCar
       arrow: 'text-text-tertiary',
     },
     primary: {
-      container: 'bg-gradient-to-br from-interactive-600/10 to-interactive-600/5 border-interactive-600/20 hover:border-interactive-600/40',
+      container: 'bg-interactive-600/10 border-interactive-600/20 hover:border-interactive-600/40',
       icon: 'bg-interactive-600 text-white shadow-lg shadow-interactive-600/20',
       arrow: 'text-interactive-600',
     },
     accent: {
-      container: 'bg-gradient-to-br from-accent-500/10 to-accent-500/5 border-accent-500/20 hover:border-accent-500/40',
+      container: 'bg-accent-500/10 border-accent-500/20 hover:border-accent-500/40',
       icon: 'bg-accent-500 text-white shadow-lg shadow-accent-500/20',
       arrow: 'text-accent-500',
     },
@@ -142,7 +142,7 @@ const QuickActionCard = memo(function QuickActionCard({ action }: QuickActionCar
               {title}
             </h3>
             {badge && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-interactive-600 text-white rounded-full">
+              <span className="px-1.5 py-0.5 text-micro font-medium bg-interactive-600 text-white rounded-full">
                 {badge}
               </span>
             )}

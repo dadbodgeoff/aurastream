@@ -35,7 +35,7 @@ export default function ProfileCreatorPage() {
         <div className="max-w-5xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-interactive-600 to-accent-600 flex items-center justify-center shadow-md shadow-interactive-600/25">
+              <div className="w-8 h-8 rounded-lg bg-interactive-600 flex items-center justify-center shadow-md shadow-interactive-600/25">
                 <User className="w-4 h-4 text-white" />
               </div>
               <div>
@@ -58,7 +58,7 @@ export default function ProfileCreatorPage() {
                 {!access.canUse && (
                   <div className="flex items-center gap-1 px-2 py-1 bg-warning-muted/10 border border-warning-muted/20 rounded-lg">
                     <AlertCircle className="w-3 h-3 text-warning-muted" />
-                    <span className="text-[10px] text-warning-muted font-medium">Limit reached</span>
+                    <span className="text-micro text-warning-muted font-medium">Limit reached</span>
                   </div>
                 )}
               </div>
@@ -96,7 +96,7 @@ export default function ProfileCreatorPage() {
             <Image className="w-3.5 h-3.5" />
             Gallery
             {gallery?.total ? (
-              <span className="ml-0.5 px-1.5 py-0.5 text-[10px] bg-background-surface rounded-full text-text-tertiary">
+              <span className="ml-0.5 px-1.5 py-0.5 text-micro bg-background-surface rounded-full text-text-tertiary">
                 {gallery.total}
               </span>
             ) : null}

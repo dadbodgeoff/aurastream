@@ -58,13 +58,13 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
 
         {/* Quick Tags */}
         <div className="flex flex-wrap gap-1 mb-2">
-          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-[10px]">
+          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-micro">
             {thumbnail.layoutType}
           </span>
-          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px]">
+          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-micro">
             {thumbnail.colorMood}
           </span>
-          <span className={cn("px-2 py-0.5 rounded text-[10px]", getDifficultyColor(thumbnail.difficulty))}>
+          <span className={cn("px-2 py-0.5 rounded text-micro", getDifficultyColor(thumbnail.difficulty))}>
             {thumbnail.difficulty}
           </span>
         </div>
@@ -82,7 +82,7 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
           <div className="mt-3 pt-3 border-t border-border-subtle space-y-3">
             {/* Colors */}
             <div>
-              <span className="text-[10px] text-text-muted block mb-1">Dominant Colors</span>
+              <span className="text-micro text-text-muted block mb-1">Dominant Colors</span>
               <div className="flex gap-1">
                 {thumbnail.dominantColors.map((color, i) => (
                   <div
@@ -97,24 +97,24 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
 
             {/* Layout Recipe */}
             <div className="p-2 bg-purple-500/10 rounded">
-              <span className="text-[10px] text-purple-400 block mb-1">📐 Layout Recipe</span>
+              <span className="text-micro text-purple-400 block mb-1">📐 Layout Recipe</span>
               <p className="text-xs text-text-primary">{thumbnail.layoutRecipe}</p>
             </div>
 
             {/* Color Recipe */}
             <div className="p-2 bg-blue-500/10 rounded">
-              <span className="text-[10px] text-blue-400 block mb-1">🎨 Color Recipe</span>
+              <span className="text-micro text-blue-400 block mb-1">🎨 Color Recipe</span>
               <p className="text-xs text-text-primary">{thumbnail.colorRecipe}</p>
             </div>
 
             {/* Why It Works */}
             <div className="p-2 bg-green-500/10 rounded">
-              <span className="text-[10px] text-green-400 block mb-1">✨ Why It Works</span>
+              <span className="text-micro text-green-400 block mb-1">✨ Why It Works</span>
               <p className="text-xs text-text-primary">{thumbnail.whyItWorks}</p>
             </div>
 
             {/* Design Elements */}
-            <div className="flex flex-wrap gap-2 text-[10px]">
+            <div className="flex flex-wrap gap-2 text-micro">
               {thumbnail.hasFace && <span className="px-2 py-1 bg-white/5 rounded">👤 Face</span>}
               {thumbnail.hasText && <span className="px-2 py-1 bg-white/5 rounded">📝 Text</span>}
               {thumbnail.hasGlowEffects && <span className="px-2 py-1 bg-white/5 rounded">✨ Glow</span>}
@@ -168,7 +168,7 @@ function CategorySection({ insight, isExpanded, onToggle }: CategorySectionProps
       {isExpanded && (
         <div className="p-4 pt-0 space-y-4">
           {/* Style Summary */}
-          <div className="p-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg">
+          <div className="p-3 bg-purple-500/10 rounded-lg">
             <p className="text-sm text-text-primary">{insight.categoryStyleSummary}</p>
           </div>
 
@@ -270,7 +270,7 @@ export function ThumbnailIntelSection() {
     return (
       <div className="bg-background-surface border border-border-subtle rounded-xl p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-warning-main/20 flex items-center justify-center">
             <span className="text-xl">🖼️</span>
           </div>
           <div>
@@ -290,7 +290,7 @@ export function ThumbnailIntelSection() {
       {/* Header */}
       <div className="bg-background-surface border border-border-subtle rounded-xl p-6">
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-warning-main/20 flex items-center justify-center">
             <span className="text-xl">🖼️</span>
           </div>
           <div>

@@ -195,7 +195,7 @@ export function PromoComposeModal({ isOpen, onClose, onSuccess }: PromoComposeMo
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-interactive-600 to-accent-600 hover:from-interactive-500 hover:to-accent-500 disabled:from-background-elevated disabled:to-background-elevated disabled:text-text-disabled disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-interactive-500/25 transition-all hover:scale-105 disabled:hover:scale-100 disabled:shadow-none"
+            className="flex items-center gap-2 px-6 py-3 bg-interactive-600 hover:bg-interactive-500 disabled:bg-background-elevated disabled:text-text-disabled disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-interactive-500/25 transition-all hover:scale-105 disabled:hover:scale-100 disabled:shadow-none"
           >
             {checkoutMutation.isPending ? (
               <>

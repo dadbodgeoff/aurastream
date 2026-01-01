@@ -65,7 +65,7 @@ function NavItem({ href, icon: Icon, label, isActive, onNavigate }: NavItemProps
       )}
     >
       <Icon className={cn('w-6 h-6', isActive && 'text-interactive-600')} />
-      <span className="text-[10px] font-medium">{label}</span>
+      <span className="text-micro font-medium">{label}</span>
     </Link>
   );
 }
@@ -142,7 +142,7 @@ export function MobileBottomNav({ onMoreClick }: MobileBottomNavProps) {
           aria-label="More options"
         >
           <MenuIcon className="w-6 h-6" />
-          <span className="text-[10px] font-medium">More</span>
+          <span className="text-micro font-medium">More</span>
         </button>
       </div>
     </nav>

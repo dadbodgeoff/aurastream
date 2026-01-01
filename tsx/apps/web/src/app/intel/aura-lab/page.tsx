@@ -205,7 +205,7 @@ export default function IntelAuraLabPage() {
       {/* Header - Refined */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-600/25 ring-1 ring-white/10">
+          <div className="w-12 h-12 rounded-2xl bg-teal-600 flex items-center justify-center shadow-lg shadow-teal-600/25 ring-1 ring-white/10">
             <Beaker className="w-6 h-6 text-white" />
           </div>
           <div>

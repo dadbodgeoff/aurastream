@@ -120,7 +120,7 @@ const styles = {
     active: 'bg-interactive-600/20 text-interactive-400 shadow-sm',
     inactive: 'text-text-secondary hover:text-text-primary hover:bg-background-elevated/50',
   },
-  badge: 'px-1.5 py-0.5 text-[10px] font-medium bg-interactive-600 text-white rounded',
+  badge: 'px-1.5 py-0.5 text-micro font-medium bg-interactive-600 text-white rounded',
   tabPanel: 'focus:outline-none',
 };
 

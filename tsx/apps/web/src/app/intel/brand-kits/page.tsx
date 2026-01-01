@@ -205,7 +205,7 @@ function Header({
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-pink-600/25 ring-1 ring-white/10">
+        <div className="w-12 h-12 rounded-2xl bg-pink-600 flex items-center justify-center shadow-lg shadow-pink-600/25 ring-1 ring-white/10">
           <Palette className="w-6 h-6 text-white" />
         </div>
         <div>
@@ -236,8 +236,7 @@ function Header({
             onClick={onCreateNew}
             className={cn(
               'flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
-              'bg-gradient-to-r from-interactive-600 to-interactive-500',
-              'hover:from-interactive-500 hover:to-interactive-400',
+              'bg-interactive-600 hover:bg-interactive-500',
               'text-white shadow-lg shadow-interactive-600/25 ring-1 ring-white/10'
             )}
           >

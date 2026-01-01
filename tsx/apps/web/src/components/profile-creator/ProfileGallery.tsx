@@ -80,7 +80,7 @@ export function ProfileGallery({ items, isLoading, onCreateNew }: ProfileGallery
             {/* Type badge */}
             <div className="absolute top-1 left-1">
               <div className={cn(
-                "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-medium",
+                "flex items-center gap-0.5 px-1.5 py-0.5 rounded text-micro font-medium",
                 item.creationType === 'profile_picture'
                   ? "bg-interactive-600/80 text-white"
                   : "bg-accent-600/80 text-white"
@@ -111,7 +111,7 @@ export function ProfileGallery({ items, isLoading, onCreateNew }: ProfileGallery
             {/* Style preset */}
             {item.stylePreset && (
               <div className="absolute bottom-1 left-1 right-1">
-                <div className="px-1.5 py-0.5 bg-background-base/80 rounded text-[8px] text-text-tertiary truncate">
+                <div className="px-1.5 py-0.5 bg-background-base/80 rounded text-micro text-text-tertiary truncate">
                   {item.stylePreset}
                 </div>
               </div>

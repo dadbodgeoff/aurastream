@@ -132,7 +132,7 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-interactive-500/20 flex items-center justify-center">
                 <span className="text-sm font-medium text-text-secondary">
                   {(displayName || '?')[0].toUpperCase()}
                 </span>
@@ -177,7 +177,7 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
               <p className="text-xs text-text-secondary mb-2">Failed to load messages</p>
               <button
                 onClick={() => refetch()}
-                className="text-[10px] text-interactive-400 hover:text-interactive-300 underline"
+                className="text-micro text-interactive-400 hover:text-interactive-300 underline"
               >
                 Try again
               </button>
@@ -185,7 +185,7 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <p className="text-xs text-text-tertiary">No messages yet</p>
-              <p className="text-[10px] text-text-tertiary mt-1">Send a message to start the conversation</p>
+              <p className="text-micro text-text-tertiary mt-1">Send a message to start the conversation</p>
             </div>
           ) : (
             <>
@@ -208,7 +208,7 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
                   >
                     <p className="text-xs whitespace-pre-wrap break-words">{msg.content}</p>
                     <div className="flex items-center justify-end gap-1 mt-1">
-                      <p className="text-[9px] text-text-tertiary">
+                      <p className="text-micro text-text-tertiary">
                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                       {msg.senderId === currentUserId && (
@@ -225,10 +225,10 @@ export function ChatWindow({ userId, displayName, avatarUrl, currentUserId, onCl
                   <div className="max-w-[75%] px-3 py-2 rounded-2xl bg-red-500/20 text-text-primary rounded-br-md border border-red-500/30">
                     <p className="text-xs whitespace-pre-wrap break-words">{content}</p>
                     <div className="flex items-center justify-end gap-2 mt-1">
-                      <span className="text-[9px] text-red-400">Failed to send</span>
+                      <span className="text-micro text-red-400">Failed to send</span>
                       <button
                         onClick={() => handleRetryMessage(tempId, content)}
-                        className="text-[9px] text-red-400 hover:text-red-300 underline"
+                        className="text-micro text-red-400 hover:text-red-300 underline"
                       >
                         Retry
                       </button>

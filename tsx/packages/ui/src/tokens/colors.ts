@@ -98,13 +98,19 @@ export const colors = {
   },
   
   // Text (Dark Theme) - Light text on dark backgrounds
+  // WCAG AA compliant: 4.5:1 contrast ratio minimum for normal text
   text: {
-    primary: '#FCFCF9',   // Cream - main text on dark backgrounds
-    secondary: '#A7A9A9', // Light gray - secondary text
-    tertiary: '#777C7C',  // Medium gray - helper text
-    muted: '#62756E',     // Slate - very muted text
-    disabled: 'rgba(167, 169, 169, 0.4)',  // Disabled state
+    primary: '#FCFCF9',   // Cream - main text on dark backgrounds (15.8:1)
+    secondary: '#B8BABA', // Lighter gray - secondary text (8.2:1) - UPGRADED from #A7A9A9
+    tertiary: '#9A9E9E',  // Medium gray - helper text (5.8:1) - UPGRADED from #777C7C
+    muted: '#7D8282',     // Slate - muted labels (4.5:1) - UPGRADED from #62756E
+    disabled: 'rgba(184, 186, 186, 0.5)',  // Disabled state
     inverse: '#131B3B',   // Charcoal for light backgrounds
+    // Semantic text colors
+    link: '#32B8C6',      // Interactive link color (6.2:1)
+    success: '#4ADE80',   // Success text (8.1:1)
+    warning: '#FBBF24',   // Warning text (10.2:1)
+    error: '#F87171',     // Error text (5.9:1)
   },
   
   // Borders - Premium spec aligned

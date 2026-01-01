@@ -40,7 +40,7 @@ export function FriendsList({ friends, isLoading, onOpenChat }: FriendsListProps
           </svg>
         </div>
         <p className="text-xs text-text-secondary mb-1">No friends yet</p>
-        <p className="text-[10px] text-text-tertiary">Search for users to add friends</p>
+        <p className="text-micro text-text-tertiary">Search for users to add friends</p>
       </div>
     );
   }
@@ -108,7 +108,7 @@ export function FriendsList({ friends, isLoading, onOpenChat }: FriendsListProps
                   className="w-9 h-9 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-interactive-500/20 to-primary-500/20 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-interactive-500/20 flex items-center justify-center">
                   <span className="text-xs font-medium text-text-secondary">
                     {(friend.displayName || '?')[0].toUpperCase()}
                   </span>
@@ -126,7 +126,7 @@ export function FriendsList({ friends, isLoading, onOpenChat }: FriendsListProps
               <p className="text-xs font-medium text-text-primary truncate">
                 {friend.displayName || 'Unknown'}
               </p>
-              <p className="text-[10px] text-text-tertiary">
+              <p className="text-micro text-text-tertiary">
                 {friend.isOnline ? 'Online' : 'Offline'}
               </p>
             </div>
@@ -161,14 +161,14 @@ export function FriendsList({ friends, isLoading, onOpenChat }: FriendsListProps
                       <button
                         onClick={() => handleRemove(friend.friendshipId, friend.displayName)}
                         disabled={isRemoving}
-                        className="w-full px-3 py-1.5 text-left text-[11px] text-text-secondary hover:bg-white/5 transition-colors disabled:opacity-50"
+                        className="w-full px-3 py-1.5 text-left text-micro text-text-secondary hover:bg-white/5 transition-colors disabled:opacity-50"
                       >
                         {isRemoving ? 'Removing...' : 'Remove Friend'}
                       </button>
                       <button
                         onClick={() => handleBlock(friend.userId, friend.displayName)}
                         disabled={isBlocking}
-                        className="w-full px-3 py-1.5 text-left text-[11px] text-error-main hover:bg-error-main/10 transition-colors disabled:opacity-50"
+                        className="w-full px-3 py-1.5 text-left text-micro text-error-main hover:bg-error-main/10 transition-colors disabled:opacity-50"
                       >
                         {isBlocking ? 'Blocking...' : 'Block User'}
                       </button>

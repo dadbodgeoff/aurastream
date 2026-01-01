@@ -305,7 +305,7 @@ export function FusionCore({
           mt-8 px-12 py-4 rounded-xl font-bold text-lg
           transition-all duration-300
           ${isReady && !isFusing
-            ? 'bg-gradient-to-r from-interactive-600 via-accent-600 to-interactive-600 bg-[length:200%_100%] hover:bg-[position:100%_0] text-white shadow-lg shadow-interactive-500/40 hover:shadow-interactive-500/60 hover:scale-105 cursor-pointer'
+            ? 'bg-interactive-600 hover:bg-interactive-500 text-white shadow-lg shadow-interactive-500/40 hover:shadow-interactive-500/60 hover:scale-105 cursor-pointer'
             : 'bg-background-elevated text-text-tertiary cursor-not-allowed'
           }
         `}

@@ -73,7 +73,7 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
               <div className="absolute inset-0 p-4 md:p-6 flex flex-col justify-center">
                 <div className="max-w-lg">
                   {banner.badge && (
-                    <span className="inline-block px-2 py-0.5 text-[10px] font-semibold bg-white/20 backdrop-blur-sm rounded-full mb-2">
+                    <span className="inline-block px-2 py-0.5 text-micro font-semibold bg-white/20 backdrop-blur-sm rounded-full mb-2">
                       {banner.badge}
                     </span>
                   )}
@@ -85,7 +85,7 @@ export function HeroCarousel({ banners, autoPlayInterval = 5000, className }: He
                   )}
                   <a
                     href={banner.ctaHref}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-900 text-xs font-semibold rounded-lg hover:bg-white/90 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-text-primary text-xs font-semibold rounded-lg hover:bg-white/90 transition-colors"
                   >
                     {banner.ctaText}
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -263,7 +263,7 @@ function FusionCard({ fusion, index, onDownload }: FusionCardProps) {
       <div className="absolute top-2 right-2">
         <div
           className={`
-            px-2 py-0.5 rounded-full text-[10px] font-bold
+            px-2 py-0.5 rounded-full text-micro font-bold
             ${rarityBadgeStyle}
           `}
         >

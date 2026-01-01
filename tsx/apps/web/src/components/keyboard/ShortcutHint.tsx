@@ -28,7 +28,7 @@ import type { ShortcutHintProps } from '@aurastream/shared';
  * Size variants for the ShortcutHint component
  */
 const sizeClasses = {
-  sm: 'text-[10px] px-1 py-0.5 min-w-[18px]',
+  sm: 'text-micro px-1 py-0.5 min-w-[18px]',
   md: 'text-xs px-1.5 py-0.5 min-w-[22px]',
   lg: 'text-sm px-2 py-1 min-w-[28px]',
 } as const;

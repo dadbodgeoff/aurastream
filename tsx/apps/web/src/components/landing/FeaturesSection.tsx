@@ -90,7 +90,7 @@ export function FeaturesSection() {
               }}
             >
               {/* Hover glow effect */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-interactive-500/5 to-accent-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="absolute inset-0 rounded-2xl bg-interactive-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               
               <div className="relative">
                 <div className="w-12 h-12 rounded-xl bg-interactive-600/10 flex items-center justify-center mb-4 group-hover:bg-interactive-600/20 group-hover:scale-110 transition-all duration-300">

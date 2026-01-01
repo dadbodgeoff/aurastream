@@ -159,7 +159,7 @@ export function BrandStudioLanding({
       {/* Empty State */}
       {!isLoading && brandKits.length === 0 && (
         <section className="text-center py-12">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-interactive-600/20 to-purple-500/20 flex items-center justify-center">
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-interactive-600/20 flex items-center justify-center">
             <Star className="w-10 h-10 text-interactive-500" />
           </div>
           <h3 className="text-xl font-semibold text-text-primary mb-2">

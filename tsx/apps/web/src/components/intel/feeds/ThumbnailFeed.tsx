@@ -6,12 +6,16 @@
  * Social feed style scrollable list of trending thumbnails from the last 24 hours.
  * Newest items appear at top, older items scroll down.
  * Shows rich metadata: layout type, color mood, why it works, timestamps.
+ * 
+ * Updated: Uses new Typography and Badge component system
  */
 
 import { useCategoryInsight } from '@aurastream/api-client';
-import { Image, Eye, Palette, Layout, Sparkles, Clock, TrendingUp, RefreshCw } from 'lucide-react';
+import { Eye, Palette, Layout, Sparkles, Clock, TrendingUp, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
+import { Text, Label, Micro, Caption } from '@/components/ui/Typography';
+import { Badge } from '@/components/ui/Badge';
 
 interface ThumbnailFeedProps {
   categoryKey: string;
@@ -44,9 +48,9 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
 
   if (thumbnails.length === 0) {
     return (
-      <div className="text-center py-8 text-text-tertiary text-sm">
+      <Text variant="bodySmall" color="tertiary" align="center" className="py-8">
         No thumbnail data yet for {categoryName}
-      </div>
+      </Text>
     );
   }
 
@@ -56,13 +60,13 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
       <div className="flex items-center justify-between px-1 mb-3">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-3.5 h-3.5 text-interactive-400" />
-          <span className="text-xs font-medium text-text-secondary">Last 24 hours</span>
+          <Label color="secondary">Last 24 hours</Label>
         </div>
         {dataUpdatedAt && (
-          <div className="flex items-center gap-1 text-[10px] text-text-tertiary">
+          <Micro className="flex items-center gap-1">
             <RefreshCw className="w-3 h-3" />
             Updated {formatTimeAgo(new Date(dataUpdatedAt).toISOString())}
-          </div>
+          </Micro>
         )}
       </div>
 
@@ -71,9 +75,9 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
         <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl sticky top-0 z-10 backdrop-blur-sm">
           <div className="flex items-center gap-2 mb-1">
             <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-xs font-medium text-purple-400">Style Insight</span>
+            <Label className="text-purple-400">Style Insight</Label>
           </div>
-          <p className="text-xs text-text-secondary leading-relaxed">{insight.categoryStyleSummary}</p>
+          <Caption color="secondary">{insight.categoryStyleSummary}</Caption>
         </div>
       )}
 
@@ -82,7 +86,7 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
         {thumbnails.map((thumb, i) => (
           <article 
             key={thumb.videoId || i} 
-            className="group p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] rounded-xl transition-all duration-200"
+            className="group card-interactive p-3"
           >
             <div className="flex gap-3">
               {/* Thumbnail Image */}
@@ -108,63 +112,65 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
                 />
                 {/* Hover overlay */}
                 <div className="absolute inset-0 bg-interactive-500/0 group-hover:bg-interactive-500/20 transition-colors flex items-center justify-center">
-                  <span className="text-[10px] font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 px-2 py-1 rounded">
+                  <Label className="text-white opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 px-2 py-1 rounded">
                     Recreate
-                  </span>
+                  </Label>
                 </div>
               </Link>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
                 {/* Title */}
-                <h3 className="text-sm font-medium text-text-primary line-clamp-2 mb-1.5 group-hover:text-interactive-400 transition-colors">
+                <Text 
+                  variant="bodySmall" 
+                  weight="medium" 
+                  lineClamp={2} 
+                  className="mb-1.5 group-hover:text-interactive-400 transition-colors"
+                >
                   {thumb.title}
-                </h3>
+                </Text>
 
                 {/* Stats Row */}
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   {thumb.viewCount && (
-                    <span className="flex items-center gap-1 text-[10px] text-green-400">
-                      <Eye className="w-3 h-3" />
+                    <Badge variant="success" size="xs" icon={<Eye className="w-3 h-3" />}>
                       {thumb.viewCount >= 1000000 
                         ? `${(thumb.viewCount / 1000000).toFixed(1)}M` 
                         : `${(thumb.viewCount / 1000).toFixed(0)}K`} views
-                    </span>
+                    </Badge>
                   )}
                   {thumb.layoutType && (
-                    <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded">
-                      <Layout className="w-2.5 h-2.5" />
+                    <Badge variant="info" size="xs" icon={<Layout className="w-2.5 h-2.5" />}>
                       {thumb.layoutType}
-                    </span>
+                    </Badge>
                   )}
                   {thumb.colorMood && (
-                    <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-purple-500/10 text-purple-400 rounded">
-                      <Palette className="w-2.5 h-2.5" />
+                    <Badge size="xs" icon={<Palette className="w-2.5 h-2.5" />} className="bg-purple-500/10 text-purple-400 border-purple-500/30">
                       {thumb.colorMood}
-                    </span>
+                    </Badge>
                   )}
                 </div>
 
                 {/* Why It Works */}
                 {thumb.whyItWorks && (
-                  <p className="text-[11px] text-text-tertiary line-clamp-2 leading-relaxed">
+                  <Caption color="tertiary" lineClamp={2}>
                     💡 {thumb.whyItWorks}
-                  </p>
+                  </Caption>
                 )}
 
                 {/* Element Tags */}
                 <div className="flex flex-wrap gap-1 mt-2">
                   {thumb.hasFace && (
-                    <span className="text-[9px] px-1.5 py-0.5 bg-white/5 text-text-tertiary rounded">face</span>
+                    <Badge variant="secondary" size="xs">face</Badge>
                   )}
                   {thumb.hasText && (
-                    <span className="text-[9px] px-1.5 py-0.5 bg-white/5 text-text-tertiary rounded">text</span>
+                    <Badge variant="secondary" size="xs">text</Badge>
                   )}
                   {thumb.hasBorder && (
-                    <span className="text-[9px] px-1.5 py-0.5 bg-white/5 text-text-tertiary rounded">border</span>
+                    <Badge variant="secondary" size="xs">border</Badge>
                   )}
                   {thumb.hasGlowEffects && (
-                    <span className="text-[9px] px-1.5 py-0.5 bg-white/5 text-text-tertiary rounded">glow</span>
+                    <Badge variant="secondary" size="xs">glow</Badge>
                   )}
                 </div>
               </div>
@@ -173,19 +179,21 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
         ))}
 
         {/* End of Feed Indicator */}
-        <div className="text-center py-4 text-[10px] text-text-tertiary">
+        <Micro align="center" className="py-4">
           <Clock className="w-3 h-3 inline mr-1" />
           Showing last 24 hours of trending thumbnails
-        </div>
+        </Micro>
       </div>
 
       {/* Pro Tips - Sticky at bottom */}
       {insight?.proTips && insight.proTips.length > 0 && (
         <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl mt-2">
-          <p className="text-[10px] font-medium text-green-400 mb-1.5">💡 Pro Tips for {categoryName}</p>
+          <Label className="text-green-400 mb-1.5">💡 Pro Tips for {categoryName}</Label>
           <ul className="space-y-1">
             {insight.proTips.slice(0, 3).map((tip, i) => (
-              <li key={i} className="text-[11px] text-text-secondary leading-relaxed">• {tip}</li>
+              <li key={i}>
+                <Caption color="secondary">• {tip}</Caption>
+              </li>
             ))}
           </ul>
         </div>

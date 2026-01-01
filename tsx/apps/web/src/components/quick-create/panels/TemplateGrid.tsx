@@ -48,7 +48,7 @@ export function TemplateGrid({ category, onCategoryChange, onSelect }: TemplateG
             <div className="flex items-center justify-between mb-2">
               <span className="text-xl">{template.emoji}</span>
               <span className={cn(
-                "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                "px-1.5 py-0.5 rounded text-micro font-medium",
                 template.category === 'stream' && "bg-green-500/10 text-green-400",
                 template.category === 'social' && "bg-primary-500/10 text-primary-400",
                 template.category === 'twitch' && "bg-primary-500/10 text-primary-400",
@@ -62,7 +62,7 @@ export function TemplateGrid({ category, onCategoryChange, onSelect }: TemplateG
             </h3>
             <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{template.tagline}</p>
             
-            <p className="text-[10px] text-text-tertiary mt-2 pt-2 border-t border-border-subtle line-clamp-1">
+            <p className="text-micro text-text-tertiary mt-2 pt-2 border-t border-border-subtle line-clamp-1">
               {template.previewStyle}
             </p>
           </button>

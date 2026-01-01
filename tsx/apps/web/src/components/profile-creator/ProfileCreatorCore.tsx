@@ -408,7 +408,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                   </div>
                   <div>
                     <h3 className="text-xs font-semibold text-text-primary">Profile Picture</h3>
-                    <p className="text-[10px] text-text-tertiary">Avatar for your channels</p>
+                    <p className="text-micro text-text-tertiary">Avatar for your channels</p>
                   </div>
                 </div>
               </button>
@@ -423,7 +423,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                   </div>
                   <div>
                     <h3 className="text-xs font-semibold text-text-primary">Streamer Logo</h3>
-                    <p className="text-[10px] text-text-tertiary">Brand mark or icon</p>
+                    <p className="text-micro text-text-tertiary">Brand mark or icon</p>
                   </div>
                 </div>
               </button>
@@ -453,7 +453,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
             <StyleSelector selected={stylePreset} onSelect={handleStyleSelect} />
 
             <div className="mt-3">
-              <label className="block text-[11px] font-medium text-text-secondary mb-1">Initial description (optional)</label>
+              <label className="block text-micro font-medium text-text-secondary mb-1">Initial description (optional)</label>
               <input
                 type="text"
                 value={initialDescription}
@@ -526,7 +526,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-success-muted text-xs font-medium">Ready to generate!</p>
-                    <p className="text-[10px] text-text-tertiary truncate">{refinedDescription?.slice(0, 80)}...</p>
+                    <p className="text-micro text-text-tertiary truncate">{refinedDescription?.slice(0, 80)}...</p>
                   </div>
                   <button onClick={handleGenerate} className="px-3 py-1.5 bg-success-muted hover:bg-success-muted/80 text-white text-xs font-medium rounded-lg transition-colors">
                     Generate
@@ -600,7 +600,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
             
             {/* Progress bar */}
             <div className="w-full bg-background-elevated rounded-full h-1.5 overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-interactive-600 to-interactive-500 rounded-full transition-all duration-500" style={{ width: `${generationProgress}%` }} />
+              <div className="h-full bg-interactive-600 rounded-full transition-all duration-500" style={{ width: `${generationProgress}%` }} />
             </div>
           </motion.div>
         )}

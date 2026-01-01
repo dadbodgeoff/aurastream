@@ -132,7 +132,7 @@ function ColorSwatch({ hex, name, isSelected, onClick }: ColorSwatchProps) {
           <Check
             className={cn(
               'w-5 h-5',
-              isLightColor(hex) ? 'text-gray-900' : 'text-white'
+              isLightColor(hex) ? 'text-text-primary' : 'text-white'
             )}
           />
         </div>

@@ -80,7 +80,7 @@ const tabStyles = {
     inactive: 'text-text-secondary hover:text-text-primary hover:bg-background-elevated/50',
     disabled: 'opacity-50 cursor-not-allowed',
   },
-  badge: 'px-1.5 py-0.5 text-[10px] font-medium bg-interactive-600 text-white rounded',
+  badge: 'px-1.5 py-0.5 text-micro font-medium bg-interactive-600 text-white rounded',
   indicator: 'h-0.5 bg-interactive-500 rounded-full transition-all duration-200',
 };
 

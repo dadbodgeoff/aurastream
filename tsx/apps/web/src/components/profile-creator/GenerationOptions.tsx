@@ -48,7 +48,7 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
 
       {/* Description Preview */}
       <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
-        <p className="text-[10px] text-text-tertiary mb-1">What will be generated:</p>
+        <p className="text-micro text-text-tertiary mb-1">What will be generated:</p>
         <p className="text-xs text-text-primary line-clamp-2">{refinedDescription}</p>
       </div>
 
@@ -56,7 +56,7 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
       <div className="grid grid-cols-2 gap-3">
         {/* Size Selection */}
         <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
-          <h3 className="text-[11px] font-semibold text-text-primary mb-2">Size</h3>
+          <h3 className="text-micro font-semibold text-text-primary mb-2">Size</h3>
           <div className="space-y-1">
             {OUTPUT_SIZES.map((size) => (
               <button
@@ -70,10 +70,10 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
                 )}
               >
                 <div className="flex items-center justify-between">
-                  <span className={cn("text-[11px] font-medium", outputSize === size.id ? "text-interactive-400" : "text-text-primary")}>
+                  <span className={cn("text-micro font-medium", outputSize === size.id ? "text-interactive-400" : "text-text-primary")}>
                     {size.name}
                   </span>
-                  <span className="text-[9px] text-text-tertiary">{size.pixels}px</span>
+                  <span className="text-micro text-text-tertiary">{size.pixels}px</span>
                 </div>
               </button>
             ))}
@@ -84,14 +84,14 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
         <div className="space-y-3">
           {/* Format */}
           <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
-            <h3 className="text-[11px] font-semibold text-text-primary mb-2">Format</h3>
+            <h3 className="text-micro font-semibold text-text-primary mb-2">Format</h3>
             <div className="flex gap-1.5">
               {(['png', 'webp'] as const).map((fmt) => (
                 <button
                   key={fmt}
                   onClick={() => setOutputFormat(fmt)}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg border text-center text-[11px] font-medium transition-all",
+                    "flex-1 py-1.5 rounded-lg border text-center text-micro font-medium transition-all",
                     outputFormat === fmt
                       ? "bg-interactive-600/10 border-interactive-600/50 text-interactive-400"
                       : "bg-background-base border-border-subtle text-text-primary hover:border-border-default"
@@ -105,14 +105,14 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
 
           {/* Background */}
           <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
-            <h3 className="text-[11px] font-semibold text-text-primary mb-2">Background</h3>
+            <h3 className="text-micro font-semibold text-text-primary mb-2">Background</h3>
             <div className="flex gap-1.5">
               {(['transparent', 'solid'] as const).map((bg) => (
                 <button
                   key={bg}
                   onClick={() => setBackground(bg)}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg border text-center text-[10px] font-medium transition-all capitalize",
+                    "flex-1 py-1.5 rounded-lg border text-center text-micro font-medium transition-all capitalize",
                     background === bg
                       ? "bg-interactive-600/10 border-interactive-600/50 text-interactive-400"
                       : "bg-background-base border-border-subtle text-text-primary hover:border-border-default"
@@ -136,7 +136,7 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
                     type="text"
                     value={backgroundColor}
                     onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="flex-1 px-2 py-1 text-[10px] bg-background-base border border-border-subtle rounded-lg text-text-primary"
+                    className="flex-1 px-2 py-1 text-micro bg-background-base border border-border-subtle rounded-lg text-text-primary"
                   />
                 </div>
               </motion.div>
@@ -154,7 +154,7 @@ export function GenerationOptions({ refinedDescription, isGenerating, onGenerate
             "flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-medium transition-all",
             isGenerating
               ? "bg-background-elevated text-text-muted cursor-not-allowed"
-              : "bg-gradient-to-r from-interactive-600 to-accent-600 text-white hover:from-interactive-500 hover:to-accent-500 shadow-lg shadow-interactive-600/25"
+              : "bg-interactive-600 text-white hover:bg-interactive-500 shadow-lg shadow-interactive-600/25"
           )}
         >
           {isGenerating ? (

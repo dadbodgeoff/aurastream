@@ -102,7 +102,7 @@ export function QuickActionCards({ className }: QuickActionCardsProps) {
             <h3 className="font-medium text-text-primary text-xs mb-0.5">
               {action.title}
             </h3>
-            <p className="text-[10px] text-text-muted line-clamp-1">
+            <p className="text-micro text-text-muted line-clamp-1">
               {action.description}
             </p>
           </div>

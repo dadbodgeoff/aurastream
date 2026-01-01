@@ -166,7 +166,7 @@ function VideoIdeaCard({ idea, rank }: { idea: VideoIdea; rank: number }) {
         <div className="flex items-center gap-2">
           <div className="w-20 h-2 bg-white/10 rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-interactive-500 to-interactive-400 rounded-full" 
+              className="h-full bg-interactive-500 rounded-full" 
               style={{ width: `${idea.opportunityScore}%` }} 
             />
           </div>

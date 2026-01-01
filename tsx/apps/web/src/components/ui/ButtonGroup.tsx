@@ -52,20 +52,20 @@ const variantClasses: Record<ButtonGroupVariant, string> = {
     'bg-interactive-500 text-white',
     'hover:bg-interactive-600',
     'active:bg-interactive-700',
-    'disabled:bg-neutral-600 disabled:text-neutral-400'
+    'disabled:bg-text-disabled disabled:text-text-muted'
   ),
   outline: cn(
     'bg-transparent text-text-primary',
     'border border-border-default',
     'hover:bg-background-elevated hover:border-interactive-500',
     'active:bg-background-surface',
-    'disabled:border-neutral-700 disabled:text-neutral-500'
+    'disabled:border-border-subtle disabled:text-text-muted'
   ),
   ghost: cn(
     'bg-transparent text-text-primary',
     'hover:bg-background-elevated',
     'active:bg-background-surface',
-    'disabled:text-neutral-500'
+    'disabled:text-text-muted'
   ),
 };
 

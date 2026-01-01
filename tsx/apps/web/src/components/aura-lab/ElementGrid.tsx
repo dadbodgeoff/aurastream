@@ -112,7 +112,7 @@ export function ElementGrid({
                   {/* Element Name */}
                   <span 
                     className={`
-                      text-[10px] font-medium truncate max-w-full px-1
+                      text-micro font-medium truncate max-w-full px-1
                       ${isSelected ? 'text-interactive-300' : isLocked ? 'text-text-disabled' : 'text-text-secondary'}
                     `}
                   >

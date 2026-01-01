@@ -142,7 +142,7 @@ export function ReviewPanel(props: ReviewPanelProps) {
       </button>
 
       <SectionCard className="relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-interactive-600 to-interactive-400" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-interactive-600" />
         
         <div className="pt-2">
           <div className="flex items-start gap-4 mb-6">

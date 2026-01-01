@@ -64,7 +64,7 @@ export function FriendsPanel({ isOpen, onClose, onOpenChat }: FriendsPanelProps)
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-base font-semibold text-text-primary">Friends</h2>
-              <p className="text-[10px] text-text-tertiary">{onlineCount} online</p>
+              <p className="text-micro text-text-tertiary">{onlineCount} online</p>
             </div>
             <button
               onClick={onClose}
@@ -82,7 +82,7 @@ export function FriendsPanel({ isOpen, onClose, onOpenChat }: FriendsPanelProps)
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-colors ${
+                className={`relative flex-1 px-2 py-1.5 rounded-md text-micro font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'bg-interactive-600/20 text-interactive-300'
                     : 'text-text-tertiary hover:text-text-secondary'
@@ -90,7 +90,7 @@ export function FriendsPanel({ isOpen, onClose, onOpenChat }: FriendsPanelProps)
               >
                 {tab.label}
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className="ml-1 px-1 py-0.5 text-[9px] bg-white/10 rounded-full">
+                  <span className="ml-1 px-1 py-0.5 text-micro bg-white/10 rounded-full">
                     {tab.count}
                   </span>
                 )}

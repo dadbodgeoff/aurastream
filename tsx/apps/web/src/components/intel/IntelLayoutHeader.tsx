@@ -59,7 +59,7 @@ export function IntelLayoutHeader({
           {/* Left: Logo and Title */}
           <div className="flex items-center gap-4">
             <Link href="/intel" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 bg-gradient-to-br from-interactive-500 to-interactive-600 rounded-xl flex items-center justify-center shadow-lg shadow-interactive-600/20 ring-1 ring-white/10 group-hover:shadow-interactive-600/30 transition-shadow">
+              <div className="w-9 h-9 bg-interactive-600 rounded-xl flex items-center justify-center shadow-lg shadow-interactive-600/20 ring-1 ring-white/10 group-hover:shadow-interactive-600/30 transition-shadow">
                 <Zap className="w-5 h-5 text-white" />
               </div>
               <span className="text-lg font-semibold text-text-primary tracking-tight">Creator Intel</span>
@@ -126,8 +126,7 @@ export function IntelLayoutHeader({
               onClick={onCreateAsset}
               className={cn(
                 'flex items-center gap-2 px-4 py-2.5',
-                'bg-gradient-to-r from-interactive-600 to-interactive-500',
-                'hover:from-interactive-500 hover:to-interactive-400',
+                'bg-interactive-600 hover:bg-interactive-500',
                 'text-white font-medium rounded-xl',
                 'shadow-lg shadow-interactive-600/25',
                 'ring-1 ring-white/10',
@@ -151,9 +150,9 @@ export function IntelLayoutHeader({
               <div 
                 className={cn(
                   "h-full rounded-full transition-all duration-500",
-                  usagePercent >= 90 ? "bg-gradient-to-r from-red-500 to-red-400" :
-                  usagePercent >= 70 ? "bg-gradient-to-r from-amber-500 to-amber-400" :
-                  "bg-gradient-to-r from-interactive-600 to-interactive-400"
+                  usagePercent >= 90 ? "bg-red-500" :
+                  usagePercent >= 70 ? "bg-amber-500" :
+                  "bg-interactive-600"
                 )}
                 style={{ width: `${usagePercent}%` }}
               />

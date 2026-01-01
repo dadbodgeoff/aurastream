@@ -69,7 +69,7 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
           <span className="text-xs font-medium text-text-secondary">Last 24 hours</span>
         </div>
         {dataUpdatedAt && (
-          <div className="flex items-center gap-1 text-[10px] text-text-tertiary">
+          <div className="flex items-center gap-1 text-micro text-text-tertiary">
             <RefreshCw className="w-3 h-3" />
             Updated {formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true })}
           </div>
@@ -85,7 +85,7 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {trendingHooks.slice(0, 6).map((hook, i) => (
-              <span key={i} className="text-[11px] px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded cursor-pointer hover:bg-orange-500/30 transition-colors">
+              <span key={i} className="text-micro px-2 py-0.5 bg-orange-500/20 text-orange-300 rounded cursor-pointer hover:bg-orange-500/30 transition-colors">
                 {hook}
               </span>
             ))}
@@ -110,17 +110,17 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
 
             {/* Metrics Row */}
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded font-medium">
+              <span className="flex items-center gap-1 text-micro px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded font-medium">
                 <TrendingUp className="w-2.5 h-2.5" />
                 {title.velocity.toLocaleString()} v/hr
               </span>
-              <span className="text-[10px] text-text-tertiary">
+              <span className="text-micro text-text-tertiary">
                 {title.views >= 1000000 
                   ? `${(title.views / 1000000).toFixed(1)}M views`
                   : `${(title.views / 1000).toFixed(0)}K views`}
               </span>
               {title.engagement_rate > 0 && (
-                <span className="text-[10px] text-blue-400">
+                <span className="text-micro text-interactive-400">
                   {(title.engagement_rate * 100).toFixed(1)}% eng
                 </span>
               )}
@@ -130,7 +130,7 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
             {title.power_words && title.power_words.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
                 {title.power_words.map((word, j) => (
-                  <span key={j} className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                  <span key={j} className="text-micro px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">
                     {word}
                   </span>
                 ))}
@@ -139,7 +139,7 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
 
             {/* Why It Works */}
             {title.why_it_works && (
-              <p className="text-[11px] text-text-tertiary leading-relaxed">
+              <p className="text-micro text-text-tertiary leading-relaxed">
                 💡 {title.why_it_works}
               </p>
             )}
@@ -148,12 +148,12 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
             {(title.structure_type || title.template) && (
               <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
                 {title.structure_type && (
-                  <span className="text-[9px] px-1.5 py-0.5 bg-white/5 text-text-tertiary rounded">
+                  <span className="text-micro px-1.5 py-0.5 bg-white/5 text-text-tertiary rounded">
                     {title.structure_type}
                   </span>
                 )}
                 {title.template && (
-                  <span className="text-[9px] text-text-tertiary truncate flex-1">
+                  <span className="text-micro text-text-tertiary truncate flex-1">
                     {title.template}
                   </span>
                 )}
@@ -163,7 +163,7 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
         ))}
 
         {/* End of Feed */}
-        <div className="text-center py-4 text-[10px] text-text-tertiary">
+        <div className="text-center py-4 text-micro text-text-tertiary">
           <Clock className="w-3 h-3 inline mr-1" />
           Showing last 24 hours of viral titles
         </div>
@@ -172,19 +172,19 @@ export function TitleFeed({ categoryKey, categoryName }: TitleFeedProps) {
       {/* Stats Summary - Sticky bottom */}
       {titleIntel?.stats && (
         <div className="p-3 bg-white/[0.02] border border-white/[0.06] rounded-xl mt-2">
-          <p className="text-[10px] text-text-tertiary mb-2">Category Averages</p>
+          <p className="text-micro text-text-tertiary mb-2">Category Averages</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div>
               <p className="text-sm font-medium text-text-primary">{titleIntel.stats.avgTitleLength}</p>
-              <p className="text-[9px] text-text-tertiary">chars</p>
+              <p className="text-micro text-text-tertiary">chars</p>
             </div>
             <div>
               <p className="text-sm font-medium text-text-primary">{titleIntel.stats.avgWordCount}</p>
-              <p className="text-[9px] text-text-tertiary">words</p>
+              <p className="text-micro text-text-tertiary">words</p>
             </div>
             <div>
               <p className="text-sm font-medium text-text-primary">{(titleIntel.stats.avgViews / 1000).toFixed(0)}K</p>
-              <p className="text-[9px] text-text-tertiary">avg views</p>
+              <p className="text-micro text-text-tertiary">avg views</p>
             </div>
           </div>
         </div>

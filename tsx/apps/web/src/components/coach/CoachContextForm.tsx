@@ -200,7 +200,7 @@ interface TrialBannerProps {
 function TrialBanner({ trialAvailable, trialUsed, upgradeMessage }: TrialBannerProps) {
   if (trialAvailable) {
     return (
-      <div className="mb-6 p-4 bg-gradient-to-r from-accent-600/10 to-primary-600/10 border border-accent-600/20 rounded-lg">
+      <div className="mb-6 p-4 bg-accent-600/10 border border-accent-600/20 rounded-lg">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-full bg-accent-600/20 flex items-center justify-center text-accent-500 flex-shrink-0">
             <GiftIcon />
@@ -392,7 +392,7 @@ function BrandKitSelector({ brandKits, selectedKit, onSelect, onClear, isLoading
         </span>
 
         {selectedKit?.is_active && (
-          <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase">
+          <span className="px-1.5 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase">
             Active
           </span>
         )}
@@ -457,7 +457,7 @@ function BrandKitSelector({ brandKits, selectedKit, onSelect, onClear, isLoading
                   {kit.name}
                 </span>
                 {kit.is_active && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase">
+                  <span className="px-1.5 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase">
                     Active
                   </span>
                 )}

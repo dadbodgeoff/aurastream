@@ -113,7 +113,7 @@ export function CreateStudio({
         <div className="flex items-center gap-4">
           <div className={cn(
             'w-12 h-12 rounded-2xl',
-            'bg-gradient-to-br from-interactive-500 via-interactive-600 to-accent-600',
+            'bg-interactive-600',
             'flex items-center justify-center',
             'shadow-lg shadow-interactive-600/30',
             'ring-1 ring-white/10'

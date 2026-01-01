@@ -106,7 +106,7 @@ export function ClipCarousel({
         <div className="flex items-center gap-2">
           {icon}
           <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
-          <span className="text-[10px] text-text-tertiary">({clips.length})</span>
+          <span className="text-micro text-text-tertiary">({clips.length})</span>
         </div>
         
         {/* Scroll Controls */}
@@ -157,14 +157,14 @@ export function ClipCarousel({
 
               {/* Duration badge */}
               {clip.duration && (
-                <span className="absolute bottom-1.5 right-1.5 px-1 py-0.5 bg-black/80 text-white text-[9px] rounded">
+                <span className="absolute bottom-1.5 right-1.5 px-1 py-0.5 bg-black/80 text-white text-micro rounded">
                   {formatDuration(clip.duration)}
                 </span>
               )}
 
               {/* Velocity badge (if available) */}
               {clip.velocity && clip.velocity > 0 && (
-                <span className="absolute top-1.5 left-1.5 px-1 py-0.5 bg-green-500/90 text-white text-[9px] rounded flex items-center gap-0.5">
+                <span className="absolute top-1.5 left-1.5 px-1 py-0.5 bg-green-500/90 text-white text-micro rounded flex items-center gap-0.5">
                   <TrendingUp className="w-2.5 h-2.5" />
                   {clip.velocity.toFixed(1)}/min
                 </span>
@@ -173,10 +173,10 @@ export function ClipCarousel({
 
             {/* Info */}
             <div className={compact ? "mt-1.5" : "mt-2"}>
-              <p className={`text-text-primary line-clamp-2 leading-snug group-hover:text-interactive-400 transition-colors ${compact ? 'text-[11px]' : 'text-sm'}`}>
+              <p className={`text-text-primary line-clamp-2 leading-snug group-hover:text-interactive-400 transition-colors ${compact ? 'text-micro' : 'text-sm'}`}>
                 {clip.title}
               </p>
-              <div className={`flex items-center gap-1.5 ${compact ? 'mt-0.5' : 'mt-1'} text-[9px] text-text-tertiary`}>
+              <div className={`flex items-center gap-1.5 ${compact ? 'mt-0.5' : 'mt-1'} text-micro text-text-tertiary`}>
                 {clip.broadcasterName && (
                   <span className="truncate max-w-[80px]">{clip.broadcasterName}</span>
                 )}

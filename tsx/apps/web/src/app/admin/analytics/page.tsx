@@ -526,7 +526,7 @@ function RealtimeCard({
   isText?: boolean;
 }) {
   return (
-    <div className="bg-gradient-to-br from-interactive-600/20 to-interactive-500/10 border border-interactive-500/30 rounded-xl p-4">
+    <div className="bg-interactive-600/15 border border-interactive-500/30 rounded-xl p-4">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-lg">{icon}</span>
         <span className="text-sm text-text-secondary">{label}</span>
@@ -671,7 +671,7 @@ function FunnelChart({ data }: { data: any[] }) {
           </div>
           <div className="h-8 bg-background-elevated rounded-lg overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-interactive-600 to-interactive-500 rounded-lg transition-all duration-500"
+              className="h-full bg-interactive-600 rounded-lg transition-all duration-500"
               style={{ width: `${(step.total_count / maxCount) * 100}%` }}
             />
           </div>

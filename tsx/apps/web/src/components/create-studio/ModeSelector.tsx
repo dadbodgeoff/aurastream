@@ -275,7 +275,7 @@ export function ModeSelector({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        'font-semibold text-[15px] tracking-tight',
+                        'font-semibold text-base tracking-tight',
                         'transition-colors duration-200',
                         isActive ? 'text-white' : 'text-text-secondary group-hover:text-text-primary'
                       )}>
@@ -286,7 +286,7 @@ export function ModeSelector({
                       {mode.badge && (
                         <span
                           className={cn(
-                            'px-2 py-0.5 text-[10px] font-bold rounded-md',
+                            'px-2 py-0.5 text-micro font-bold rounded-md',
                             'uppercase tracking-wider',
                             'transition-colors duration-200',
                             isPremium
@@ -317,7 +317,7 @@ export function ModeSelector({
 
                 {/* Description */}
                 <p className={cn(
-                  'text-[13px] leading-relaxed pl-14',
+                  'text-sm leading-relaxed pl-14',
                   'transition-colors duration-200',
                   isActive ? 'text-white/70' : 'text-text-muted group-hover:text-text-tertiary'
                 )}>
@@ -328,7 +328,7 @@ export function ModeSelector({
               {/* Locked overlay for premium */}
               {isLocked && (
                 <div className="absolute inset-0 rounded-2xl bg-background-base/60 backdrop-blur-[2px] flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-200 z-20">
-                  <span className="px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-400 text-xs font-semibold rounded-full ring-1 ring-amber-500/30 shadow-lg">
+                  <span className="px-4 py-2 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded-full ring-1 ring-amber-500/30 shadow-lg">
                     Upgrade to Pro
                   </span>
                 </div>

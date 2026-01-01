@@ -79,14 +79,14 @@ export function StatCard({
       {(sublabel || trend) && (
         <div className="flex items-center gap-2 mt-1.5">
           {trend && (
-            <span className={cn('flex items-center gap-0.5 text-[11px] font-medium', trendColors[trend.direction])}>
+            <span className={cn('flex items-center gap-0.5 text-micro font-medium', trendColors[trend.direction])}>
               {trend.direction === 'up' && <ArrowUpIcon size="sm" />}
               {trend.direction === 'down' && <ArrowDownIcon size="sm" />}
               {trend.value > 0 ? '+' : ''}{trend.value}%
               {trend.label && <span className="text-text-muted ml-1">{trend.label}</span>}
             </span>
           )}
-          {sublabel && <p className="text-[11px] text-text-muted">{sublabel}</p>}
+          {sublabel && <p className="text-micro text-text-muted">{sublabel}</p>}
         </div>
       )}
     </div>

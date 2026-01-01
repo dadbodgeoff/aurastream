@@ -55,7 +55,7 @@ export function BrandKitNav({
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium truncate">{panel.label}</span>
                   {panel.isOptional && (
-                    <span className="text-[10px] text-text-muted">opt</span>
+                    <span className="text-micro text-text-muted">opt</span>
                   )}
                 </div>
                 {status && status.itemCount > 0 && (

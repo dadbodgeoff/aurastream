@@ -49,7 +49,7 @@ export function IntelMigrationBanner({ fromPage, className }: IntelMigrationBann
           transition={{ duration: 0.2 }}
           className={cn(
             'relative overflow-hidden rounded-xl mb-6',
-            'bg-gradient-to-r from-interactive-600/20 via-interactive-500/10 to-accent-500/10',
+            'bg-interactive-600/15',
             'border border-interactive-500/30',
             className
           )}

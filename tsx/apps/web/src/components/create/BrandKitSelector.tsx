@@ -107,7 +107,7 @@ export function BrandKitSelector({
 
         {/* Active badge */}
         {selectedKit?.is_active && (
-          <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
+          <span className="px-1.5 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
             Active
           </span>
         )}
@@ -196,7 +196,7 @@ export function BrandKitSelector({
                   </span>
                 </div>
                 {kit.is_active && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
+                  <span className="px-1.5 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
                     Active
                   </span>
                 )}

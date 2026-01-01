@@ -341,7 +341,7 @@ export default function GenerationProgressPage() {
               <div className="pt-6 border-t border-border-subtle">
                 <Link
                   href={isProfileCreatorAsset(asset.asset_type) ? '/dashboard/profile-creator' : '/dashboard/quick-create'}
-                  className="block w-full px-6 py-4 bg-gradient-to-r from-interactive-600 to-primary-600 hover:from-interactive-500 hover:to-primary-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="block w-full px-6 py-4 bg-interactive-600 hover:bg-interactive-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -454,7 +454,7 @@ export default function GenerationProgressPage() {
               {/* Progress Bar */}
               <div className="w-full bg-background-elevated rounded-full h-2 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-interactive-600 to-interactive-500 rounded-full transition-all duration-500"
+                  className="h-full bg-interactive-600 rounded-full transition-all duration-500"
                   style={{ width: `${progress}%` }}
                 />
               </div>

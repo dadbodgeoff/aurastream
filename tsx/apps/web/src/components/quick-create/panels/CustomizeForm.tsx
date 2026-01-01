@@ -101,7 +101,7 @@ export function CustomizeForm(props: CustomizeFormProps) {
           <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-semibold text-text-primary">Style</h3>
-              <span className="px-1.5 py-0.5 bg-interactive-600/10 text-interactive-600 text-[10px] font-medium rounded">
+              <span className="px-1.5 py-0.5 bg-interactive-600/10 text-interactive-600 text-micro font-medium rounded">
                 {template.vibes.length}
               </span>
             </div>
@@ -137,7 +137,7 @@ export function CustomizeForm(props: CustomizeFormProps) {
                 
                 return (
                 <div key={field.id}>
-                  <label className="block text-[11px] font-medium text-text-secondary mb-1">
+                  <label className="block text-micro font-medium text-text-secondary mb-1">
                     {field.label}
                     {field.required && <span className="text-error-light ml-0.5">*</span>}
                   </label>
@@ -225,7 +225,7 @@ export function CustomizeForm(props: CustomizeFormProps) {
                 </div>
 
                 {brandKits.length === 0 && (
-                  <p className="text-center text-text-tertiary text-[10px] py-2">
+                  <p className="text-center text-text-tertiary text-micro py-2">
                     No brand kits. <Link href="/dashboard/brand-kits" className="text-interactive-600 hover:underline">Create one</Link>
                   </p>
                 )}
@@ -253,13 +253,13 @@ export function CustomizeForm(props: CustomizeFormProps) {
               {includeLogo && hasLogo && (
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div>
-                    <label className="block text-[10px] font-medium text-text-secondary mb-1">Position</label>
+                    <label className="block text-micro font-medium text-text-secondary mb-1">Position</label>
                     <select value={logoPosition} onChange={(e) => onLogoPositionChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
                       {LOGO_POSITIONS.map(p => <option key={p} value={p}>{p.replace('-', ' ')}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-medium text-text-secondary mb-1">Size</label>
+                    <label className="block text-micro font-medium text-text-secondary mb-1">Size</label>
                     <select value={logoSize} onChange={(e) => onLogoSizeChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
                       {LOGO_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -273,8 +273,8 @@ export function CustomizeForm(props: CustomizeFormProps) {
 
       {/* Continue - Compact */}
       <div className="flex items-center justify-between pt-1">
-        {!isFormValid && <p className="text-[10px] text-text-tertiary">Fill required fields</p>}
-        {isFormValid && !selectedVibe && <p className="text-[10px] text-text-tertiary">Select a style</p>}
+        {!isFormValid && <p className="text-micro text-text-tertiary">Fill required fields</p>}
+        {isFormValid && !selectedVibe && <p className="text-micro text-text-tertiary">Select a style</p>}
         {isFormValid && selectedVibe && <div />}
         <button
           onClick={onNext}

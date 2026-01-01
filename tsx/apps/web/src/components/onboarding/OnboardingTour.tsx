@@ -477,10 +477,10 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
   if (showSkipModal) {
     return (
       <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div className="mx-4 w-full max-w-md rounded-2xl border border-interactive-500/30 bg-gradient-to-br from-[#1F2121] to-[#262828] p-6 shadow-2xl shadow-interactive-500/20">
+        <div className="mx-4 w-full max-w-md rounded-2xl border border-interactive-500/30 bg-[#1F2121] p-6 shadow-2xl shadow-interactive-500/20">
           {/* AuraStream Logo/Header */}
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-600">
               <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
@@ -514,7 +514,7 @@ export function OnboardingTour({ className }: OnboardingTourProps): JSX.Element 
             </button>
             <button
               onClick={confirmSkip}
-              className="flex-1 rounded-xl bg-gradient-to-r from-interactive-600 to-interactive-700 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-interactive-500/30 transition-all hover:from-interactive-500 hover:to-interactive-600 hover:shadow-interactive-500/40"
+              className="flex-1 rounded-xl bg-interactive-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-interactive-500/30 transition-all hover:bg-interactive-500 hover:shadow-interactive-500/40"
             >
               Skip Tour
             </button>

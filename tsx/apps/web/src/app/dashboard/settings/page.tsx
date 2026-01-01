@@ -170,7 +170,7 @@ function BillingTab({ user }: { user: any }) {
             )}
           >
             {plan.recommended && (
-              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-interactive-600 text-white text-[10px] font-medium rounded-full">
+              <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-interactive-600 text-white text-micro font-medium rounded-full">
                 Recommended
               </span>
             )}

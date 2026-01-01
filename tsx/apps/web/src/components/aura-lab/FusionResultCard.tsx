@@ -96,9 +96,9 @@ export function FusionResultCard({
   const ScoreBar = ({ label, value }: { label: string; value: number }) => {
     const percentage = (value / 10) * 100;
     const getBarColor = () => {
-      if (value >= 8) return 'bg-gradient-to-r from-accent-500 to-accent-400';
-      if (value >= 6) return 'bg-gradient-to-r from-interactive-500 to-interactive-400';
-      return 'bg-gradient-to-r from-text-tertiary to-text-secondary';
+      if (value >= 8) return 'bg-accent-500';
+      if (value >= 6) return 'bg-interactive-500';
+      return 'bg-text-tertiary';
     };
 
     return (
@@ -146,10 +146,10 @@ export function FusionResultCard({
                 ],
               }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-orange-500/20 border border-amber-500/50"
+              className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-amber-500/20 border border-amber-500/50"
             >
               <Trophy className="w-5 h-5 text-amber-400" />
-              <span className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400">
+              <span className="text-lg font-bold text-amber-400">
                 CRITICAL SUCCESS!
               </span>
               <Trophy className="w-5 h-5 text-amber-400" />
@@ -273,7 +273,7 @@ export function FusionResultCard({
                 transition-all duration-200
                 ${isKeeping
                   ? 'bg-green-600 text-white cursor-wait'
-                  : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white shadow-lg shadow-green-500/25'
+                  : 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-500/25'
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}

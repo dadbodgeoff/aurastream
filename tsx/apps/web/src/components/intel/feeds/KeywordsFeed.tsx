@@ -6,12 +6,16 @@
  * Social feed style scrollable list of trending keywords and tag clusters from the last 24 hours.
  * Newest items appear at top, older items scroll down.
  * Shows keywords with velocity scores, effect sizes, power word categories, and tag clusters.
+ * 
+ * Updated: Uses new Typography and Badge component system
  */
 
 import { useTitleIntel, useTagIntel } from '@aurastream/api-client';
-import { Hash, TrendingUp, BarChart3, Tag, Zap, Target, Clock, RefreshCw, Copy, Check } from 'lucide-react';
+import { Hash, TrendingUp, BarChart3, Tag as TagIcon, Zap, Clock, RefreshCw, Copy, Check } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useState } from 'react';
+import { Text, Label, Micro, Caption } from '@/components/ui/Typography';
+import { Badge, Tag } from '@/components/ui/Badge';
 
 interface KeywordsFeedProps {
   categoryKey: string;
@@ -62,9 +66,9 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
 
   if (!hasData) {
     return (
-      <div className="text-center py-8 text-text-tertiary text-sm">
+      <Text variant="bodySmall" color="tertiary" align="center" className="py-8">
         No keyword data yet for {categoryName}
-      </div>
+      </Text>
     );
   }
 
@@ -74,13 +78,13 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
       <div className="flex items-center justify-between px-1 mb-3">
         <div className="flex items-center gap-2">
           <Hash className="w-3.5 h-3.5 text-green-400" />
-          <span className="text-xs font-medium text-text-secondary">Last 24 hours</span>
+          <Label color="secondary">Last 24 hours</Label>
         </div>
         {dataUpdatedAt && (
-          <div className="flex items-center gap-1 text-[10px] text-text-tertiary">
+          <Micro className="flex items-center gap-1">
             <RefreshCw className="w-3 h-3" />
             Updated {formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true })}
-          </div>
+          </Micro>
         )}
       </div>
 
@@ -89,13 +93,13 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
         <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl sticky top-0 z-10 backdrop-blur-sm">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="w-3.5 h-3.5 text-purple-400" />
-            <span className="text-xs font-medium text-purple-400">Power Words</span>
+            <Label className="text-purple-400">Power Words</Label>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {trendingPowerWords.map((word, i) => (
-              <span key={i} className="text-[11px] px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded cursor-pointer hover:bg-purple-500/30 transition-colors">
+              <Tag key={i} variant="default" className="bg-purple-500/20 text-purple-300 border-purple-500/30 hover:bg-purple-500/30">
                 {word}
-              </span>
+              </Tag>
             ))}
           </div>
         </div>
@@ -109,7 +113,7 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
           <>
             <div className="flex items-center gap-2 px-1 pt-2">
               <TrendingUp className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-xs font-medium text-text-primary">Trending Keywords</span>
+              <Label>Trending Keywords</Label>
             </div>
             
             {keywords.slice(0, 10).map((kw, i) => {
@@ -119,47 +123,45 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
               return (
                 <article 
                   key={i} 
-                  className="group p-3 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] rounded-xl transition-all duration-200"
+                  className="group card-interactive p-3"
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 flex-1">
-                      <span className="text-sm font-medium text-text-primary group-hover:text-blue-400 transition-colors">
+                      <Text variant="bodySmall" weight="medium" className="group-hover:text-blue-400 transition-colors">
                         "{kw.keyword}"
-                      </span>
+                      </Text>
                       {kw.isTrending && (
-                        <span className="text-[9px] px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded font-medium animate-pulse">
+                        <Badge variant="success" size="xs" className="animate-pulse">
                           TRENDING
-                        </span>
+                        </Badge>
                       )}
                     </div>
                     {kw.powerCategory && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                      <Badge size="xs" className="bg-purple-500/20 text-purple-400 border-purple-500/30">
                         {kw.powerCategory}
-                      </span>
+                      </Badge>
                     )}
                   </div>
 
                   {/* Metrics */}
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded font-medium">
-                      <TrendingUp className="w-2.5 h-2.5" />
+                    <Badge variant="info" size="xs" icon={<TrendingUp className="w-2.5 h-2.5" />}>
                       {kw.velocityScore.toLocaleString()} v/hr
-                    </span>
-                    <span className="text-[10px] text-text-tertiary">
-                      in {kw.frequency} videos
-                    </span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                      isPositive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
+                    </Badge>
+                    <Micro>in {kw.frequency} videos</Micro>
+                    <Badge 
+                      variant={isPositive ? 'success' : 'error'} 
+                      size="xs"
+                    >
                       {isPositive ? '+' : ''}{effectPct}% vs baseline
-                    </span>
+                    </Badge>
                   </div>
 
                   {/* Top Video */}
                   {kw.topVideoTitle && (
-                    <p className="text-[10px] text-text-tertiary line-clamp-1">
+                    <Micro lineClamp={1}>
                       📺 Top: "{kw.topVideoTitle}"
-                    </p>
+                    </Micro>
                   )}
                 </article>
               );
@@ -171,9 +173,9 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
         {tagClusters.length > 0 && (
           <>
             <div className="flex items-center gap-2 px-1 pt-4">
-              <Tag className="w-3.5 h-3.5 text-green-400" />
-              <span className="text-xs font-medium text-text-primary">Tag Clusters</span>
-              <span className="text-[10px] text-text-tertiary">(tags that work together)</span>
+              <TagIcon className="w-3.5 h-3.5 text-green-400" />
+              <Label>Tag Clusters</Label>
+              <Micro>(tags that work together)</Micro>
             </div>
             
             {tagClusters.map((cluster, i) => (
@@ -182,27 +184,27 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
                 className="group p-3 bg-green-500/5 hover:bg-green-500/10 border border-green-500/20 hover:border-green-500/30 rounded-xl transition-all duration-200"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-green-400 group-hover:text-green-300 transition-colors">
+                  <Text variant="bodySmall" weight="medium" className="text-green-400 group-hover:text-green-300 transition-colors">
                     #{cluster.primary_tag}
-                  </span>
-                  <span className="text-[10px] text-text-tertiary">
+                  </Text>
+                  <Micro>
                     {cluster.avg_views >= 1000000 
                       ? `${(cluster.avg_views / 1000000).toFixed(1)}M avg`
                       : `${(cluster.avg_views / 1000).toFixed(0)}K avg`}
-                  </span>
+                  </Micro>
                 </div>
 
                 <div className="flex flex-wrap gap-1 mb-2">
                   {cluster.related_tags.map((tag, j) => (
-                    <span key={j} className="text-[10px] px-1.5 py-0.5 bg-white/5 text-text-secondary rounded hover:bg-white/10 cursor-pointer transition-colors">
+                    <Tag key={j} variant="outline">
                       #{tag}
-                    </span>
+                    </Tag>
                   ))}
                 </div>
 
-                <p className="text-[10px] text-text-tertiary">
+                <Micro>
                   {cluster.video_count} videos • "{cluster.example_title?.slice(0, 50)}..."
-                </p>
+                </Micro>
               </article>
             ))}
           </>
@@ -213,24 +215,26 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
           <>
             <div className="flex items-center gap-2 px-1 pt-4">
               <BarChart3 className="w-3.5 h-3.5 text-orange-400" />
-              <span className="text-xs font-medium text-text-primary">Top Performing Tags</span>
+              <Label>Top Performing Tags</Label>
             </div>
             
             <div className="grid grid-cols-2 gap-2">
               {tags.slice(0, 8).map((tag, i) => (
                 <article 
                   key={i} 
-                  className="group p-2.5 bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] rounded-lg transition-all duration-200"
+                  className="group card-interactive p-2.5"
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium text-text-primary group-hover:text-orange-400 transition-colors">#{tag.tag}</p>
+                    <Label className="group-hover:text-orange-400 transition-colors">#{tag.tag}</Label>
                     <CopyTagButton tag={tag.tag} />
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-text-tertiary">
-                    <span>{tag.avgViews >= 1000000 
-                      ? `${(tag.avgViews / 1000000).toFixed(1)}M avg`
-                      : `${(tag.avgViews / 1000).toFixed(0)}K avg`}</span>
-                    <span>{tag.videosUsing} videos</span>
+                  <div className="flex items-center justify-between">
+                    <Micro>
+                      {tag.avgViews >= 1000000 
+                        ? `${(tag.avgViews / 1000000).toFixed(1)}M avg`
+                        : `${(tag.avgViews / 1000).toFixed(0)}K avg`}
+                    </Micro>
+                    <Micro>{tag.videosUsing} videos</Micro>
                   </div>
                 </article>
               ))}
@@ -239,10 +243,10 @@ export function KeywordsFeed({ categoryKey, categoryName }: KeywordsFeedProps) {
         )}
 
         {/* End of Feed */}
-        <div className="text-center py-4 text-[10px] text-text-tertiary">
+        <Micro align="center" className="py-4">
           <Clock className="w-3 h-3 inline mr-1" />
           Showing last 24 hours of keyword & tag data
-        </div>
+        </Micro>
       </div>
     </div>
   );

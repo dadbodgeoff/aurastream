@@ -234,7 +234,7 @@ export function QuickCreateWizard() {
     <div className="max-w-5xl mx-auto pb-8">
       {/* Header - More refined */}
       <div className="mb-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-600/25 ring-1 ring-white/10">
+        <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/25 ring-1 ring-white/10">
           <BoltIcon />
         </div>
         <div>

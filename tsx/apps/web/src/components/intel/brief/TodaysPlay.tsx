@@ -21,10 +21,10 @@ const INSIGHT_ICONS = {
 
 // Colors for different insight types
 const INSIGHT_COLORS = {
-  trending_phrase: 'from-purple-600/20 to-transparent border-purple-500/30',
-  viral_spike: 'from-red-600/20 to-transparent border-red-500/30',
-  keyword_surge: 'from-blue-600/20 to-transparent border-blue-500/30',
-  low_competition: 'from-green-600/20 to-transparent border-green-500/30',
+  trending_phrase: 'bg-purple-600/20 border-purple-500/30',
+  viral_spike: 'bg-red-600/20 border-red-500/30',
+  keyword_surge: 'bg-blue-600/20 border-blue-500/30',
+  low_competition: 'bg-green-600/20 border-green-500/30',
 };
 
 const METRIC_COLORS = {
@@ -83,11 +83,11 @@ export function TodaysPlay() {
   }
 
   const InsightIcon = INSIGHT_ICONS[insight.insightType] || Target;
-  const gradientClass = INSIGHT_COLORS[insight.insightType] || 'from-interactive-600/20 to-transparent border-interactive-500/30';
+  const gradientClass = INSIGHT_COLORS[insight.insightType] || 'bg-interactive-600/20 border-interactive-500/30';
   const metricClass = METRIC_COLORS[insight.insightType] || 'text-interactive-400 bg-interactive-500/20';
 
   return (
-    <section className={`bg-gradient-to-br ${gradientClass} border rounded-2xl p-6`}>
+    <section className={`${gradientClass} border rounded-2xl p-6`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

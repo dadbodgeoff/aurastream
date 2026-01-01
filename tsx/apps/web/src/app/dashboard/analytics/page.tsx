@@ -40,18 +40,18 @@ function StatCard({
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
       <div className="flex items-center justify-between mb-4">
-        <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">{label}</span>
+        <span className="text-text-tertiary text-sm font-medium">{label}</span>
         <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400">
           {icon}
         </div>
       </div>
       <div className="flex items-end gap-2">
-        <span className="text-3xl font-bold text-gray-900 dark:text-white">{value}</span>
+        <span className="text-3xl font-bold text-text-primary">{value}</span>
         {subValue && (
           <span className={`text-sm mb-1 ${
             trend === 'up' ? 'text-green-500' : 
             trend === 'down' ? 'text-red-500' : 
-            'text-gray-500'
+            'text-text-tertiary'
           }`}>
             {subValue}
           </span>
@@ -91,7 +91,7 @@ function MiniChart({ data, dataKey }: { data: TrendDataPoint[]; dataKey: keyof T
 
 function TopPagesTable({ pages }: { pages?: TopPage[] }) {
   if (!pages || pages.length === 0) {
-    return <p className="text-gray-500 text-sm">No page data yet</p>;
+    return <p className="text-text-tertiary text-sm">No page data yet</p>;
   }
   
   const maxViews = Math.max(...pages.map(p => p.views), 1);
@@ -100,9 +100,9 @@ function TopPagesTable({ pages }: { pages?: TopPage[] }) {
     <div className="space-y-3">
       {pages.map((page, i) => (
         <div key={i} className="flex items-center gap-3">
-          <span className="text-gray-400 text-sm w-6">{i + 1}.</span>
+          <span className="text-text-muted text-sm w-6">{i + 1}.</span>
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-gray-900 dark:text-white truncate">{page.page}</div>
+            <div className="text-sm text-text-primary truncate">{page.page}</div>
             <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full mt-1">
               <div
                 className="h-full bg-purple-500 rounded-full"
@@ -110,7 +110,7 @@ function TopPagesTable({ pages }: { pages?: TopPage[] }) {
               />
             </div>
           </div>
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{page.views}</span>
+          <span className="text-sm font-medium text-text-secondary">{page.views}</span>
         </div>
       ))}
     </div>
@@ -123,23 +123,23 @@ function TopPagesTable({ pages }: { pages?: TopPage[] }) {
 
 function RecentSignupsList({ signups }: { signups?: RecentSignup[] }) {
   if (!signups || signups.length === 0) {
-    return <p className="text-gray-500 text-sm">No signups yet</p>;
+    return <p className="text-text-tertiary text-sm">No signups yet</p>;
   }
   
   return (
     <div className="space-y-3">
       {signups.map((signup, i) => (
         <div key={i} className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
+          <div className="w-8 h-8 rounded-full bg-interactive-500 flex items-center justify-center text-white text-sm font-medium">
             {signup.displayName?.charAt(0) || signup.email?.charAt(0) || '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+            <div className="text-sm font-medium text-text-primary truncate">
               {signup.displayName || 'Unknown'}
             </div>
-            <div className="text-xs text-gray-500 truncate">{signup.email}</div>
+            <div className="text-xs text-text-tertiary truncate">{signup.email}</div>
           </div>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-text-muted">
             {new Date(signup.createdAt).toLocaleDateString()}
           </span>
         </div>
@@ -154,14 +154,14 @@ function RecentSignupsList({ signups }: { signups?: RecentSignup[] }) {
 
 function GenerationStatsTable({ stats }: { stats?: GenerationStats }) {
   if (!stats || stats.byAssetType.length === 0) {
-    return <p className="text-gray-500 text-sm">No generation data yet</p>;
+    return <p className="text-text-tertiary text-sm">No generation data yet</p>;
   }
   
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="text-left text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
+          <tr className="text-left text-text-tertiary border-b border-gray-100 dark:border-gray-700">
             <th className="pb-2 font-medium">Asset Type</th>
             <th className="pb-2 font-medium text-right">Completed</th>
             <th className="pb-2 font-medium text-right">Failed</th>
@@ -171,7 +171,7 @@ function GenerationStatsTable({ stats }: { stats?: GenerationStats }) {
         <tbody>
           {stats.byAssetType.map((row, i) => (
             <tr key={i} className="border-b border-gray-50 dark:border-gray-800">
-              <td className="py-2 text-gray-900 dark:text-white">{row.assetType}</td>
+              <td className="py-2 text-text-primary">{row.assetType}</td>
               <td className="py-2 text-right text-green-600">{row.completed}</td>
               <td className="py-2 text-right text-red-500">{row.failed}</td>
               <td className="py-2 text-right">
@@ -188,7 +188,7 @@ function GenerationStatsTable({ stats }: { stats?: GenerationStats }) {
         </tbody>
         <tfoot>
           <tr className="font-medium">
-            <td className="pt-3 text-gray-900 dark:text-white">Total</td>
+            <td className="pt-3 text-text-primary">Total</td>
             <td className="pt-3 text-right text-green-600">{stats.totalCompleted}</td>
             <td className="pt-3 text-right text-red-500">{stats.totalFailed}</td>
             <td className="pt-3 text-right">
@@ -258,8 +258,8 @@ export default function AnalyticsDashboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">
+            <h1 className="text-2xl font-bold text-text-primary">Analytics</h1>
+            <p className="text-text-tertiary mt-1">
               Track your site performance and user engagement
             </p>
           </div>
@@ -333,15 +333,15 @@ export default function AnalyticsDashboardPage() {
         {trend && trend.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Visitors Trend</h3>
+              <h3 className="text-sm font-medium text-text-tertiary mb-4">Visitors Trend</h3>
               <MiniChart data={trend} dataKey="visitors" />
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Signups Trend</h3>
+              <h3 className="text-sm font-medium text-text-tertiary mb-4">Signups Trend</h3>
               <MiniChart data={trend} dataKey="signups" />
             </div>
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Generations Trend</h3>
+              <h3 className="text-sm font-medium text-text-tertiary mb-4">Generations Trend</h3>
               <MiniChart data={trend} dataKey="generations" />
             </div>
           </div>
@@ -351,19 +351,19 @@ export default function AnalyticsDashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Top Pages */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Pages</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Top Pages</h3>
             <TopPagesTable pages={topPages} />
           </div>
           
           {/* Recent Signups */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Signups</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Recent Signups</h3>
             <RecentSignupsList signups={recentSignups} />
           </div>
           
           {/* Generation Stats */}
           <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Generation Stats</h3>
+            <h3 className="text-lg font-semibold text-text-primary mb-4">Generation Stats</h3>
             <GenerationStatsTable stats={generations} />
           </div>
         </div>

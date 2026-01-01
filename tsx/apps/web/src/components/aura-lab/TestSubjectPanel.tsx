@@ -159,7 +159,7 @@ export function TestSubjectPanel({
                   {['PNG', 'JPG', 'WebP'].map((type) => (
                     <span
                       key={type}
-                      className="px-2 py-0.5 text-[10px] font-mono text-text-tertiary bg-background-elevated/80 rounded"
+                      className="px-2 py-0.5 text-micro font-mono text-text-tertiary bg-background-elevated/80 rounded"
                     >
                       {type}
                     </span>
@@ -218,8 +218,7 @@ export function TestSubjectPanel({
                   onClick={onLock}
                   className="
                     w-full py-3 px-4 rounded-lg font-semibold text-sm
-                    bg-gradient-to-r from-green-600 to-emerald-600
-                    hover:from-green-500 hover:to-emerald-500
+                    bg-green-600 hover:bg-green-500
                     text-white shadow-lg shadow-green-500/25
                     transition-all duration-200 hover:scale-[1.02]
                     flex items-center justify-center gap-2

@@ -32,7 +32,7 @@ export function TodaysMissionPanel() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-interactive-600/10 via-background-surface to-accent-500/5 border border-interactive-500/20 p-6 md:p-8">
+      <div className="relative overflow-hidden rounded-xl bg-interactive-600/10 border border-interactive-500/20 p-6 md:p-8">
         <div className="flex items-center gap-2 text-xs font-semibold text-interactive-400 uppercase tracking-wider mb-4">
           <Zap className="w-4 h-4" />
           <span>Today&apos;s Insight</span>
@@ -52,7 +52,7 @@ export function TodaysMissionPanel() {
   // Error state
   if (isError || !insight) {
     return (
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-interactive-600/10 via-background-surface to-accent-500/5 border border-interactive-500/20 p-6 md:p-8">
+      <div className="relative overflow-hidden rounded-xl bg-interactive-600/10 border border-interactive-500/20 p-6 md:p-8">
         <div className="flex items-center gap-2 text-xs font-semibold text-interactive-400 uppercase tracking-wider mb-4">
           <Zap className="w-4 h-4" />
           <span>Today&apos;s Insight</span>
@@ -83,7 +83,7 @@ export function TodaysMissionPanel() {
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-xl bg-gradient-to-br from-interactive-600/12 via-background-surface/90 to-accent-500/6 border border-interactive-500/20 p-6 md:p-8"
+      className="relative overflow-hidden rounded-xl bg-interactive-600/12 border border-interactive-500/20 p-6 md:p-8"
     >
       {/* Decorative gradient orbs */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-interactive-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />

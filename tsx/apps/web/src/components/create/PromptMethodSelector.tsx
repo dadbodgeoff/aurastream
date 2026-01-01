@@ -54,13 +54,13 @@ export function PromptMethodSelector({
           "p-4 rounded-xl border-2 text-left transition-all duration-200 group relative overflow-hidden",
           "hover:scale-[1.01] active:scale-[0.99]",
           isPremium
-            ? "border-interactive-600/40 hover:border-interactive-600 bg-gradient-to-br from-interactive-600/5 to-accent-600/5"
+            ? "border-interactive-600/40 hover:border-interactive-600 bg-interactive-600/5"
             : "border-border-subtle hover:border-border-default bg-background-surface/50"
         )}
       >
         {/* Premium badge */}
         <div className={cn(
-          "absolute top-2 right-2 px-2 py-0.5 text-[10px] font-semibold rounded-full",
+          "absolute top-2 right-2 px-2 py-0.5 text-micro font-semibold rounded-full",
           isPremium
             ? "bg-interactive-600 text-white"
             : "bg-background-elevated text-text-muted"

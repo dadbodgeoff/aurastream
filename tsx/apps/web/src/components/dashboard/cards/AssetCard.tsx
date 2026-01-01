@@ -255,7 +255,7 @@ export function AssetCard({
               {formatAssetType(assetType)}
             </span>
             {isPublic && (
-              <span className="flex-shrink-0 px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/10 text-emerald-500 rounded">
+              <span className="flex-shrink-0 px-1.5 py-0.5 text-micro font-medium bg-emerald-500/10 text-emerald-500 rounded">
                 Public
               </span>
             )}
