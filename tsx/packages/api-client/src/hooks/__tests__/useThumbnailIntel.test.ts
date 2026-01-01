@@ -345,7 +345,7 @@ describe('useThumbnailIntel Hooks', () => {
           wrapper: createWrapper(),
         });
 
-        await result.current.mutateAsync();
+        await result.current.mutateAsync('fortnite');
 
         expect(mockFetch).toHaveBeenCalledWith(
           expect.stringContaining('/thumbnail-intel/analyze'),

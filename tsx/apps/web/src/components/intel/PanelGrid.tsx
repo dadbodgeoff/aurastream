@@ -3,14 +3,8 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
 import { useIntelStore } from '@/stores/intelStore';
 import { useUpdateIntelPreferences } from '@aurastream/api-client';
-import type { PanelType } from '@aurastream/api-client';
+import type { PanelType, PanelConfig, PanelSize } from '@aurastream/api-client';
 import { PANEL_REGISTRY } from './panelRegistry';
-
-interface PanelConfig {
-  panelType: PanelType;
-  position: { x: number; y: number };
-  size: string;
-}
 
 // =============================================================================
 // Types
@@ -38,13 +32,11 @@ const BREAKPOINTS = { lg: 1200, md: 900, sm: 600, xs: 0 };
 const ROW_HEIGHT = 100;
 const MARGIN: [number, number] = [16, 16];
 
-const SIZE_TO_GRID: Record<string, { w: number; h: number }> = {
+const SIZE_TO_GRID: Record<PanelSize, { w: number; h: number }> = {
+  tiny: { w: 1, h: 1 },
   small: { w: 1, h: 2 },
-  medium: { w: 1, h: 3 },
   wide: { w: 2, h: 2 },
-  tall: { w: 1, h: 4 },
   large: { w: 2, h: 3 },
-  hero: { w: 4, h: 2 },
 };
 
 // =============================================================================
