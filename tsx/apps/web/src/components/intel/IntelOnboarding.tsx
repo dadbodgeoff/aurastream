@@ -384,7 +384,7 @@ export function IntelOnboarding() {
               }
             }}
           >
-            {availableCategories?.slice(0, 12).map((category) => {
+            {availableCategories?.map((category) => {
               const isSelected = selectedCategories.includes(category.key);
               const isDisabled = !isSelected && selectedCategories.length >= 3;
               
