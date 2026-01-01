@@ -39,7 +39,31 @@ async def recreate_thumbnail(
     then generates a recreation that matches the original's style.
     
     Requires either face_image_base64 (new upload) or face_asset_id (saved face).
+    
+    **Usage Limits:**
+    - Free: Counts toward 3 creations/month
+    - Pro: Counts toward 50 creations/month
+    - Studio: Unlimited
     """
+    from backend.services.usage_limit_service import get_usage_limit_service
+    
+    # Check usage limits (counts as a creation)
+    usage_service = get_usage_limit_service()
+    usage = await usage_service.check_limit(current_user.sub, "creations")
+    
+    if not usage.can_use:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "CREATION_LIMIT_REACHED",
+                "message": f"You've used all {usage.limit} creations this month",
+                "used": usage.used,
+                "limit": usage.limit,
+                "tier": usage.tier,
+                "upgrade_url": "/dashboard/settings?tab=subscription",
+            }
+        )
+    
     # Validate face input
     if not request.face_image_base64 and not request.face_asset_id:
         # Allow recreation without face if original has no face
@@ -64,6 +88,9 @@ async def recreate_thumbnail(
             brand_kit_id=request.brand_kit_id,
             additional_instructions=request.additional_instructions,
         )
+        
+        # Increment usage counter after successful creation
+        await usage_service.increment(current_user.sub, "creations")
         
         return RecreateResponse(**result)
         
