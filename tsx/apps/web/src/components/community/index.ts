@@ -29,3 +29,18 @@ export { CreatorSpotlight } from './CreatorSpotlight';
 export type { SpotlightCreator } from './CreatorSpotlight';
 
 export { InspirationGallery } from './InspirationGallery';
+
+// Community Hub components (UX Consolidation 2025)
+export { CommunityTabs } from './CommunityTabs';
+export type { CommunityTabValue } from './CommunityTabs';
+
+export { PromoBoardContent } from './PromoBoardContent';
+
+export { CommunityGalleryContent } from './CommunityGalleryContent';
+export type { CommunityGalleryContentProps, GalleryTab } from './CommunityGalleryContent';
+
+export { CreatorSpotlightContent } from './CreatorSpotlightContent';
+export type { CreatorSpotlightContentProps } from './CreatorSpotlightContent';
+
+export { CommunityHub } from './CommunityHub';
+export type { CommunityHubProps } from './CommunityHub';

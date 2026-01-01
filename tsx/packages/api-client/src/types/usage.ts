@@ -4,7 +4,7 @@
  * @module types/usage
  */
 
-export type SubscriptionTier = 'free' | 'pro' | 'studio';
+export type SubscriptionTier = 'free' | 'pro' | 'studio' | 'unlimited';
 
 export interface UsageStats {
   /** Current subscription tier */
@@ -69,5 +69,11 @@ export const TIER_DISPLAY: Record<SubscriptionTier, {
     color: 'text-accent-400',
     bgColor: 'bg-accent-500/10',
     borderColor: 'border-accent-500/30',
+  },
+  unlimited: {
+    name: 'Unlimited',
+    color: 'text-yellow-400',
+    bgColor: 'bg-yellow-500/10',
+    borderColor: 'border-yellow-500/30',
   },
 };

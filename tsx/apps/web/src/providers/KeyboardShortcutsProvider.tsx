@@ -66,21 +66,35 @@ const DEFAULT_SHORTCUTS: Shortcut[] = [
     key: 'n',
     action: 'newAsset',
     label: 'New Asset',
-    description: 'Navigate to quick create',
+    description: 'Navigate to create page',
     category: 'navigation',
   },
   {
     key: 'b',
     action: 'brandKits',
-    label: 'Brand Kits',
+    label: 'Brand Studio',
     description: 'Navigate to brand kits',
     category: 'navigation',
   },
   {
     key: 'a',
     action: 'assets',
-    label: 'Assets',
+    label: 'Asset Library',
     description: 'Navigate to assets',
+    category: 'navigation',
+  },
+  {
+    key: 'i',
+    action: 'intel',
+    label: 'Creator Intel',
+    description: 'Navigate to Creator Intel',
+    category: 'navigation',
+  },
+  {
+    key: 'c',
+    action: 'community',
+    label: 'Community',
+    description: 'Navigate to community',
     category: 'navigation',
   },
   // Modal shortcuts
@@ -178,13 +192,19 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
           openCommandPalette();
           break;
         case 'newAsset':
-          router.push('/dashboard/quick-create');
+          router.push('/dashboard/create');
           break;
         case 'brandKits':
           router.push('/dashboard/brand-kits');
           break;
         case 'assets':
           router.push('/dashboard/assets');
+          break;
+        case 'intel':
+          router.push('/dashboard/intel');
+          break;
+        case 'community':
+          router.push('/community');
           break;
         case 'showShortcuts':
           openModal();

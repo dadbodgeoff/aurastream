@@ -132,6 +132,9 @@ ASSET_DIMENSIONS = {
     "twitch_badge": (72, 72),
     "twitch_panel": (320, 160),
     "twitch_offline": (1920, 1080),
+    # Profile Creator assets (square)
+    "profile_picture": (512, 512),   # Default profile picture size
+    "streamer_logo": (512, 512),     # Default logo size
 }
 
 # Valid state transitions for job state machine

@@ -24,6 +24,18 @@ export { useCoachAccess } from './useCoachAccess';
 export type { UseCoachAccessReturn } from './useCoachAccess';
 export { useDownload } from './useDownload';
 export type { UseDownloadOptions, DownloadState } from './useDownload';
+export { 
+  useRedirectToast, 
+  clearAllRedirectToasts, 
+  clearRedirectToast, 
+  isRedirectToastShown,
+  REDIRECT_MESSAGES,
+} from './useRedirectToast';
+export type { 
+  RedirectKey, 
+  UseRedirectToastOptions, 
+  UseRedirectToastReturn,
+} from './useRedirectToast';
 
 // Aura Lab hooks - re-exported from api-client for convenience
 export {

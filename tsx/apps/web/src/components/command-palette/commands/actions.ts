@@ -27,7 +27,7 @@ export function createActionCommands(
       description: 'Start generating a new asset',
       keywords: ['generate', 'create', 'new', 'make', 'image'],
       section: 'actions',
-      action: () => navigate('/dashboard/quick-create'),
+      action: () => navigate('/dashboard/create'),
     },
     {
       id: 'action-new-brand-kit',
@@ -43,7 +43,7 @@ export function createActionCommands(
       description: 'Generate a new Twitch emote',
       keywords: ['twitch', 'emote', 'emoji', 'stream'],
       section: 'actions',
-      action: () => navigate('/dashboard/quick-create?type=twitch_emote'),
+      action: () => navigate('/dashboard/create?type=twitch_emote'),
     },
     {
       id: 'action-new-thumbnail',
@@ -51,7 +51,7 @@ export function createActionCommands(
       description: 'Generate a new YouTube thumbnail',
       keywords: ['youtube', 'thumbnail', 'video', 'cover'],
       section: 'actions',
-      action: () => navigate('/dashboard/quick-create?type=youtube_thumbnail'),
+      action: () => navigate('/dashboard/create?type=youtube_thumbnail'),
     },
     {
       id: 'action-new-banner',
@@ -59,7 +59,7 @@ export function createActionCommands(
       description: 'Generate a new Twitch banner',
       keywords: ['twitch', 'banner', 'header', 'stream'],
       section: 'actions',
-      action: () => navigate('/dashboard/quick-create?type=twitch_banner'),
+      action: () => navigate('/dashboard/create?type=twitch_banner'),
     },
   ];
 

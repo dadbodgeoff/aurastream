@@ -95,6 +95,68 @@ services:
           memory: 128M
 
   # =============================================================================
+  # Playbook Worker - Generates algorithmic playbook reports every 4 hours
+  # =============================================================================
+  
+  aurastream-playbook-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aurastream-playbook-worker
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://aurastream-redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      aurastream-redis:
+        condition: service_healthy
+      aurastream-api:
+        condition: service_healthy
+    command: python -m backend.workers.playbook_worker
+    networks:
+      - aurastream-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # =============================================================================
+  # Thumbnail Intel Worker - Analyzes gaming thumbnails daily at 6 AM EST
+  # =============================================================================
+  
+  aurastream-thumbnail-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aurastream-thumbnail-worker
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://aurastream-redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    depends_on:
+      aurastream-redis:
+        condition: service_healthy
+      aurastream-api:
+        condition: service_healthy
+    command: python -m backend.workers.thumbnail_intel_worker
+    networks:
+      - aurastream-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # =============================================================================
   # Next.js Frontend - Port 3001
   # =============================================================================
   

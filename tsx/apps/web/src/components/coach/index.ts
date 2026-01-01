@@ -47,6 +47,13 @@ export { CoachSlideOver } from './CoachSlideOver';
 export { CoachTips } from './CoachTips';
 
 // ============================================================================
+// Extracted Page Content (UX Consolidation 2025)
+// ============================================================================
+
+export { CoachPageContent } from './CoachPageContent';
+export type { CoachPageContentProps } from './CoachPageContent';
+
+// ============================================================================
 // Streaming Components (Task 2)
 // ============================================================================
 

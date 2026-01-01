@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useUnreadCount } from '@aurastream/api-client/src/hooks/useMessages';
-import { useFriendsList } from '@aurastream/api-client/src/hooks/useFriends';
+import { useUnreadCount } from '@aurastream/api-client';
+import { useFriendsList } from '@aurastream/api-client';
 import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
 import { FriendsPanel } from './FriendsPanel';
 import { MessagesPanel } from './MessagesPanel';

@@ -340,14 +340,14 @@ export default function GenerationProgressPage() {
               {/* Create Another - Prominent CTA */}
               <div className="pt-6 border-t border-border-subtle">
                 <Link
-                  href="/dashboard/quick-create"
+                  href={isProfileCreatorAsset(asset.asset_type) ? '/dashboard/profile-creator' : '/dashboard/quick-create'}
                   className="block w-full px-6 py-4 bg-gradient-to-r from-interactive-600 to-primary-600 hover:from-interactive-500 hover:to-primary-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                 >
                   <span className="flex items-center justify-center gap-2">
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    Create Another Asset
+                    Create Another {isProfileCreatorAsset(asset.asset_type) ? 'Profile' : 'Asset'}
                   </span>
                 </Link>
               </div>
@@ -531,8 +531,14 @@ function formatAssetType(assetType: string): string {
     overlay: 'Stream Overlay',
     twitch_panel: 'Twitch Panel',
     twitch_offline: 'Offline Screen',
+    profile_picture: 'Profile Picture',
+    streamer_logo: 'Streamer Logo',
   };
   return labels[assetType] || assetType.replace(/_/g, ' ');
+}
+
+function isProfileCreatorAsset(assetType: string): boolean {
+  return assetType === 'profile_picture' || assetType === 'streamer_logo';
 }
 
 function getPublicAssetUrl(assetId: string): string {

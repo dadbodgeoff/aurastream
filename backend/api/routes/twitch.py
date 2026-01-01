@@ -60,8 +60,12 @@ async def generate_twitch_asset(
     This endpoint creates a generation job and returns immediately.
     Use the job ID to poll for status.
     """
+    from backend.services.generation_service import get_generation_service
+    from backend.workers.twitch_worker import enqueue_twitch_generation_job
+    
     # Validate brand kit ownership via context engine
     context_engine = get_context_engine()
+    generation_service = get_generation_service()
     
     try:
         # Build context (validates brand kit ownership)
@@ -72,13 +76,36 @@ async def generate_twitch_asset(
             game_id=data.game_id,
         )
         
+        # Create job in database
+        job = await generation_service.create_job(
+            user_id=current_user.sub,
+            brand_kit_id=data.brand_kit_id,
+            asset_type=data.asset_type,
+            custom_prompt=data.custom_prompt,
+            parameters={
+                "game_id": data.game_id,
+                "text_overlay": data.text_overlay,
+            } if data.game_id or data.text_overlay else None,
+        )
+        
+        # Enqueue job to Twitch worker
+        enqueue_twitch_generation_job(
+            job_id=job.id,
+            user_id=current_user.sub,
+            brand_kit_id=data.brand_kit_id,
+            asset_type=data.asset_type,
+            custom_prompt=data.custom_prompt,
+            game_id=data.game_id,
+            text_overlay=data.text_overlay,
+        )
+        
         # Audit log
         audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="twitch.generate",
             resource_type="twitch_asset",
-            resource_id=data.brand_kit_id or "no-brand-kit",
+            resource_id=job.id,
             details={
                 "asset_type": data.asset_type,
                 "brand_kit_id": data.brand_kit_id,
@@ -87,13 +114,8 @@ async def generate_twitch_asset(
             ip_address=request.client.host if request.client else None,
         )
         
-        # TODO: In production, enqueue job to worker
-        # For now, return a placeholder job ID
-        import uuid
-        job_id = str(uuid.uuid4())
-        
         return {
-            "job_id": job_id,
+            "job_id": job.id,
             "status": "queued",
             "asset_type": data.asset_type,
             "message": "Generation job created successfully",
@@ -130,6 +152,9 @@ async def generate_pack(
     - emote: 5 Emotes with variations
     - stream: 3 Panels, 1 Offline screen
     """
+    import uuid
+    from backend.workers.twitch_worker import enqueue_pack_generation_job
+    
     context_engine = get_context_engine()
     
     try:
@@ -141,23 +166,32 @@ async def generate_pack(
             game_id=data.game_id,
         )
         
+        # Generate pack ID
+        pack_id = str(uuid.uuid4())
+        
+        # Enqueue pack job to Twitch worker
+        enqueue_pack_generation_job(
+            pack_id=pack_id,
+            user_id=current_user.sub,
+            brand_kit_id=data.brand_kit_id,
+            pack_type=data.pack_type,
+            custom_prompt=data.custom_prompt,
+            game_id=data.game_id,
+        )
+        
         # Audit log
         audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="twitch.generate_pack",
             resource_type="twitch_pack",
-            resource_id=data.brand_kit_id or "no-brand-kit",
+            resource_id=pack_id,
             details={
                 "pack_type": data.pack_type,
                 "brand_kit_id": data.brand_kit_id,
             },
             ip_address=request.client.host if request.client else None,
         )
-        
-        # TODO: In production, enqueue pack job to worker
-        import uuid
-        pack_id = str(uuid.uuid4())
         
         return {
             "pack_id": pack_id,

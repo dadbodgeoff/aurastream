@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useFriendsList } from '@aurastream/api-client/src/hooks/useFriends';
+import { useFriendsList } from '@aurastream/api-client';
 import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
 import { ErrorRecovery } from '@/components/ErrorRecovery';
 import { FriendsList } from './FriendsList';

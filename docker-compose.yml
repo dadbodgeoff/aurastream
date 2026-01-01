@@ -76,6 +76,65 @@ services:
         reservations:
           memory: 128M
 
+  # Twitch Generation Worker - Processes Twitch-specific asset generation jobs
+  twitch-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app/backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: rq worker --url redis://redis:6379 twitch_generation
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
+
+  # Clip Radar Worker - Polls Twitch clips every 5 minutes for viral detection
+  # NOTE: This is now also started automatically by the API server on startup.
+  # This separate service is kept for production scaling and redundancy.
+  clip-radar-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    command: python -m backend.workers.clip_radar_worker
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
   # =============================================================================
   # Frontend Services
   # =============================================================================

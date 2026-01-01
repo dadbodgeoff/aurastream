@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useMessageHistory, useSendMessage, useMarkAsRead, useLoadOlderMessages } from '@aurastream/api-client/src/hooks/useMessages';
+import { useMessageHistory, useSendMessage, useMarkAsRead, useLoadOlderMessages } from '@aurastream/api-client';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 import { useErrorRecovery } from '@/components/ErrorRecovery';

@@ -27,7 +27,10 @@ export type AssetType =
   // Other Twitch assets
   | 'twitch_badge'
   | 'twitch_panel'
-  | 'twitch_offline';
+  | 'twitch_offline'
+  // Profile Creator assets
+  | 'profile_picture'
+  | 'streamer_logo';
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'partial';
 
 // Re-export brand customization types for convenience
@@ -149,6 +152,9 @@ export const ASSET_DIMENSIONS: Record<AssetType, { width: number; height: number
   twitch_badge: { width: 72, height: 72 },
   twitch_panel: { width: 320, height: 160 },
   twitch_offline: { width: 1920, height: 1080 },
+  // Profile Creator assets
+  profile_picture: { width: 400, height: 400 },
+  streamer_logo: { width: 512, height: 512 },
 };
 
 export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -171,4 +177,7 @@ export const ASSET_TYPE_LABELS: Record<AssetType, string> = {
   twitch_badge: 'Twitch Badge',
   twitch_panel: 'Twitch Panel',
   twitch_offline: 'Offline Screen',
+  // Profile Creator assets
+  profile_picture: 'Profile Picture',
+  streamer_logo: 'Streamer Logo',
 };

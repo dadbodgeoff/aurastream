@@ -21,6 +21,13 @@ from backend.workers.twitch_worker import (
     QUEUE_NAME as TWITCH_QUEUE_NAME,
 )
 
+from backend.workers.playbook_worker import (
+    run_generation_sync as run_playbook_generation,
+    run_continuous as run_playbook_worker,
+    run_once as run_playbook_once,
+    GENERATION_INTERVAL as PLAYBOOK_GENERATION_INTERVAL,
+)
+
 __all__ = [
     # Generation worker
     "enqueue_generation_job",
@@ -35,4 +42,9 @@ __all__ = [
     "process_pack_generation_job",
     "run_twitch_worker",
     "TWITCH_QUEUE_NAME",
+    # Playbook worker
+    "run_playbook_generation",
+    "run_playbook_worker",
+    "run_playbook_once",
+    "PLAYBOOK_GENERATION_INTERVAL",
 ]

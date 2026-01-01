@@ -9,7 +9,6 @@ import {
   BackgroundEffects,
   LandingNav,
   ProductHero,
-  FeaturesSection,
   AssetShowcase,
   CTASection,
   LandingFooter,
@@ -33,9 +32,6 @@ export default function LandingPage() {
 
       {/* Hero section */}
       <ProductHero />
-
-      {/* Features section */}
-      <FeaturesSection />
 
       {/* Asset showcase gallery */}
       <AssetShowcase />

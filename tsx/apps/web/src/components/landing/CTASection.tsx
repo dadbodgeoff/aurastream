@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ArrowRightIcon } from './icons';
@@ -10,23 +10,37 @@ import { ArrowRightIcon } from './icons';
 // Floating particles, gradient backgrounds, glowing button
 // =============================================================================
 
-// Generate random particles
-const PARTICLES = Array.from({ length: 12 }, (_, i) => ({
-  id: i,
-  left: `${Math.random() * 100}%`,
-  top: `${Math.random() * 100}%`,
-  size: Math.random() * 4 + 2,
-  duration: Math.random() * 10 + 14,
-  delay: Math.random() * 5,
-}));
+// Seeded random for consistent SSR/client rendering
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
 
 export function CTASection() {
   const [isVisible, setIsVisible] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
+
+  // Generate particles only on client to avoid hydration mismatch
+  const particles = useMemo(() => {
+    if (!isMounted) return [];
+    return Array.from({ length: 12 }, (_, i) => ({
+      id: i,
+      left: `${seededRandom(i * 1.1) * 100}%`,
+      top: `${seededRandom(i * 2.2) * 100}%`,
+      size: seededRandom(i * 3.3) * 4 + 2,
+      duration: seededRandom(i * 4.4) * 10 + 14,
+      delay: seededRandom(i * 5.5) * 5,
+    }));
+  }, [isMounted]);
 
   const handleCtaClick = () => {
     // CTA click - page navigation handles tracking
   };
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -62,7 +76,7 @@ export function CTASection() {
           )}
         >
           {/* Floating particles */}
-          {PARTICLES.map((particle) => (
+          {particles.map((particle) => (
             <div
               key={particle.id}
               className="absolute rounded-full bg-interactive-500/20 animate-float-particle"

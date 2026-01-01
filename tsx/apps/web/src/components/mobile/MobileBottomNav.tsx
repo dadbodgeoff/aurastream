@@ -24,21 +24,18 @@ const GridIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const PaletteIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-  </svg>
-);
-
 const MenuIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 );
 
-const CommunityIcon = ({ className }: { className?: string }) => (
+const IntelIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+    <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="6" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
   </svg>
 );
 
@@ -107,7 +104,7 @@ export function MobileBottomNav({ onMoreClick }: MobileBottomNavProps) {
     { href: '/dashboard', icon: HomeIcon, label: 'Home' },
     { href: '/dashboard/create', icon: SparklesIcon, label: 'Create' },
     { href: '/dashboard/assets', icon: GridIcon, label: 'Assets' },
-    { href: '/community', icon: CommunityIcon, label: 'Community' },
+    { href: '/dashboard/intel', icon: IntelIcon, label: 'Intel' },
   ];
 
   return (

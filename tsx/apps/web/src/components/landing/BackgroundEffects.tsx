@@ -14,12 +14,14 @@ interface BackgroundEffectsProps {
   enableNoise?: boolean;
   enableOrbs?: boolean;
   enableGrid?: boolean;
+  heroBackgroundUrl?: string;
 }
 
 export function BackgroundEffects({
   enableNoise = true,
   enableOrbs = true,
   enableGrid = true,
+  heroBackgroundUrl = 'https://qgyvdadgdomnubngfpun.supabase.co/storage/v1/object/public/streamer-studio-assets/landing/hero-background.jpeg',
 }: BackgroundEffectsProps) {
   const [scrollY, setScrollY] = useState(0);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -70,6 +72,20 @@ export function BackgroundEffects({
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+      {/* Hero background image - main visual */}
+      {heroBackgroundUrl && (
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url(${heroBackgroundUrl})`,
+            opacity: 0.5,
+          }}
+        />
+      )}
+      
+      {/* Subtle overlay for text readability - keeps image visible */}
+      <div className="absolute inset-0 bg-gradient-to-b from-background-base/40 via-background-base/30 to-background-base/70" />
+      
       {/* Noise texture overlay - lightweight, keep on mobile */}
       {enableNoise && (
         <svg className="absolute inset-0 w-full h-full opacity-[0.015]" xmlns="http://www.w3.org/2000/svg">

@@ -18,12 +18,6 @@ const SparklesIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const QuickCreateIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-  </svg>
-);
-
 const GridIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -36,21 +30,30 @@ const PaletteIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const WandIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
-  </svg>
-);
-
 const BeakerIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l.8 4.2a.75.75 0 01-.728.943H4.128a.75.75 0 01-.728-.943l.8-4.2" />
   </svg>
 );
 
-const PromoIcon = ({ className }: { className?: string }) => (
+const CommunityIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+  </svg>
+);
+
+const IntelIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="6" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="12" cy="12" r="2" strokeLinecap="round" strokeLinejoin="round" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+  </svg>
+);
+
+const ProfileCreatorIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
 
@@ -77,19 +80,30 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  section?: 'main' | 'tools';
 }
 
-const navItems: NavItem[] = [
-  { href: '/dashboard', icon: HomeIcon, label: 'Home' },
-  { href: '/dashboard/quick-create', icon: QuickCreateIcon, label: 'Quick Create' },
-  { href: '/dashboard/create', icon: SparklesIcon, label: 'Create' },
-  { href: '/dashboard/assets', icon: GridIcon, label: 'Assets' },
-  { href: '/dashboard/brand-kits', icon: PaletteIcon, label: 'Brand Kits' },
-  { href: '/dashboard/brand-kits?vibe=true', icon: WandIcon, label: 'Vibe Branding' },
-  { href: '/dashboard/aura-lab', icon: BeakerIcon, label: 'Aura Lab' },
-  { href: '/promo', icon: PromoIcon, label: 'Promo Board' },
-  { href: '/dashboard/settings', icon: SettingsIcon, label: 'Settings' },
+// Main navigation items
+const mainNavItems: NavItem[] = [
+  { href: '/dashboard', icon: HomeIcon, label: 'Overview', section: 'main' },
+  { href: '/dashboard/studio', icon: SparklesIcon, label: 'Create', section: 'main' },
+  { href: '/dashboard/brand-kits', icon: PaletteIcon, label: 'Brand Studio', section: 'main' },
+  { href: '/dashboard/assets', icon: GridIcon, label: 'Asset Library', section: 'main' },
+  { href: '/community', icon: CommunityIcon, label: 'Community', section: 'main' },
 ];
+
+// Tools navigation items
+const toolsNavItems: NavItem[] = [
+  { href: '/dashboard/intel', icon: IntelIcon, label: 'Creator Intel', section: 'tools' },
+  { href: '/dashboard/profile-creator', icon: ProfileCreatorIcon, label: 'Profile Creator', section: 'tools' },
+  { href: '/dashboard/aura-lab', icon: BeakerIcon, label: 'Aura Lab', section: 'tools' },
+];
+
+// Settings item
+const settingsItem: NavItem = { href: '/dashboard/settings', icon: SettingsIcon, label: 'Settings' };
+
+// Combined nav items for dropdown
+const navItems: NavItem[] = [...mainNavItems, ...toolsNavItems, settingsItem];
 
 interface MobileNavDropdownProps {
   onLogout?: () => void;

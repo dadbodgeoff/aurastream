@@ -232,13 +232,13 @@ export function QuickCreateWizard() {
 
   return (
     <div className="max-w-5xl mx-auto pb-8">
-      {/* Header */}
-      <div className="mb-4 flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-interactive-600 to-interactive-500 flex items-center justify-center shadow-md shadow-interactive-600/25">
+      {/* Header - More refined */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-600/25 ring-1 ring-white/10">
           <BoltIcon />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-text-primary">Quick Create</h1>
+          <h1 className="text-lg font-bold text-text-primary tracking-tight">Quick Create</h1>
           <p className="text-xs text-text-secondary">Professional templates, instant results</p>
         </div>
       </div>

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Palette, Sparkles, Send, Loader2, Check, ArrowRight, RefreshCw, ChevronLeft } from 'lucide-react';
+import { User, Palette, Sparkles, Send, Loader2, Check, ArrowRight, RefreshCw, ChevronLeft, Download, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { 
@@ -26,7 +28,7 @@ interface ProfileCreatorCoreProps {
   onComplete: () => void;
 }
 
-type Step = 'type' | 'style' | 'chat' | 'generate' | 'complete';
+type Step = 'type' | 'style' | 'chat' | 'generate' | 'generating' | 'complete';
 
 interface ChatMessage {
   id: string;
@@ -35,7 +37,16 @@ interface ChatMessage {
   isStreaming?: boolean;
 }
 
+interface GeneratedAsset {
+  id: string;
+  url: string;
+  assetType: string;
+  width: number;
+  height: number;
+}
+
 export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCoreProps) {
+  const router = useRouter();
   const [step, setStep] = useState<Step>('type');
   const [creationType, setCreationType] = useState<CreationType | null>(null);
   const [stylePreset, setStylePreset] = useState<StylePreset | null>(null);
@@ -50,9 +61,16 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const [confidence, setConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  // Generation state
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState<'idle' | 'queued' | 'processing' | 'completed' | 'failed'>('idle');
+  const [generatedAsset, setGeneratedAsset] = useState<GeneratedAsset | null>(null);
+
   const generateMutation = useGenerateFromSession();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -61,6 +79,95 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   useEffect(() => {
     if (step === 'chat') inputRef.current?.focus();
   }, [step]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearTimeout(pollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Poll job status
+  const pollJobStatus = useCallback(async (currentJobId: string) => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const accessToken = apiClient.getAccessToken();
+    
+    console.log('[ProfileCreator] Polling job status:', currentJobId);
+    
+    try {
+      const response = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      
+      if (!response.ok) {
+        console.error('[ProfileCreator] Job status fetch failed:', response.status);
+        throw new Error('Failed to fetch job status');
+      }
+      
+      const job = await response.json();
+      console.log('[ProfileCreator] Job status:', job.status, 'Progress:', job.progress);
+      
+      setGenerationProgress(job.progress || 0);
+      setGenerationStatus(job.status);
+      
+      if (job.status === 'completed') {
+        console.log('[ProfileCreator] Job completed, fetching assets...');
+        
+        // Fetch the generated asset
+        const assetsResponse = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}/assets`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+        
+        console.log('[ProfileCreator] Assets response status:', assetsResponse.status);
+        
+        if (assetsResponse.ok) {
+          const assets = await assetsResponse.json();
+          console.log('[ProfileCreator] Assets received:', assets);
+          
+          if (assets && assets.length > 0) {
+            const asset = assets[0];
+            console.log('[ProfileCreator] Setting generated asset:', asset);
+            
+            setGeneratedAsset({
+              id: asset.id,
+              url: asset.url,
+              assetType: asset.asset_type || asset.assetType,
+              width: asset.width,
+              height: asset.height,
+            });
+            setStep('complete');
+            onComplete();
+          } else {
+            console.error('[ProfileCreator] No assets returned');
+            setError('Generation completed but no assets found');
+            setStep('generate');
+          }
+        } else {
+          console.error('[ProfileCreator] Failed to fetch assets:', assetsResponse.status);
+          setError('Failed to fetch generated asset');
+          setStep('generate');
+        }
+        return; // Stop polling
+      }
+      
+      if (job.status === 'failed') {
+        console.error('[ProfileCreator] Job failed:', job.error_message);
+        setError(job.error_message || 'Generation failed');
+        setStep('generate'); // Go back to options
+        return; // Stop polling
+      }
+      
+      // Continue polling for queued/processing status
+      console.log('[ProfileCreator] Continuing to poll...');
+      pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 1500);
+    } catch (err) {
+      console.error('[ProfileCreator] Polling error:', err);
+      // Continue polling on error (with longer delay)
+      pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 3000);
+    }
+  }, [onComplete]);
 
   const handleTypeSelect = (type: CreationType) => {
     setCreationType(type);
@@ -220,17 +327,49 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     background: 'transparent' | 'solid' | 'gradient';
     backgroundColor?: string;
   }) => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      console.error('[ProfileCreator] No session ID for generation');
+      return;
+    }
+    
+    console.log('[ProfileCreator] Starting generation with options:', options);
+    
+    setError(null);
+    setGenerationProgress(0);
+    setGenerationStatus('queued');
+    setGeneratedAsset(null); // Clear any previous asset
+    setStep('generating');
+    
     try {
-      await generateMutation.mutateAsync({ sessionId, options });
-      setStep('complete');
-      setTimeout(() => onComplete(), 2000);
+      const result = await generateMutation.mutateAsync({ sessionId, options });
+      console.log('[ProfileCreator] Generation started, job ID:', result.jobId);
+      setJobId(result.jobId);
+      
+      // Start polling for job status after a short delay
+      pollIntervalRef.current = setTimeout(() => {
+        console.log('[ProfileCreator] Starting polling for job:', result.jobId);
+        pollJobStatus(result.jobId);
+      }, 1500);
     } catch (error) {
-      console.error('Generation failed:', error);
+      console.error('[ProfileCreator] Generation failed:', error);
+      setError(error instanceof Error ? error.message : 'Generation failed');
+      setGenerationStatus('failed');
+      setStep('generate');
     }
   };
 
+  const handleDownload = () => {
+    if (!generatedAsset) return;
+    const link = document.createElement('a');
+    link.href = generatedAsset.url;
+    link.download = `${generatedAsset.assetType}-${generatedAsset.id}.png`;
+    link.click();
+  };
+
   const handleReset = () => {
+    if (pollIntervalRef.current) {
+      clearTimeout(pollIntervalRef.current);
+    }
     setStep('type');
     setCreationType(null);
     setStylePreset(null);
@@ -241,6 +380,10 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setRefinedDescription(null);
     setConfidence(0);
     setError(null);
+    setJobId(null);
+    setGenerationProgress(0);
+    setGenerationStatus('idle');
+    setGeneratedAsset(null);
   };
 
   return (
@@ -434,14 +577,113 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
           </motion.div>
         )}
 
-        {/* Step 5: Complete */}
-        {step === 'complete' && (
-          <motion.div key="complete" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
+        {/* Step 5: Generating (inline progress) */}
+        {step === 'generating' && (
+          <motion.div key="generating" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <svg className="w-full h-full animate-spin" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-background-elevated" />
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" className="text-interactive-600" strokeDasharray={`${generationProgress * 2.51} 251`} transform="rotate(-90 50 50)" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-sm font-bold text-text-primary">{generationProgress}%</span>
+                </div>
+              </div>
+              <h2 className="text-base font-semibold text-text-primary mb-1">Creating Your {creationType === 'profile_picture' ? 'Profile Picture' : 'Logo'}</h2>
+              <p className="text-xs text-text-secondary animate-pulse">
+                {generationProgress < 30 ? 'Starting generation...' : 
+                 generationProgress < 60 ? 'AI is creating your masterpiece...' : 
+                 generationProgress < 90 ? 'Applying finishing touches...' : 'Almost there...'}
+              </p>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="w-full bg-background-elevated rounded-full h-1.5 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-interactive-600 to-interactive-500 rounded-full transition-all duration-500" style={{ width: `${generationProgress}%` }} />
+            </div>
+          </motion.div>
+        )}
+
+        {/* Step 6: Complete (show asset inline) */}
+        {step === 'complete' && generatedAsset && (
+          <motion.div key="complete" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4">
+            {/* Success header */}
+            <div className="text-center">
+              <div className="w-10 h-10 bg-success-muted/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                <Check className="w-5 h-5 text-success-muted" />
+              </div>
+              <h2 className="text-base font-semibold text-text-primary">Your {creationType === 'profile_picture' ? 'Profile Picture' : 'Logo'} is Ready!</h2>
+            </div>
+
+            {/* Asset preview */}
+            <div className="relative rounded-xl overflow-hidden border border-border-subtle bg-background-surface">
+              <img
+                src={generatedAsset.url}
+                alt={`Generated ${creationType}`}
+                className="w-full h-auto max-h-[300px] object-contain mx-auto"
+              />
+            </div>
+
+            {/* Asset info */}
+            <div className="flex items-center justify-center gap-3 text-xs text-text-muted">
+              <span>{generatedAsset.width}×{generatedAsset.height}</span>
+              <span>•</span>
+              <span>{creationType === 'profile_picture' ? 'Profile Picture' : 'Streamer Logo'}</span>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleDownload}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+              
+              <div className="flex gap-2">
+                <Link
+                  href="/dashboard/assets"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-background-elevated hover:bg-background-surface text-text-primary text-xs font-medium rounded-lg transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View in Library
+                </Link>
+                <button
+                  onClick={handleReset}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-background-elevated hover:bg-background-surface text-text-primary text-xs font-medium rounded-lg transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Create Another
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Fallback complete state (no asset) */}
+        {step === 'complete' && !generatedAsset && (
+          <motion.div key="complete-fallback" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-8">
             <div className="w-12 h-12 bg-success-muted/20 rounded-full flex items-center justify-center mx-auto mb-3">
               <Sparkles className="w-6 h-6 text-success-muted" />
             </div>
-            <h2 className="text-base font-semibold text-text-primary">Generation Started!</h2>
-            <p className="text-xs text-text-secondary mt-1">Check the gallery in a moment</p>
+            <h2 className="text-base font-semibold text-text-primary">Generation Complete!</h2>
+            <p className="text-xs text-text-secondary mt-1 mb-4">Check your asset library</p>
+            <div className="flex gap-2 justify-center">
+              <Link
+                href="/dashboard/assets"
+                className="px-4 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                View Assets
+              </Link>
+              <button
+                onClick={handleReset}
+                className="px-4 py-2 bg-background-elevated hover:bg-background-surface text-text-primary text-xs font-medium rounded-lg transition-colors"
+              >
+                Create Another
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -49,6 +49,13 @@ TIER_LIMITS = {
         "creations": 50,
         "profile_creator": 10,
     },
+    "unlimited": {
+        "vibe_branding": -1,  # -1 = unlimited
+        "aura_lab": -1,
+        "coach": -1,
+        "creations": -1,
+        "profile_creator": -1,
+    },
 }
 
 

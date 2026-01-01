@@ -14,16 +14,22 @@ import type { BrandKit } from '@aurastream/api-client';
 // Type Definitions
 // ============================================================================
 
-/** Asset types supported by the Prompt Coach */
+/** Asset types supported by the Prompt Coach (matches backend coach.py) */
 export type AssetType = 
+  // General asset types (matching generation.py)
+  | 'thumbnail'
+  | 'overlay'
+  | 'banner'
+  | 'story_graphic'
+  | 'clip_cover'
+  // Twitch-specific asset types
   | 'twitch_emote' 
-  | 'youtube_thumbnail' 
-  | 'twitch_banner' 
   | 'twitch_badge' 
   | 'twitch_panel'
   | 'twitch_offline'
-  | 'overlay' 
-  | 'story_graphic'
+  // Legacy/extended types for backwards compatibility
+  | 'youtube_thumbnail' 
+  | 'twitch_banner' 
   | 'tiktok_story'
   | 'instagram_story'
   | 'instagram_reel';
@@ -43,24 +49,24 @@ export interface FontInfo {
   body: string;
 }
 
-/** Brand context to send with coach request */
+/** Brand context to send with coach request (all fields optional per backend) */
 export interface BrandContext {
-  brand_kit_id: string;
-  colors: ColorInfo[];
-  tone: string;
-  fonts: FontInfo;
-  logo_url?: string;
+  brand_kit_id?: string | null;  // Optional - users can proceed without a brand kit
+  colors: ColorInfo[];           // Empty array if no brand kit
+  tone: string;                  // Defaults to 'professional'
+  fonts?: FontInfo | null;       // Optional - system defaults used if not specified
+  logo_url?: string | null;      // Optional
 }
 
-/** Request payload for starting a coach session */
+/** Request payload for starting a coach session (brand_context is optional) */
 export interface StartCoachRequest {
-  brand_context: BrandContext;
+  brand_context?: BrandContext | null;  // Optional - defaults provided for users without brand kits
   asset_type: AssetType;
   mood: Mood;
-  custom_mood?: string;
-  game_id?: string;
-  game_name?: string;
-  description: string;
+  custom_mood?: string | null;  // Required when mood='custom'
+  game_id?: string | null;
+  game_name?: string | null;
+  description: string;  // min 5, max 500 chars
 }
 
 /** Game selection state */
@@ -243,16 +249,10 @@ export function useCoachContext(): UseCoachContextReturn {
       return null;
     }
 
-    // Create brand context - use selected kit or create a default empty context
-    // Backend accepts null/empty values for users without brand kits
-    const brandContext: BrandContext = selectedBrandKit 
+    // Create brand context - use selected kit or null (backend accepts null)
+    const brandContext: BrandContext | null = selectedBrandKit 
       ? brandKitToBrandContext(selectedBrandKit)
-      : {
-          brand_kit_id: '',
-          colors: [],
-          tone: 'professional',
-          fonts: { headline: 'Inter', body: 'Inter' },
-        };
+      : null;
 
     const request: StartCoachRequest = {
       brand_context: brandContext,

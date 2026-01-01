@@ -78,6 +78,9 @@ def _build_redirect_uri(request: Request, provider: str) -> str:
     """
     settings = get_settings()
     base_url = settings.API_BASE_URL.rstrip("/")
+    # Remove trailing /api if present to avoid double /api/api
+    if base_url.endswith("/api"):
+        base_url = base_url[:-4]
     return f"{base_url}/api/v1/auth/oauth/{provider}/callback"
 
 

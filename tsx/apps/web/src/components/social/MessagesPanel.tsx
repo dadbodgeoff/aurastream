@@ -1,8 +1,8 @@
 'use client';
 
-import { useConversations, useUnreadCount } from '@aurastream/api-client/src/hooks/useMessages';
+import { useConversations, useUnreadCount } from '@aurastream/api-client';
 import { Skeleton, ProfileSkeleton } from '@/components/ui/Skeleton';
-import type { Conversation } from '@aurastream/api-client/src/types/social';
+import type { Conversation } from '@aurastream/api-client';
 
 interface MessagesPanelProps {
   isOpen: boolean;

@@ -4,7 +4,7 @@ import React, { useEffect, useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useLightbox } from './useLightbox';
 import { LightboxOverlay } from './LightboxOverlay';
-import { LightboxZoom } from './LightboxZoom';
+import { LightboxZoom, type LightboxZoomRef } from './LightboxZoom';
 import { LightboxControls } from './LightboxControls';
 
 export interface ImageLightboxProps {
@@ -33,38 +33,11 @@ export interface ImageLightboxProps {
  * - Focus trap for accessibility
  * - Screen reader announcements
  * - Action controls (download, share, copy link, regenerate)
+ * - Reduced motion support
+ * - Zoom resets on close and navigation
  *
  * This component reads from the global lightbox store.
  * Use the useLightbox hook to open images.
- *
- * @example
- * ```tsx
- * // In your layout or app root
- * <ImageLightbox
- *   onDownload={(assetId) => downloadAsset(assetId)}
- *   onShare={(assetId) => shareAsset(assetId)}
- *   onCopyLink={(assetId) => copyAssetLink(assetId)}
- *   onRegenerate={(assetId) => regenerateAsset(assetId)}
- * />
- *
- * // In your component
- * function AssetCard({ asset }) {
- *   const { openImage } = useLightbox();
- *
- *   return (
- *     <img
- *       src={asset.url}
- *       alt={asset.name}
- *       onClick={() => openImage({
- *         src: asset.url,
- *         alt: asset.name,
- *         assetId: asset.id,
- *         assetType: asset.type,
- *       })}
- *     />
- *   );
- * }
- * ```
  */
 export function ImageLightbox({
   onDownload,
@@ -88,6 +61,15 @@ export function ImageLightbox({
   // Track the element that triggered the lightbox for focus restoration
   const triggerElementRef = useRef<Element | null>(null);
 
+  // Ref to the LightboxZoom component for programmatic reset
+  const zoomRef = useRef<LightboxZoomRef>(null);
+
+  // Track if image is zoomed (to disable swipe navigation)
+  const [isZoomed, setIsZoomed] = useState(false);
+
+  // Reset trigger - increments when we need to reset zoom
+  const [resetTrigger, setResetTrigger] = useState(0);
+
   // Touch tracking for swipe gestures
   const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null);
   const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null);
@@ -95,18 +77,14 @@ export function ImageLightbox({
   // Minimum swipe distance for navigation
   const minSwipeDistance = 50;
 
-  /**
-   * Store the trigger element when lightbox opens
-   */
+  // Store the trigger element when lightbox opens
   useEffect(() => {
     if (isOpen) {
       triggerElementRef.current = document.activeElement;
     }
   }, [isOpen]);
 
-  /**
-   * Restore focus when lightbox closes
-   */
+  // Restore focus when lightbox closes
   useEffect(() => {
     if (!isOpen && triggerElementRef.current instanceof HTMLElement) {
       triggerElementRef.current.focus();
@@ -114,9 +92,21 @@ export function ImageLightbox({
     }
   }, [isOpen]);
 
-  /**
-   * Handle keyboard navigation
-   */
+  // Reset zoom when lightbox closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsZoomed(false);
+      setResetTrigger(prev => prev + 1);
+    }
+  }, [isOpen]);
+
+  // Reset zoom when navigating to a different image
+  useEffect(() => {
+    setIsZoomed(false);
+    setResetTrigger(prev => prev + 1);
+  }, [currentIndex]);
+
+  // Handle keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
 
@@ -127,13 +117,13 @@ export function ImageLightbox({
           close();
           break;
         case 'ArrowLeft':
-          if (hasGallery) {
+          if (hasGallery && !isZoomed) {
             e.preventDefault();
             prev();
           }
           break;
         case 'ArrowRight':
-          if (hasGallery) {
+          if (hasGallery && !isZoomed) {
             e.preventDefault();
             next();
           }
@@ -143,33 +133,30 @@ export function ImageLightbox({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, hasGallery, close, next, prev]);
+  }, [isOpen, hasGallery, isZoomed, close, next, prev]);
 
-  /**
-   * Handle touch start for swipe gestures
-   */
+  // Handle touch start for swipe gestures
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isZoomed) return;
     setTouchEnd(null);
     setTouchStart({
       x: e.targetTouches[0].clientX,
       y: e.targetTouches[0].clientY,
     });
-  }, []);
+  }, [isZoomed]);
 
-  /**
-   * Handle touch move for swipe gestures
-   */
+  // Handle touch move for swipe gestures
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (isZoomed) return;
     setTouchEnd({
       x: e.targetTouches[0].clientX,
       y: e.targetTouches[0].clientY,
     });
-  }, []);
+  }, [isZoomed]);
 
-  /**
-   * Handle touch end for swipe gestures
-   */
+  // Handle touch end for swipe gestures
   const handleTouchEnd = useCallback(() => {
+    if (isZoomed) return;
     if (!touchStart || !touchEnd || !hasGallery) return;
 
     const distanceX = touchStart.x - touchEnd.x;
@@ -178,21 +165,22 @@ export function ImageLightbox({
 
     if (isHorizontalSwipe && Math.abs(distanceX) > minSwipeDistance) {
       if (distanceX > 0) {
-        // Swipe left -> next
         next();
       } else {
-        // Swipe right -> prev
         prev();
       }
     }
 
     setTouchStart(null);
     setTouchEnd(null);
-  }, [touchStart, touchEnd, hasGallery, next, prev]);
+  }, [touchStart, touchEnd, hasGallery, isZoomed, next, prev]);
 
-  /**
-   * Handle action callbacks
-   */
+  // Handle zoom state changes from LightboxZoom
+  const handleZoomChange = useCallback((zoomed: boolean) => {
+    setIsZoomed(zoomed);
+  }, []);
+
+  // Handle action callbacks
   const handleDownload = useCallback(() => {
     onDownload?.(currentImage?.assetId);
   }, [onDownload, currentImage]);
@@ -255,7 +243,7 @@ export function ImageLightbox({
         </button>
 
         {/* Gallery navigation - Previous */}
-        {hasGallery && (
+        {hasGallery && !isZoomed && (
           <button
             onClick={prev}
             className={cn(
@@ -275,10 +263,15 @@ export function ImageLightbox({
         )}
 
         {/* Image with zoom */}
-        <LightboxZoom image={currentImage} />
+        <LightboxZoom
+          ref={zoomRef}
+          image={currentImage}
+          onZoomChange={handleZoomChange}
+          resetTrigger={resetTrigger}
+        />
 
         {/* Gallery navigation - Next */}
-        {hasGallery && (
+        {hasGallery && !isZoomed && (
           <button
             onClick={next}
             className={cn(
@@ -313,6 +306,24 @@ export function ImageLightbox({
           </div>
         )}
 
+        {/* Zoom hint (shows when not zoomed) */}
+        {!isZoomed && (
+          <div
+            className={cn(
+              'absolute bottom-20 left-1/2 -translate-x-1/2',
+              'px-3 py-1.5 rounded-full',
+              'bg-background-elevated/60 backdrop-blur-sm',
+              'border border-border-subtle',
+              'text-xs text-text-muted',
+              'opacity-60 pointer-events-none',
+              'hidden sm:block'
+            )}
+            aria-hidden="true"
+          >
+            Scroll to zoom • Double-click to reset
+          </div>
+        )}
+
         {/* Controls */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
           <LightboxControls
@@ -327,6 +338,7 @@ export function ImageLightbox({
     </LightboxOverlay>
   );
 }
+
 
 // =============================================================================
 // Icons

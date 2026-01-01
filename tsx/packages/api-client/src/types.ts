@@ -11,7 +11,7 @@ export interface User {
   emailVerified: boolean;
   displayName: string;
   avatarUrl: string | null;
-  subscriptionTier: 'free' | 'pro' | 'studio';
+  subscriptionTier: 'free' | 'pro' | 'studio' | 'unlimited';
   subscriptionStatus: 'active' | 'past_due' | 'canceled' | 'none';
   assetsGeneratedThisMonth: number;
   termsAcceptedAt: string | null;

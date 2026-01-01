@@ -3,8 +3,8 @@
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { StylePreset } from '@aurastream/api-client/src/types/profileCreator';
-import { STYLE_PRESETS } from '@aurastream/api-client/src/types/profileCreator';
+import type { StylePreset } from '@aurastream/api-client';
+import { STYLE_PRESETS } from '@aurastream/api-client';
 
 interface StyleSelectorProps {
   selected: StylePreset | null;

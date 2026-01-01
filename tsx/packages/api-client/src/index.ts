@@ -649,3 +649,233 @@ export {
   useGenerationStats,
   useAnalyticsDashboard,
 } from './hooks/useAnalyticsDashboard';
+
+
+// Clip Radar type exports
+export type {
+  ViralClip,
+  FreshClip,
+  ViralClipsResponse,
+  FreshClipsResponse,
+  RadarStatus,
+  TrackedCategory,
+  RecapClip,
+  DailyRecap,
+  CategorySummary,
+  CategoryRecap,
+  HourlyActivity,
+  RecapListResponse,
+  PollResult,
+  CategoryPollResult,
+} from './types/clipRadar';
+
+// Clip Radar hooks exports
+export {
+  clipRadarKeys,
+  useViralClips,
+  useFreshClips,
+  useRadarStatus,
+  useTrackedCategories,
+  useRecentRecaps,
+  useDailyRecap,
+  useCategoryRecap,
+  useTriggerPoll,
+  useCreateRecap,
+} from './hooks/useClipRadar';
+
+
+// Intel type exports
+export type {
+  UserIntelPreferences,
+  UpdatePreferencesRequest,
+  AvailableCategory,
+  CategorySubscription,
+  SubscribeCategoryRequest,
+  SubscribeCategoryResponse,
+  UnsubscribeCategoryResponse,
+  TodaysMission,
+  IntelDashboardData,
+  TrackActivityRequest,
+  PanelType,
+  PanelConfig,
+  PanelSize,
+} from './types/intel';
+
+// Intel hooks exports
+export {
+  intelKeys,
+  useIntelPreferences,
+  useAvailableCategories,
+  useIntelMission,
+  useActivitySummary,
+  useUpdateIntelPreferences,
+  useSubscribeCategory,
+  useUnsubscribeCategory,
+  useTrackActivity,
+  useMissionActed,
+  // Title Intelligence hooks
+  useTitleIntel,
+  useTagIntel,
+  useAllTitlesIntel,
+  useVideoIdeas,
+  useDailyInsight,
+} from './hooks/useIntel';
+
+// Re-export video ideas types (renamed to avoid collision with playbook VideoIdea)
+export type {
+  VideoIdea as SynthesizedVideoIdea,
+  VideoIdeasResponse as SynthesizedVideoIdeasResponse,
+  DailyInsight,
+} from './hooks/useIntel';
+
+export type { 
+  ActivitySummary,
+  // Title Intelligence types
+  TitlePattern,
+  TitleKeyword,
+  TitleFormula as IntelTitleFormula,
+  GameTitleIntel,
+  TagIntel,
+  GameTagIntel,
+  AllGamesIntelSummary,
+} from './hooks/useIntel';
+
+// Trends type exports
+export type {
+  DailyBrief,
+  ThumbnailOfDay,
+  YouTubeHighlight,
+  TwitchHighlight,
+  TwitchClip,
+  HotGame,
+  Insight,
+  ThumbnailAnalysis as TrendThumbnailAnalysis,
+  VelocityAlert,
+  TimingRecommendation,
+  TitlePatterns,
+  ThumbnailPatterns,
+  TrendHistoryResponse,
+  TrendCategory,
+  TrendingKeyword,
+  TrendingKeywordsResponse,
+  YouTubeGameTrendingRequest,
+  YouTubeGameTrendingResponse,
+  AvailableGame,
+  AvailableGamesResponse,
+} from './types/trends';
+
+// Trends hooks exports
+export {
+  trendsKeys,
+  useDailyBrief,
+  useYouTubeTrending,
+  useTwitchLive,
+  useTwitchGames,
+  useTwitchClips,
+  useTrendingKeywords,
+  useThumbnailAnalysis,
+  useVelocityAlerts,
+  useTiming,
+  useTrendHistory,
+  useAvailableGames,
+  useYouTubeGameTrending,
+  useYouTubeSearch,
+  useCrossPlatformTrends,
+} from './hooks/useTrends';
+
+export type { CrossPlatformData, RisingCreator } from './hooks/useTrends';
+
+// Thumbnail Intel type exports
+export type {
+  ThumbnailAnalysis,
+  CategoryInsight,
+  ThumbnailIntelOverview,
+  CategoryListItem,
+} from './types/thumbnailIntel';
+
+// Thumbnail Intel hooks exports
+export {
+  thumbnailIntelKeys,
+  useThumbnailCategories,
+  useThumbnailIntelOverview,
+  useCategoryInsight,
+  useAnalyzeThumbnail,
+} from './hooks/useThumbnailIntel';
+
+export type { AnalyzeThumbnailResult } from './hooks/useThumbnailIntel';
+
+// Thumbnail Recreation type exports
+export type {
+  RecreateRequest,
+  RecreateResponse,
+  RecreationStatus,
+  RecreationHistoryItem,
+  RecreationHistory,
+  FaceAsset,
+  FaceAssetsResponse,
+  UploadFaceRequest,
+  UploadFaceResponse,
+} from './types/thumbnailRecreate';
+
+// Thumbnail Recreation hooks exports
+export {
+  thumbnailRecreateKeys,
+  useRecreateThumbnail,
+  useRecreationStatus,
+  useRecreationHistory,
+  useFaceAssets,
+  useUploadFace,
+  useDeleteFace,
+} from './hooks/useThumbnailRecreate';
+
+// Playbook type exports
+export type {
+  StrategyPriority,
+  ContentType,
+  DifficultyLevel,
+  ImpactLevel,
+  PlaybookMood,
+  TimeSensitivity,
+  HookType,
+  CardType,
+  CardColorTheme,
+  CompetitionLevel,
+  ViewerAvailability,
+  GrowthPotential,
+  GoldenHourWindow,
+  WeeklyTimeSlot,
+  WeeklySchedule,
+  NicheOpportunity,
+  ViralHook,
+  TitleFormula,
+  ThumbnailRecipe,
+  ContentStrategy,
+  VideoIdea,
+  InsightCard,
+  TodaysPlaybook,
+  PlaybookReportSummary,
+} from './types/playbook';
+
+// Playbook hooks exports
+export {
+  playbookKeys,
+  useLatestPlaybook,
+  usePlaybookReports,
+  usePlaybookReport,
+  useUnviewedPlaybookCount,
+} from './hooks/usePlaybook';
+
+// Profile Creator additional exports (OUTPUT_SIZES, etc.)
+export { OUTPUT_SIZES } from './types/profileCreator';
+export type {
+  OutputSize,
+  OutputFormat,
+  BackgroundType,
+} from './types/profileCreator';
+
+// Trends additional type exports
+export type {
+  GameFilter,
+  SortBy,
+  SortOrder,
+} from './types/trends';

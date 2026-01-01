@@ -144,7 +144,7 @@ class UserResponse(BaseModel):
     email_verified: bool = Field(..., description="Whether email has been verified")
     display_name: str = Field(..., description="User's display name")
     avatar_url: Optional[str] = Field(None, description="URL to user's avatar image")
-    subscription_tier: Literal['free', 'pro', 'studio'] = Field(
+    subscription_tier: Literal['free', 'pro', 'studio', 'unlimited'] = Field(
         ..., 
         description="Current subscription tier"
     )

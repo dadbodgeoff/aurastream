@@ -13,7 +13,7 @@
  * - pro: Professional tier with enhanced features
  * - studio: Premium tier with full access including Prompt Coach
  */
-export type SubscriptionTier = 'free' | 'pro' | 'studio';
+export type SubscriptionTier = 'free' | 'pro' | 'studio' | 'unlimited';
 
 /**
  * Current status of a user's subscription.

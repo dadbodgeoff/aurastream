@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Download, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { OutputSize, OutputFormat, BackgroundType } from '@aurastream/api-client/src/types/profileCreator';
-import { OUTPUT_SIZES } from '@aurastream/api-client/src/types/profileCreator';
+import type { OutputSize, OutputFormat, BackgroundType } from '@aurastream/api-client';
+import { OUTPUT_SIZES } from '@aurastream/api-client';
 
 interface GenerationOptionsProps {
   refinedDescription: string;

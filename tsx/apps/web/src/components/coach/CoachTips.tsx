@@ -296,6 +296,9 @@ export function CoachTips({ assetType, className }: CoachTipsProps) {
       tiktok_story: ['style', 'color', 'composition'],
       instagram_story: ['style', 'color', 'composition'],
       instagram_reel: ['style', 'color', 'composition'],
+      banner: ['style', 'color', 'composition'],
+      thumbnail: ['composition', 'style', 'color'],
+      clip_cover: ['composition', 'style', 'color'],
     };
 
     const relevantCategories = assetCategoryMap[assetType] || [];

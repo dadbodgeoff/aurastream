@@ -197,21 +197,52 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
         await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=10)
         
         # Step 3: Get asset dimensions
+        # Profile Creator passes custom dimensions in parameters
         asset_type = job.asset_type
-        dimensions = ASSET_DIMENSIONS.get(asset_type, (1280, 720))
-        width, height = dimensions
+        job_params = job.parameters or {}
+        
+        if job_params.get("width") and job_params.get("height"):
+            # Use custom dimensions from Profile Creator
+            width = job_params["width"]
+            height = job_params["height"]
+        else:
+            # Fall back to ASSET_DIMENSIONS lookup
+            dimensions = ASSET_DIMENSIONS.get(asset_type, (1280, 720))
+            width, height = dimensions
         
         # Step 4: Call Nano Banana API
         await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=30)
         
-        generation_request = GenerationRequest(prompt=job.prompt, width=width, height=height)
+        # Check for recreation mode - download reference thumbnail as input image
+        input_image = None
+        if job_params.get("recreation_mode") and job_params.get("reference_thumbnail_url"):
+            logger.info(f"Recreation mode: downloading reference thumbnail for job_id={job_id}")
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    ref_url = job_params["reference_thumbnail_url"]
+                    response = await client.get(ref_url)
+                    if response.status_code == 200:
+                        input_image = response.content
+                        logger.info(f"Downloaded reference thumbnail: {len(input_image)} bytes")
+                    else:
+                        logger.warning(f"Failed to download reference thumbnail: {response.status_code}")
+            except Exception as e:
+                logger.warning(f"Error downloading reference thumbnail: {e}")
+        
+        generation_request = GenerationRequest(
+            prompt=job.prompt, 
+            width=width, 
+            height=height,
+            input_image=input_image,
+            input_mime_type="image/jpeg" if input_image else "image/png"
+        )
         generation_response = await nano_banana_client.generate(generation_request)
         
         logger.info(f"Image generated: job_id={job_id}, inference_time_ms={generation_response.inference_time_ms}")
         
         # Step 5: Composite logo if requested
         image_data = generation_response.image_data
-        job_params = job.parameters or {}
         
         if job_params.get("include_logo") and job_params.get("brand_kit_id"):
             await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=50)

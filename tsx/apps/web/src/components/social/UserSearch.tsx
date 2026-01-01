@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useUserSearch, useSendFriendRequest } from '@aurastream/api-client/src/hooks/useFriends';
+import { useUserSearch, useSendFriendRequest } from '@aurastream/api-client';
 import { useDebouncedValue } from '@aurastream/shared/src/hooks/useDebouncedValue';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';

@@ -22,6 +22,7 @@ Headers added:
 import logging
 from typing import Callable, Optional
 
+import jwt
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -33,6 +34,7 @@ from backend.api.middleware.rate_limit import (
     get_client_ip,
     get_rate_limit_store,
 )
+from api.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,33 @@ ANONYMOUS_PATHS = {
 }
 
 
+def _decode_jwt_for_rate_limit(token: str) -> Optional[dict]:
+    """
+    Decode JWT token to extract user_id and tier for rate limiting.
+    
+    This is a lightweight decode that doesn't validate expiration strictly
+    since we just need the user identity for rate limiting purposes.
+    """
+    try:
+        settings = get_settings()
+        # Decode without full validation - we just need user_id and tier
+        payload = jwt.decode(
+            token,
+            settings.JWT_SECRET_KEY,
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"verify_exp": False}  # Don't fail on expired tokens for rate limiting
+        )
+        return {
+            "user_id": payload.get("sub"),
+            "tier": payload.get("tier", "free")
+        }
+    except jwt.InvalidTokenError:
+        return None
+    except Exception as e:
+        logger.debug(f"JWT decode error for rate limiting: {e}")
+        return None
+
+
 class APIRateLimitMiddleware(BaseHTTPMiddleware):
     """
     Middleware that applies global API rate limiting.
@@ -70,6 +99,10 @@ class APIRateLimitMiddleware(BaseHTTPMiddleware):
         """Process request and apply rate limiting."""
         # Skip if rate limiting is disabled
         if not RATE_LIMITING_ENABLED:
+            return await call_next(request)
+        
+        # Skip OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
             return await call_next(request)
         
         # Skip excluded paths
@@ -91,15 +124,15 @@ class APIRateLimitMiddleware(BaseHTTPMiddleware):
             user_id = getattr(user, "sub", None)
             tier = getattr(user, "tier", "free")
         
-        # If no user in state, try to extract from Authorization header
+        # If no user in state, try to decode JWT from Authorization header
         if not user_id:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
-                # We have a token but haven't decoded it yet
-                # The actual auth will happen in the route dependency
-                # For now, treat as potentially authenticated
-                # We'll use IP-based limiting with a higher limit
-                tier = "free"  # Assume free tier for token holders
+                token = auth_header[7:]  # Remove "Bearer " prefix
+                jwt_data = _decode_jwt_for_rate_limit(token)
+                if jwt_data and jwt_data.get("user_id"):
+                    user_id = jwt_data["user_id"]
+                    tier = jwt_data.get("tier", "free")
         
         # Determine rate limit key
         if user_id:

@@ -79,7 +79,7 @@ export function useCoachAccess(): UseCoachAccessReturn {
     trialAvailable: data?.trialAvailable ?? false,
     trialUsed: data?.trialUsed ?? false,
     grounding: data?.grounding ?? false,
-    upgradeMessage: data?.upgradeMessage,
+    upgradeMessage: data?.upgradeMessage ?? undefined,
     isLoading,
     error: error as Error | null,
   };

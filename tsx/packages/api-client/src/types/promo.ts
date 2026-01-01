@@ -5,7 +5,7 @@
 
 // Enums / Literal Types
 export type PromoPaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
-export type SubscriptionTier = 'free' | 'pro' | 'studio';
+export type SubscriptionTier = 'free' | 'pro' | 'studio' | 'unlimited';
 
 // Request Types
 /** Request body for creating a promo checkout session. */

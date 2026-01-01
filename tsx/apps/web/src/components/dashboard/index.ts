@@ -28,3 +28,6 @@ export * from './modals';
 
 // Icons
 export * from './icons';
+
+// Overview Components (Dashboard 2.0)
+export * from './overview';

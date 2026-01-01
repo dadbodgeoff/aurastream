@@ -8,7 +8,7 @@
  * @module types/usageLimits
  */
 
-export type SubscriptionTier = 'free' | 'pro' | 'studio';
+export type SubscriptionTier = 'free' | 'pro' | 'studio' | 'unlimited';
 
 /**
  * Usage stats for a single feature
@@ -89,6 +89,13 @@ export const TIER_LIMITS = {
     creations: 50,
     profileCreator: 10,
   },
+  unlimited: {
+    vibeBranding: -1,
+    auraLab: -1,
+    coach: -1,
+    creations: -1,
+    profileCreator: -1,
+  },
 } as const;
 
 /**
@@ -137,6 +144,7 @@ export const API_RATE_LIMITS = {
   free: 60,
   pro: 120,
   studio: 300,
+  unlimited: 1000,
 } as const;
 
 /**

@@ -408,11 +408,14 @@ function transformSpotlightCreator(data: any): SpotlightCreator {
 }
 
 export function useSpotlightCreators(limit?: number) {
+  // Backend enforces max limit of 20
+  const safeLimit = limit ? Math.min(limit, 20) : undefined;
+  
   return useQuery({
     queryKey: communityKeys.spotlightCreators(),
     queryFn: async (): Promise<SpotlightCreator[]> => {
       const res = await fetch(
-        `${API_BASE}/community/creators/spotlight${limit ? `?limit=${limit}` : ''}`,
+        `${API_BASE}/community/creators/spotlight${safeLimit ? `?limit=${safeLimit}` : ''}`,
         { headers: authHeaders(getToken()) }
       );
       if (!res.ok) throw new Error('Failed to fetch spotlight creators');

@@ -1,7 +1,7 @@
 'use client';
 
-import { useRemoveFriend, useBlockUser } from '@aurastream/api-client/src/hooks/useFriends';
-import type { Friend } from '@aurastream/api-client/src/types/social';
+import { useRemoveFriend, useBlockUser } from '@aurastream/api-client';
+import type { Friend } from '@aurastream/api-client';
 import { useState, useCallback } from 'react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';

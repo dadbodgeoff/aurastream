@@ -1018,3 +1018,74 @@ body {
     box-shadow: none !important;
   }
 }
+
+
+/* =============================================================================
+   Intel Dashboard Grid Layout Styles
+   ============================================================================= */
+
+/* Ensure grid items fill their cells */
+.react-grid-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.react-grid-item > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Panel cards should fill their container */
+.react-grid-item .panel-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.react-grid-item .panel-card > .panel-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Drag handle cursor */
+.drag-handle {
+  cursor: grab;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Grid placeholder styling */
+.react-grid-placeholder {
+  background: var(--color-primary-500) !important;
+  opacity: 0.2 !important;
+  border-radius: 12px !important;
+}
+
+/* Smooth transitions for grid items */
+.react-grid-item.cssTransforms {
+  transition-property: transform;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
+
+/* Remove transition during drag */
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 100;
+}
+
+/* Resize handle (if enabled) */
+.react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}

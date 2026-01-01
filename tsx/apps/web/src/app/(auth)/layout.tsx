@@ -1,20 +1,35 @@
 'use client';
 
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+
+const HERO_BACKGROUND_URL = 'https://qgyvdadgdomnubngfpun.supabase.co/storage/v1/object/public/streamer-studio-assets/landing/hero-background.jpeg';
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Use state to avoid hydration mismatch with server date
+  const [year, setYear] = useState<number | null>(null);
+  
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background-base p-4">
-      {/* Background subtle effect */}
-      <div className="fixed inset-0 bg-background-base pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center bg-background-base p-4 relative overflow-hidden">
+      {/* Hero background image */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url(${HERO_BACKGROUND_URL})`,
+          opacity: 0.5,
+        }}
+      />
       
-      {/* Subtle decorative elements */}
-      <div className="fixed top-1/4 left-1/4 w-96 h-96 bg-interactive-600/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed bottom-1/4 right-1/4 w-96 h-96 bg-accent-600/5 rounded-full blur-3xl pointer-events-none" />
+      {/* Overlay for text readability */}
+      <div className="fixed inset-0 bg-gradient-to-b from-background-base/40 via-background-base/50 to-background-base/70 pointer-events-none" />
       
       <div className="w-full max-w-md relative z-10">
         {/* Logo and tagline */}
@@ -28,14 +43,14 @@ export default function AuthLayout({
         </div>
         
         {/* Auth card */}
-        <div className="bg-background-surface rounded-xl p-8 shadow-lg border border-border-default backdrop-blur-sm">
+        <div className="bg-background-surface/90 rounded-xl p-8 shadow-lg border border-border-default backdrop-blur-md">
           {children}
         </div>
         
         {/* Footer */}
         <div className="text-center mt-6 text-text-tertiary text-sm">
           <p>
-            © {new Date().getFullYear()} Aurastream. All rights reserved.
+            © {year ?? '2025'} Aurastream. All rights reserved.
           </p>
         </div>
       </div>

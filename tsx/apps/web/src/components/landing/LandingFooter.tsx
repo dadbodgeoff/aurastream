@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AURASTREAM_BRANDING } from '@aurastream/shared';
@@ -12,6 +12,12 @@ import { AURASTREAM_BRANDING } from '@aurastream/shared';
 
 export function LandingFooter() {
   const [logoError, setLogoError] = useState(false);
+  const [year, setYear] = useState<number | null>(null);
+  
+  // Avoid hydration mismatch by setting year on client only
+  useEffect(() => {
+    setYear(new Date().getFullYear());
+  }, []);
   
   return (
     <footer className="relative py-12 px-4 sm:px-6 lg:px-8 border-t border-border-subtle overflow-hidden">
@@ -61,7 +67,7 @@ export function LandingFooter() {
         </div>
 
         <p className="text-sm text-text-muted">
-          © {new Date().getFullYear()} 1v1Bro LLC
+          © {year ?? '2025'} 1v1Bro LLC
         </p>
       </div>
     </footer>

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useAcceptFriendRequest, useDeclineFriendRequest } from '@aurastream/api-client/src/hooks/useFriends';
-import type { FriendRequest } from '@aurastream/api-client/src/types/social';
+import { useAcceptFriendRequest, useDeclineFriendRequest } from '@aurastream/api-client';
+import type { FriendRequest } from '@aurastream/api-client';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 

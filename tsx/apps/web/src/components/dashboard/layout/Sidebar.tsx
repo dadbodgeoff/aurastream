@@ -11,16 +11,13 @@ import {
   CreateIcon,
   BrandIcon,
   LibraryIcon,
-  CoachIcon,
   SettingsIcon,
   AnalyticsIcon,
   LogoutIcon,
-  QuickCreateIcon,
   CommunityIcon,
-  VibeIcon,
   AuraLabIcon,
-  PromoIcon,
   ProfileCreatorIcon,
+  IntelIcon,
 } from '../icons';
 
 export interface NavItem {
@@ -46,19 +43,16 @@ export interface SidebarProps {
 
 const mainNavItems: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: DashboardIcon },
-  { name: 'Quick Create', href: '/dashboard/quick-create', icon: QuickCreateIcon, badge: 'New', dataTour: 'quick-create' },
-  { name: 'Create', href: '/dashboard/create', icon: CreateIcon },
+  { name: 'Create', href: '/dashboard/studio', icon: CreateIcon, dataTour: 'create' },
   { name: 'Brand Studio', href: '/dashboard/brand-kits', icon: BrandIcon, dataTour: 'brand-kits' },
   { name: 'Asset Library', href: '/dashboard/assets', icon: LibraryIcon, dataTour: 'assets' },
-  { name: 'Community', href: '/community', icon: CommunityIcon, badge: 'New', dataTour: 'community' },
-  { name: 'Promo Board', href: '/promo', icon: PromoIcon, badge: '$1', dataTour: 'promo' },
+  { name: 'Community', href: '/community', icon: CommunityIcon, dataTour: 'community' },
 ];
 
 const toolsNavItems: NavItem[] = [
-  { name: 'Prompt Coach', href: '/dashboard/coach', icon: CoachIcon, badge: 'Pro', dataTour: 'coach' },
-  { name: 'Profile Creator', href: '/dashboard/profile-creator', icon: ProfileCreatorIcon, badge: 'New', dataTour: 'profile-creator' },
-  { name: 'Vibe Branding', href: '/dashboard/brand-kits?vibe=true', icon: VibeIcon, badge: 'New', dataTour: 'vibe-branding' },
-  { name: 'Aura Lab', href: '/dashboard/aura-lab', icon: AuraLabIcon, badge: 'New', dataTour: 'aura-lab' },
+  { name: 'Creator Intel', href: '/dashboard/intel', icon: IntelIcon, badge: 'New', dataTour: 'intel' },
+  { name: 'Profile Creator', href: '/dashboard/profile-creator', icon: ProfileCreatorIcon, dataTour: 'profile-creator' },
+  { name: 'Aura Lab', href: '/dashboard/aura-lab', icon: AuraLabIcon, dataTour: 'aura-lab' },
 ];
 
 const settingsNavItems: NavItem[] = [

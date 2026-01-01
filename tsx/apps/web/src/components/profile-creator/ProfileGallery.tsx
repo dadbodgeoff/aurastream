@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Plus, Download, User, Palette, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { GalleryItem } from '@aurastream/api-client/src/types/profileCreator';
+import type { GalleryItem } from '@aurastream/api-client';
 import { downloadAsset } from '@/utils/download';
 
 interface ProfileGalleryProps {

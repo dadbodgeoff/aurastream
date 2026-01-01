@@ -23,7 +23,7 @@ export const userArbitrary = fc.record({
   id: fc.uuid(),
   email: fc.emailAddress(),
   displayName: fc.string({ minLength: 1, maxLength: 50 }),
-  subscriptionTier: fc.constantFrom('free', 'pro', 'studio'),
+  subscriptionTier: fc.constantFrom('free', 'pro', 'studio', 'unlimited'),
 });
 
 /**
