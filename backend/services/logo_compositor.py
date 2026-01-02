@@ -8,14 +8,20 @@ Uses Pillow for image manipulation with support for:
 - Transparency preservation
 - Automatic padding and scaling
 
+Note: All CPU-intensive PIL operations run in thread pool executors
+to avoid blocking the async event loop.
+
 Usage:
     compositor = LogoCompositor()
-    result = compositor.composite(
+    result = await compositor.composite_async(
         base_image=image_bytes,
         logo=logo_bytes,
         position="bottom-right",
         size="medium"
     )
+    
+    # Or synchronous (for non-async contexts like workers):
+    result = compositor.composite(...)
 """
 
 import io
@@ -230,6 +236,44 @@ class LogoCompositor:
         
         # Merge back
         return Image.merge("RGBA", (r, g, b, a))
+    
+    async def composite_async(
+        self,
+        base_image: bytes,
+        logo: bytes,
+        position: LogoPosition = "bottom-right",
+        size: Optional[LogoSize] = None,
+        opacity: float = 1.0,
+    ) -> bytes:
+        """
+        Composite a logo onto a base image asynchronously.
+        
+        Runs CPU-intensive PIL operations in thread pool executor
+        to avoid blocking the async event loop.
+        
+        Args:
+            base_image: Base image bytes (PNG, JPEG, WebP)
+            logo: Logo image bytes (PNG recommended for transparency)
+            position: Where to place the logo
+            size: Logo size preset (small, medium, large)
+            opacity: Logo opacity (0.0 to 1.0)
+            
+        Returns:
+            Composited image as PNG bytes
+            
+        Raises:
+            ValueError: If images cannot be processed
+        """
+        from backend.services.async_executor import run_cpu_bound
+        
+        return await run_cpu_bound(
+            self.composite,
+            base_image,
+            logo,
+            position,
+            size,
+            opacity,
+        )
 
 
 # Singleton instance

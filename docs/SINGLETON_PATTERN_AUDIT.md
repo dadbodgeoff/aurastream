@@ -481,3 +481,182 @@ The singleton pattern is a **significant technical debt** that impacts testing, 
 4. **Reduces risk** - Gradual migration, one route at a time
 
 **Recommendation:** Start with Phase 1 (create dependencies module) and Phase 2 (update auth routes) to validate the approach before full migration.
+
+---
+
+## Related: Redis Failure Resilience (Implemented)
+
+**Status:** ✅ COMPLETED (January 2, 2026)
+
+### Problem Addressed
+
+The original Redis client (`backend/database/redis_client.py`) was minimal and didn't handle connection failures gracefully:
+
+```python
+# OLD - No resilience
+def get_redis_client() -> redis.Redis:
+    global _redis_client
+    if _redis_client is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        _redis_client = redis.from_url(redis_url, decode_responses=True)
+    return _redis_client
+```
+
+This meant:
+- If Redis went down, rate limiting silently failed → brute force attacks possible
+- Token blacklist checks might fail open → revoked tokens still work
+- Session invalidation on password change might not propagate
+
+### Solution Implemented
+
+Created `ResilientRedisClient` with:
+
+1. **Circuit Breaker Pattern** - Prevents cascading failures
+   - Opens after 5 consecutive failures
+   - Half-open state after 30s recovery timeout
+   - Closes after 3 successful calls in half-open state
+
+2. **Security Modes** (like `SecureAuthService`)
+   - `STRICT` (default): Operations fail if Redis unavailable
+   - `PERMISSIVE`: Operations degrade gracefully with warnings
+
+3. **Health Checks** - For monitoring and load balancer probes
+   - Returns latency, circuit state, and error details
+   - Integrated into `/health` endpoint
+
+4. **Comprehensive Logging** - Security events logged at CRITICAL level
+
+### Usage
+
+```python
+# New resilient client
+from backend.database.redis_client import get_resilient_redis_client
+
+redis = get_resilient_redis_client()
+
+# Operations with fallback (PERMISSIVE mode)
+value = await redis.get("key", fallback="default")
+
+# Operations that fail if Redis down (STRICT mode)
+try:
+    await redis.set("key", "value")
+except RedisUnavailableError:
+    # Handle Redis being down
+    pass
+
+# Health check
+status = await redis.health_check()
+if not status.is_healthy:
+    logger.warning(f"Redis unhealthy: {status.error}")
+```
+
+### Environment Variables
+
+```bash
+# Security mode (default: strict)
+REDIS_SECURITY_MODE=strict  # or "permissive"
+
+# Redis URL (existing)
+REDIS_URL=redis://localhost:6379
+```
+
+### Files Changed
+
+- `backend/database/redis_client.py` - Added `ResilientRedisClient`, circuit breaker, security modes
+- `backend/api/main.py` - Updated `/health` endpoint to include Redis status
+- `backend/tests/unit/test_redis_resilience.py` - 22 unit tests for resilience features
+- `backend/tests/conftest.py` - Added Redis client reset to test isolation
+
+
+---
+
+## Related: Blocking Operations in Async Context (Implemented)
+
+**Status:** ✅ COMPLETED (January 2, 2026)
+
+### Problem Addressed
+
+CPU-bound operations like PIL image processing and rembg background removal were blocking the async event loop:
+
+```python
+# OLD - Blocking the event loop
+async def remove_background(self, image_data: bytes) -> bytes:
+    import rembg
+    output_bytes = rembg.remove(image_data)  # ← Blocks for seconds!
+    # ... rest of processing
+```
+
+This caused:
+- Request timeouts under load
+- Degraded performance for all concurrent requests
+- Image processing (which can take seconds) blocking all other requests
+
+### Solution Implemented
+
+Created `backend/services/async_executor.py` with thread pool executors:
+
+1. **CPU Executor** - For CPU-intensive work (PIL, rembg, compression)
+   - Pool size based on CPU cores (default: min(4, cpu_count))
+   - Prevents overwhelming the system
+
+2. **I/O Executor** - For blocking I/O operations
+   - Larger pool since threads mostly wait
+   - Default: min(8, cpu_count * 2)
+
+3. **Convenience Functions**
+   - `run_cpu_bound()` - Run CPU-intensive functions
+   - `run_blocking()` - Run blocking I/O functions
+   - `@offload_blocking` / `@offload_cpu_bound` - Decorators
+
+### Usage
+
+```python
+from backend.services.async_executor import run_cpu_bound, offload_cpu_bound
+
+# Option 1: Explicit call
+async def remove_background(self, image_data: bytes) -> bytes:
+    result = await run_cpu_bound(_remove_background_sync, image_data)
+    return result
+
+# Option 2: Decorator
+@offload_cpu_bound
+def process_image(data: bytes) -> bytes:
+    # This blocking code runs in thread pool
+    img = Image.open(BytesIO(data))
+    # ... processing
+    return output.getvalue()
+
+# Usage (now async):
+result = await process_image(image_bytes)
+```
+
+### Environment Variables
+
+```bash
+# CPU executor pool size (default: min(4, cpu_count))
+CPU_EXECUTOR_POOL_SIZE=4
+
+# I/O executor pool size (default: min(8, cpu_count * 2))
+IO_EXECUTOR_POOL_SIZE=8
+```
+
+### Files Changed
+
+- `backend/services/async_executor.py` - NEW: Thread pool executor utilities
+- `backend/services/creator_media/background_removal.py` - Uses `run_cpu_bound` for rembg
+- `backend/services/twitch/asset_pipeline.py` - Uses `run_cpu_bound` for rembg
+- `backend/workers/generation_worker.py` - Uses `run_cpu_bound` for emote processing
+- `backend/services/logo_compositor.py` - Added `composite_async()` method
+- `backend/services/creator_media/compositor.py` - Uses `run_cpu_bound` for PIL compositing
+- `backend/tests/unit/test_async_executor.py` - 16 unit tests for executor utilities
+
+### Performance Impact
+
+Before: A single rembg call (~2-3 seconds) would block ALL concurrent requests
+After: rembg runs in thread pool, event loop continues serving other requests
+
+This is especially important for:
+- Twitch emote generation (rembg + 3 resize operations)
+- Media asset compositing (multiple PIL operations)
+- Logo compositing
+- Any endpoint that processes images

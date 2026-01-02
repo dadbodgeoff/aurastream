@@ -390,6 +390,13 @@ def reset_service_singletons():
     gen_module._generation_service = None
     logo_module._logo_service = None
     
+    # Reset Redis clients
+    try:
+        from backend.database.redis_client import reset_redis_clients
+        reset_redis_clients()
+    except (ImportError, AttributeError):
+        pass
+    
     # Reset coach service if it exists
     try:
         import backend.services.coach.coach_service as coach_module
@@ -411,6 +418,13 @@ def reset_service_singletons():
     bk_module._brand_kit_service = None
     gen_module._generation_service = None
     logo_module._logo_service = None
+    
+    # Reset Redis clients after test
+    try:
+        from backend.database.redis_client import reset_redis_clients
+        reset_redis_clients()
+    except (ImportError, AttributeError):
+        pass
     
     # Reset coach service after test
     try:

@@ -15,7 +15,8 @@ import os
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from backend.services.thumbnail_intel.constants import GEMINI_VISION_MODEL
 from backend.services.thumbnail_intel.collector import ThumbnailData
@@ -101,12 +102,12 @@ class ThumbnailVisionAnalyzer:
     def __init__(self):
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(GEMINI_VISION_MODEL)
+            self._client = genai.Client(api_key=api_key)
+            self.model_name = GEMINI_VISION_MODEL
             self.enabled = True
         else:
             logger.warning("GOOGLE_API_KEY not set - Vision analysis disabled")
-            self.model = None
+            self._client = None
             self.enabled = False
     
     async def analyze_category_thumbnails(
@@ -135,26 +136,28 @@ class ThumbnailVisionAnalyzer:
             # Build the prompt with all images
             prompt = self._build_analysis_prompt(category_name, thumbnails)
             
-            # Prepare image parts for Gemini
-            image_parts = []
-            for i, img_bytes in enumerate(thumbnail_images):
+            # Prepare image parts for Gemini (new SDK format)
+            contents = [types.Part.from_text(text=prompt)]
+            for img_bytes in thumbnail_images:
                 if img_bytes:
-                    image_parts.append({
-                        "mime_type": "image/jpeg",
-                        "data": base64.b64encode(img_bytes).decode("utf-8"),
-                    })
+                    contents.append(types.Part.from_bytes(
+                        data=img_bytes,
+                        mime_type="image/jpeg",
+                    ))
             
-            if not image_parts:
+            if len(contents) <= 1:
                 logger.warning(f"No valid images for {category_key}")
                 return self._fallback_insight(category_key, category_name, thumbnails)
             
             # Call Gemini Vision
-            response = self.model.generate_content(
-                [prompt] + image_parts,
-                generation_config=genai.GenerationConfig(
-                    temperature=0.7,
-                    max_output_tokens=3000,
-                ),
+            config = types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=3000,
+            )
+            response = await self._client.aio.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=config,
             )
             
             # Parse response

@@ -12,6 +12,9 @@ It handles the complete lifecycle of asset generation:
 7. Creates asset record(s) in database
 8. Updates job status to COMPLETED (or FAILED on error)
 
+Note: CPU-intensive operations (PIL, rembg) run in thread pool executors
+to avoid blocking the async event loop.
+
 Usage:
     python -m backend.workers.generation_worker
 """
@@ -47,6 +50,7 @@ from backend.services.exceptions import (
     GenerationError,
     JobNotFoundError,
 )
+from backend.services.async_executor import run_cpu_bound
 
 # Configure logging at module level for RQ job processes
 logging.basicConfig(
@@ -135,6 +139,39 @@ async def download_media_assets(
     return media_assets
 
 
+def _process_emote_sync(image_data: bytes, sizes: List[int]) -> List[tuple]:
+    """
+    Synchronous emote processing - runs in thread pool.
+    
+    Removes background and creates all size variants.
+    Returns list of (size, png_bytes) tuples.
+    """
+    import rembg
+    
+    # Step 1: Remove background (CPU-intensive)
+    transparent_bytes = rembg.remove(image_data)
+    
+    # Load as PIL Image for resizing
+    img = Image.open(BytesIO(transparent_bytes)).convert("RGBA")
+    
+    results = []
+    
+    # Step 2: Process each size
+    for size in sizes:
+        # Resize using Lanczos for best quality
+        resized = img.resize((size, size), Image.Resampling.LANCZOS)
+        
+        # Export as PNG with transparency
+        buffer = BytesIO()
+        resized.save(buffer, format="PNG", optimize=True)
+        buffer.seek(0)
+        png_bytes = buffer.read()
+        
+        results.append((size, png_bytes))
+    
+    return results
+
+
 async def process_twitch_emote_sizes(
     image_data: bytes,
     user_id: str,
@@ -146,10 +183,13 @@ async def process_twitch_emote_sizes(
     Process a Twitch emote into all three required sizes (112, 56, 28).
     
     Steps:
-    1. Remove background using rembg
-    2. Resize to each Twitch size using Lanczos
+    1. Remove background using rembg (in thread pool)
+    2. Resize to each Twitch size using Lanczos (in thread pool)
     3. Upload each size to storage
     4. Create asset records for each size
+    
+    All CPU-intensive PIL/rembg operations run in thread pool executor
+    to avoid blocking the async event loop.
     
     Args:
         image_data: Raw image bytes from AI generation
@@ -161,29 +201,16 @@ async def process_twitch_emote_sizes(
     Returns:
         List of created asset dicts with id, url, width, height
     """
-    import rembg
+    logger.info(f"Processing Twitch emote (background removal + resize): job_id={job_id}")
     
-    # Step 1: Remove background
-    logger.info(f"Removing background for emote: job_id={job_id}")
-    transparent_bytes = rembg.remove(image_data)
-    
-    # Load as PIL Image for resizing
-    img = Image.open(BytesIO(transparent_bytes)).convert("RGBA")
+    # Run CPU-intensive processing in thread pool
+    processed_sizes = await run_cpu_bound(_process_emote_sync, image_data, TWITCH_EMOTE_SIZES)
     
     created_assets = []
     
-    # Step 2-4: Process each size
-    for size in TWITCH_EMOTE_SIZES:
-        logger.info(f"Processing emote size {size}x{size}: job_id={job_id}")
-        
-        # Resize using Lanczos for best quality
-        resized = img.resize((size, size), Image.Resampling.LANCZOS)
-        
-        # Export as PNG with transparency
-        buffer = BytesIO()
-        resized.save(buffer, format="PNG", optimize=True)
-        buffer.seek(0)
-        png_bytes = buffer.read()
+    # Upload and create records for each size
+    for size, png_bytes in processed_sizes:
+        logger.info(f"Uploading emote size {size}x{size}: job_id={job_id}")
         
         # Determine asset type for this size
         asset_type = f"twitch_emote_{size}"

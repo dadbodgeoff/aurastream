@@ -12,6 +12,9 @@ Uses Pillow for image manipulation with support for:
 Architecture follows the same pattern as LogoCompositor but with
 extended capabilities for the Creator Media Library feature.
 
+Note: All CPU-intensive PIL operations run in thread pool executors
+to avoid blocking the async event loop.
+
 Usage:
     compositor = MediaAssetCompositor()
     result = await compositor.composite(
@@ -43,6 +46,8 @@ from typing import List, Dict, Any, Optional, Tuple
 
 import aiohttp
 from PIL import Image
+
+from backend.services.async_executor import run_cpu_bound
 
 logger = logging.getLogger(__name__)
 
@@ -360,6 +365,48 @@ class MediaAssetCompositor:
         
         return Image.alpha_composite(base, layer)
     
+    def _composite_all_sync(
+        self,
+        base_image: bytes,
+        specs_with_bytes: List[Tuple[PlacementSpec, Optional[bytes]]],
+    ) -> Tuple[bytes, int, List[str]]:
+        """
+        Synchronous compositing - runs in thread pool.
+        
+        All CPU-intensive PIL operations happen here.
+        
+        Returns:
+            Tuple of (output_bytes, assets_composited, errors)
+        """
+        errors: List[str] = []
+        assets_composited = 0
+        
+        # Load base image
+        base = Image.open(io.BytesIO(base_image))
+        
+        # Convert to RGBA for compositing
+        if base.mode != 'RGBA':
+            base = base.convert('RGBA')
+        
+        # Composite each asset
+        for spec, asset_bytes in specs_with_bytes:
+            if asset_bytes is None:
+                errors.append(f"Failed to fetch asset: {spec.display_name}")
+                continue
+            
+            try:
+                base = self._composite_single_asset(base, asset_bytes, spec)
+                assets_composited += 1
+            except Exception as e:
+                errors.append(f"Failed to composite {spec.display_name}: {str(e)}")
+        
+        # Convert back to PNG bytes
+        output = io.BytesIO()
+        base.save(output, format='PNG', optimize=True)
+        output.seek(0)
+        
+        return output.read(), assets_composited, errors
+    
     async def composite(
         self,
         base_image: bytes,
@@ -371,6 +418,7 @@ class MediaAssetCompositor:
         Composite multiple media assets onto a base image.
         
         Assets are layered in z-index order (lowest first).
+        CPU-intensive PIL operations run in thread pool executor.
         
         Args:
             base_image: Base image bytes (PNG, JPEG, WebP)
@@ -381,9 +429,6 @@ class MediaAssetCompositor:
         Returns:
             CompositeResult with composited image and metadata
         """
-        errors: List[str] = []
-        assets_composited = 0
-        
         if not placements:
             return CompositeResult(
                 image_data=base_image,
@@ -391,57 +436,52 @@ class MediaAssetCompositor:
                 errors=["No placements provided"],
             )
         
+        errors: List[str] = []
+        
         # Limit number of assets
         if len(placements) > MAX_COMPOSITE_ASSETS:
             placements = placements[:MAX_COMPOSITE_ASSETS]
             errors.append(f"Truncated to {MAX_COMPOSITE_ASSETS} assets")
         
         try:
-            # Load base image
-            base = Image.open(io.BytesIO(base_image))
-            
-            # Convert to RGBA for compositing
-            if base.mode != 'RGBA':
-                base = base.convert('RGBA')
-            
-            # Use actual base dimensions
-            actual_width, actual_height = base.size
+            # Get actual dimensions from base image (quick operation)
+            base_temp = Image.open(io.BytesIO(base_image))
+            actual_width, actual_height = base_temp.size
+            base_temp.close()
             
             # Parse and sort placements by z-index
-            specs: List[Tuple[PlacementSpec, Dict[str, Any]]] = []
+            specs: List[PlacementSpec] = []
             for p in placements:
                 spec = self._parse_placement(p, actual_width, actual_height)
-                specs.append((spec, p))
+                specs.append(spec)
             
             # Sort by z-index (lowest first = rendered first = behind)
-            specs.sort(key=lambda x: x[0].z_index)
+            specs.sort(key=lambda x: x.z_index)
             
-            # Fetch all assets concurrently
-            fetch_tasks = [self._fetch_asset(spec.url) for spec, _ in specs]
+            # Fetch all assets concurrently (I/O bound, stays async)
+            fetch_tasks = [self._fetch_asset(spec.url) for spec in specs]
             asset_bytes_list = await asyncio.gather(*fetch_tasks)
             
-            # Composite each asset
-            for (spec, raw_placement), asset_bytes in zip(specs, asset_bytes_list):
-                if asset_bytes is None:
-                    errors.append(f"Failed to fetch asset: {spec.display_name}")
-                    continue
-                
-                try:
-                    base = self._composite_single_asset(base, asset_bytes, spec)
-                    assets_composited += 1
+            # Pair specs with their fetched bytes
+            specs_with_bytes = list(zip(specs, asset_bytes_list))
+            
+            # Log what we're compositing
+            for spec, asset_bytes in specs_with_bytes:
+                if asset_bytes is not None:
                     logger.info(
-                        f"Composited asset: name={spec.display_name}, "
+                        f"Compositing asset: name={spec.display_name}, "
                         f"type={spec.asset_type}, pos=({spec.x:.1f}%, {spec.y:.1f}%), "
                         f"size=({spec.width:.1f}%, {spec.height:.1f}%)"
                     )
-                except Exception as e:
-                    errors.append(f"Failed to composite {spec.display_name}: {str(e)}")
-                    logger.warning(f"Composite error for {spec.asset_id}: {e}")
             
-            # Convert back to PNG bytes
-            output = io.BytesIO()
-            base.save(output, format='PNG', optimize=True)
-            output.seek(0)
+            # Run CPU-intensive compositing in thread pool
+            output_bytes, assets_composited, composite_errors = await run_cpu_bound(
+                self._composite_all_sync,
+                base_image,
+                specs_with_bytes,
+            )
+            
+            errors.extend(composite_errors)
             
             logger.info(
                 f"Media compositing complete: "
@@ -450,7 +490,7 @@ class MediaAssetCompositor:
             )
             
             return CompositeResult(
-                image_data=output.read(),
+                image_data=output_bytes,
                 assets_composited=assets_composited,
                 errors=errors,
             )

@@ -10,7 +10,8 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from backend.api.schemas.playbook import (
     WeeklySchedule,
@@ -37,12 +38,12 @@ class PlaybookAIRefiner:
     def __init__(self):
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel("gemini-2.0-flash-001")
+            self._client = genai.Client(api_key=api_key)
+            self.model_name = "gemini-2.0-flash-001"
             self.enabled = True
         else:
             logger.warning("GOOGLE_API_KEY not set - AI refinement disabled")
-            self.model = None
+            self._client = None
             self.enabled = False
     
     async def refine_playbook(
@@ -262,12 +263,14 @@ Rules:
     
     async def _call_gemini(self, prompt: str) -> str:
         """Call Gemini API."""
-        response = self.model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=1500,  # Increased for video ideas
-            ),
+        config = types.GenerateContentConfig(
+            temperature=0.7,
+            max_output_tokens=1500,
+        )
+        response = await self._client.aio.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=config,
         )
         return response.text
     

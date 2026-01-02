@@ -9,6 +9,9 @@ The Asset Pipeline handles:
 2. Color grading to match brand colors
 3. Text overlay using PIL (NOT AI)
 4. Downscaling with Lanczos algorithm
+
+Note: All CPU-intensive PIL and rembg operations run in thread pool
+executors to avoid blocking the async event loop.
 """
 
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance
@@ -18,6 +21,7 @@ import logging
 
 from backend.services.twitch.context_engine import GenerationContext
 from backend.services.twitch.dimensions import DIMENSION_SPECS, get_dimension_spec
+from backend.services.async_executor import run_cpu_bound
 
 logger = logging.getLogger(__name__)
 
@@ -102,21 +106,26 @@ class AssetPipeline:
         """
         Remove background using rembg.
         
+        Runs in thread pool executor to avoid blocking the event loop.
+        
         Args:
             image: PIL Image to process
             
         Returns:
             Image with transparent background (RGBA)
         """
-        import rembg
+        def _remove_bg_sync(img_bytes: bytes) -> bytes:
+            """Synchronous rembg processing for thread pool."""
+            import rembg
+            return rembg.remove(img_bytes)
         
         # Convert to bytes for rembg
         img_bytes = BytesIO()
         image.save(img_bytes, format="PNG")
         img_bytes.seek(0)
         
-        # Remove background
-        output_bytes = rembg.remove(img_bytes.read())
+        # Remove background in thread pool (CPU-intensive)
+        output_bytes = await run_cpu_bound(_remove_bg_sync, img_bytes.read())
         
         # Load result
         return Image.open(BytesIO(output_bytes))
