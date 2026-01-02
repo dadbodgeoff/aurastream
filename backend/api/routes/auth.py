@@ -49,9 +49,12 @@ from backend.api.schemas.auth import (
     AccountDelete,
     MessageResponse,
 )
-from backend.services.auth_service import get_auth_service, User
-from backend.services.auth_token_service import get_auth_token_service
-from backend.services.audit_service import get_audit_service
+from backend.api.service_dependencies import (
+    AuthServiceDep,
+    AuditServiceDep,
+    AuthTokenServiceDep,
+)
+from backend.services.auth_service import User
 from backend.services.jwt_service import TokenPayload
 from backend.services.exceptions import (
     InvalidCredentialsError,
@@ -131,7 +134,12 @@ def _user_to_response(user: User) -> UserResponse:
         429: {"description": "Rate limit exceeded"},
     },
 )
-async def signup(request: Request, data: SignupRequest) -> SignupResponse:
+async def signup(
+    request: Request,
+    data: SignupRequest,
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
+) -> SignupResponse:
     """
     Register a new user account.
     
@@ -141,6 +149,8 @@ async def signup(request: Request, data: SignupRequest) -> SignupResponse:
     Args:
         request: FastAPI request object
         data: SignupRequest with email, password, and display_name
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         SignupResponse: Created user data with success message
@@ -150,9 +160,6 @@ async def signup(request: Request, data: SignupRequest) -> SignupResponse:
         HTTPException: 422 if password doesn't meet requirements
         HTTPException: 429 if rate limit exceeded
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -245,6 +252,8 @@ async def login(
     request: Request,
     response: Response,
     data: LoginRequest,
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
 ) -> LoginResponse:
     """
     Authenticate user and return tokens.
@@ -256,6 +265,8 @@ async def login(
         request: FastAPI request object
         response: FastAPI response object for setting cookies
         data: LoginRequest with email, password, and optional remember_me
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         LoginResponse: Access token, refresh token, expiration, user data, and CSRF token
@@ -264,8 +275,6 @@ async def login(
         HTTPException: 401 if credentials are invalid
         HTTPException: 429 if rate limit exceeded
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
     settings = get_settings()
     
     ip_address = get_client_ip(request)
@@ -364,6 +373,8 @@ async def logout(
     request: Request,
     response: Response,
     current_user: TokenPayload = Depends(get_current_user),
+    auth_service: AuthServiceDep = None,
+    audit_service: AuditServiceDep = None,
 ) -> LogoutResponse:
     """
     Log out current user.
@@ -374,13 +385,12 @@ async def logout(
         request: FastAPI request object
         response: FastAPI response object for clearing cookies
         current_user: Authenticated user's token payload
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         LogoutResponse: Success message
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -441,6 +451,8 @@ async def logout(
 async def refresh_token(
     request: Request,
     data: RefreshRequest,
+    auth_service: AuthServiceDep,
+    audit_service: AuditServiceDep,
 ) -> RefreshResponse:
     """
     Refresh access token using refresh token.
@@ -451,6 +463,8 @@ async def refresh_token(
     Args:
         request: FastAPI request object
         data: RefreshRequest with refresh_token
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         RefreshResponse: New access token, new refresh token, and expiration
@@ -458,9 +472,6 @@ async def refresh_token(
     Raises:
         HTTPException: 401 if refresh token is invalid, expired, or reused
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -552,6 +563,7 @@ async def refresh_token(
 )
 async def get_me(
     current_user: TokenPayload = Depends(get_current_user),
+    auth_service: AuthServiceDep = None,
 ) -> UserResponse:
     """
     Get current authenticated user's profile.
@@ -561,6 +573,7 @@ async def get_me(
     
     Args:
         current_user: Authenticated user's token payload
+        auth_service: Injected AuthService
         
     Returns:
         UserResponse: Full user profile (excluding sensitive fields)
@@ -569,8 +582,6 @@ async def get_me(
         HTTPException: 401 if not authenticated
         HTTPException: 404 if user no longer exists
     """
-    auth_service = get_auth_service()
-    
     try:
         user = await auth_service.get_user(user_id=current_user.sub)
         return _user_to_response(user)
@@ -615,6 +626,9 @@ async def get_me(
 async def request_password_reset(
     request: Request,
     data: PasswordResetRequest,
+    auth_service: AuthServiceDep,
+    auth_token_service: AuthTokenServiceDep,
+    audit_service: AuditServiceDep,
 ) -> MessageResponse:
     """
     Request a password reset.
@@ -625,14 +639,13 @@ async def request_password_reset(
     Args:
         request: FastAPI request object
         data: PasswordResetRequest with email
+        auth_service: Injected AuthService
+        auth_token_service: Injected AuthTokenService
+        audit_service: Injected AuditService
         
     Returns:
         MessageResponse: Success message (always)
     """
-    auth_service = get_auth_service()
-    auth_token_service = get_auth_token_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -687,6 +700,9 @@ async def request_password_reset(
 async def confirm_password_reset(
     request: Request,
     data: PasswordResetConfirm,
+    auth_service: AuthServiceDep,
+    auth_token_service: AuthTokenServiceDep,
+    audit_service: AuditServiceDep,
 ) -> MessageResponse:
     """
     Confirm password reset with token.
@@ -696,6 +712,9 @@ async def confirm_password_reset(
     Args:
         request: FastAPI request object
         data: PasswordResetConfirm with token and new_password
+        auth_service: Injected AuthService
+        auth_token_service: Injected AuthTokenService
+        audit_service: Injected AuditService
         
     Returns:
         MessageResponse: Success message
@@ -704,10 +723,6 @@ async def confirm_password_reset(
         HTTPException: 400 if token is invalid or expired
         HTTPException: 422 if password doesn't meet requirements
     """
-    auth_service = get_auth_service()
-    auth_token_service = get_auth_token_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -776,6 +791,8 @@ async def confirm_password_reset(
 async def request_email_verification(
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    auth_token_service: AuthTokenServiceDep = None,
+    audit_service: AuditServiceDep = None,
 ) -> MessageResponse:
     """
     Request email verification.
@@ -785,13 +802,12 @@ async def request_email_verification(
     Args:
         request: FastAPI request object
         current_user: Authenticated user's token payload
+        auth_token_service: Injected AuthTokenService
+        audit_service: Injected AuditService
         
     Returns:
         MessageResponse: Success message
     """
-    auth_token_service = get_auth_token_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -836,6 +852,9 @@ async def request_email_verification(
 async def verify_email(
     request: Request,
     token: str,
+    auth_service: AuthServiceDep,
+    auth_token_service: AuthTokenServiceDep,
+    audit_service: AuditServiceDep,
 ) -> MessageResponse:
     """
     Verify email with token.
@@ -845,6 +864,9 @@ async def verify_email(
     Args:
         request: FastAPI request object
         token: Email verification token from URL
+        auth_service: Injected AuthService
+        auth_token_service: Injected AuthTokenService
+        audit_service: Injected AuditService
         
     Returns:
         MessageResponse: Success message
@@ -852,10 +874,6 @@ async def verify_email(
     Raises:
         HTTPException: 400 if token is invalid or expired
     """
-    auth_service = get_auth_service()
-    auth_token_service = get_auth_token_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -930,6 +948,8 @@ async def update_profile(
     request: Request,
     data: ProfileUpdate,
     current_user: TokenPayload = Depends(get_current_user),
+    auth_service: AuthServiceDep = None,
+    audit_service: AuditServiceDep = None,
 ) -> UserResponse:
     """
     Update current user's profile.
@@ -938,6 +958,8 @@ async def update_profile(
         request: FastAPI request object
         data: ProfileUpdate with optional display_name and avatar_url
         current_user: Authenticated user's token payload
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         UserResponse: Updated user profile
@@ -946,9 +968,6 @@ async def update_profile(
         HTTPException: 401 if not authenticated
         HTTPException: 422 if validation fails
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -1012,6 +1031,8 @@ async def change_password(
     request: Request,
     data: PasswordChange,
     current_user: TokenPayload = Depends(get_current_user),
+    auth_service: AuthServiceDep = None,
+    audit_service: AuditServiceDep = None,
 ) -> MessageResponse:
     """
     Change current user's password.
@@ -1020,6 +1041,8 @@ async def change_password(
         request: FastAPI request object
         data: PasswordChange with current_password and new_password
         current_user: Authenticated user's token payload
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         MessageResponse: Success message
@@ -1028,9 +1051,6 @@ async def change_password(
         HTTPException: 401 if current password is incorrect
         HTTPException: 422 if new password doesn't meet requirements
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
@@ -1120,6 +1140,8 @@ async def delete_account(
     response: Response,
     data: AccountDelete,
     current_user: TokenPayload = Depends(get_current_user),
+    auth_service: AuthServiceDep = None,
+    audit_service: AuditServiceDep = None,
 ) -> MessageResponse:
     """
     Delete current user's account.
@@ -1129,6 +1151,8 @@ async def delete_account(
         response: FastAPI response object for clearing cookies
         data: AccountDelete with password and confirmation
         current_user: Authenticated user's token payload
+        auth_service: Injected AuthService
+        audit_service: Injected AuditService
         
     Returns:
         MessageResponse: Success message
@@ -1137,9 +1161,6 @@ async def delete_account(
         HTTPException: 401 if password is incorrect
         HTTPException: 422 if confirmation is not "DELETE"
     """
-    auth_service = get_auth_service()
-    audit_service = get_audit_service()
-    
     ip_address = get_client_ip(request)
     user_agent = _get_user_agent(request)
     
