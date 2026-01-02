@@ -29,8 +29,10 @@ from backend.api.schemas.brand_kit import (
     BrandKitListResponse,
     BrandKitFonts,
 )
-from backend.services.brand_kit_service import get_brand_kit_service
-from backend.services.audit_service import get_audit_service
+from backend.api.service_dependencies import (
+    BrandKitServiceDep,
+    AuditServiceDep,
+)
 from backend.services.jwt_service import TokenPayload
 from backend.services.exceptions import (
     BrandKitNotFoundError,
@@ -129,6 +131,7 @@ def _brand_kit_to_response(brand_kit: dict) -> BrandKitResponse:
 )
 async def list_brand_kits(
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> BrandKitListResponse:
     """
     List all brand kits for the current user.
@@ -138,11 +141,11 @@ async def list_brand_kits(
     
     Args:
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
         
     Returns:
         BrandKitListResponse: List of brand kits with metadata
     """
-    service = get_brand_kit_service()
     brand_kits = await service.list(current_user.sub)
     
     responses = [_brand_kit_to_response(bk) for bk in brand_kits]
@@ -192,6 +195,8 @@ async def create_brand_kit(
     data: BrandKitCreate,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> BrandKitResponse:
     """
     Create a new brand kit.
@@ -203,6 +208,8 @@ async def create_brand_kit(
         data: BrandKitCreate with brand kit configuration
         request: FastAPI request object for audit logging
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
+        audit: Injected AuditService
         
     Returns:
         BrandKitResponse: Created brand kit data
@@ -211,8 +218,6 @@ async def create_brand_kit(
         HTTPException: 403 if brand kit limit exceeded
         HTTPException: 422 if validation fails
     """
-    service = get_brand_kit_service()
-    
     try:
         brand_kit = await service.create(
             user_id=current_user.sub,
@@ -220,7 +225,6 @@ async def create_brand_kit(
         )
         
         # Audit log the creation
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="brand_kit.create",
@@ -263,6 +267,7 @@ async def create_brand_kit(
 )
 async def get_active_brand_kit(
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> Optional[BrandKitResponse]:
     """
     Get the user's active brand kit.
@@ -272,11 +277,11 @@ async def get_active_brand_kit(
     
     Args:
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
         
     Returns:
         BrandKitResponse or None: Active brand kit or null
     """
-    service = get_brand_kit_service()
     brand_kit = await service.get_active(current_user.sub)
     
     if brand_kit is None:
@@ -313,6 +318,7 @@ async def get_active_brand_kit(
 async def get_brand_kit(
     brand_kit_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> BrandKitResponse:
     """
     Get a brand kit by ID.
@@ -323,6 +329,7 @@ async def get_brand_kit(
     Args:
         brand_kit_id: UUID of the brand kit
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
         
     Returns:
         BrandKitResponse: Brand kit data
@@ -331,8 +338,6 @@ async def get_brand_kit(
         HTTPException: 403 if user doesn't own the brand kit
         HTTPException: 404 if brand kit not found
     """
-    service = get_brand_kit_service()
-    
     try:
         brand_kit = await service.get(
             user_id=current_user.sub,
@@ -392,6 +397,8 @@ async def update_brand_kit(
     data: BrandKitUpdate,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> BrandKitResponse:
     """
     Update a brand kit.
@@ -404,6 +411,8 @@ async def update_brand_kit(
         data: BrandKitUpdate with fields to update
         request: FastAPI request object for audit logging
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
+        audit: Injected AuditService
         
     Returns:
         BrandKitResponse: Updated brand kit data
@@ -413,8 +422,6 @@ async def update_brand_kit(
         HTTPException: 404 if brand kit not found
         HTTPException: 422 if validation fails
     """
-    service = get_brand_kit_service()
-    
     try:
         brand_kit = await service.update(
             user_id=current_user.sub,
@@ -423,7 +430,6 @@ async def update_brand_kit(
         )
         
         # Audit log the update
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="brand_kit.update",
@@ -478,6 +484,8 @@ async def delete_brand_kit(
     brand_kit_id: str,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> Response:
     """
     Delete a brand kit.
@@ -489,6 +497,8 @@ async def delete_brand_kit(
         brand_kit_id: UUID of the brand kit
         request: FastAPI request object for audit logging
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
+        audit: Injected AuditService
         
     Returns:
         Response: Empty response with 204 status
@@ -497,8 +507,6 @@ async def delete_brand_kit(
         HTTPException: 403 if user doesn't own the brand kit
         HTTPException: 404 if brand kit not found
     """
-    service = get_brand_kit_service()
-    
     try:
         await service.delete(
             user_id=current_user.sub,
@@ -506,7 +514,6 @@ async def delete_brand_kit(
         )
         
         # Audit log the deletion
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="brand_kit.delete",
@@ -564,6 +571,8 @@ async def activate_brand_kit(
     brand_kit_id: str,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> BrandKitResponse:
     """
     Activate a brand kit.
@@ -575,6 +584,8 @@ async def activate_brand_kit(
         brand_kit_id: UUID of the brand kit to activate
         request: FastAPI request object for audit logging
         current_user: Authenticated user's token payload
+        service: Injected BrandKitService
+        audit: Injected AuditService
         
     Returns:
         BrandKitResponse: Activated brand kit data with is_active=True
@@ -583,8 +594,6 @@ async def activate_brand_kit(
         HTTPException: 403 if user doesn't own the brand kit
         HTTPException: 404 if brand kit not found
     """
-    service = get_brand_kit_service()
-    
     try:
         brand_kit = await service.activate(
             user_id=current_user.sub,
@@ -592,7 +601,6 @@ async def activate_brand_kit(
         )
         
         # Audit log the activation
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="brand_kit.activate",
@@ -636,9 +644,9 @@ async def update_colors(
     brand_kit_id: str,
     colors: ColorPalette,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> ColorPaletteResponse:
     """Update extended color palette."""
-    service = get_brand_kit_service()
     try:
         await service.update_colors_extended(
             current_user.sub, brand_kit_id, colors.model_dump()
@@ -665,9 +673,9 @@ async def update_colors(
 async def get_colors(
     brand_kit_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> ColorPaletteResponse:
     """Get extended color palette."""
-    service = get_brand_kit_service()
     try:
         brand_kit = await service.get(current_user.sub, brand_kit_id)
         colors_data = brand_kit.get("colors_extended", {})
@@ -697,9 +705,9 @@ async def update_typography(
     brand_kit_id: str,
     typography: Typography,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> TypographyResponse:
     """Update typography hierarchy."""
-    service = get_brand_kit_service()
     try:
         await service.update_typography(
             current_user.sub, brand_kit_id, typography.model_dump(exclude_none=True)
@@ -726,9 +734,9 @@ async def update_typography(
 async def get_typography(
     brand_kit_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> TypographyResponse:
     """Get typography hierarchy."""
-    service = get_brand_kit_service()
     try:
         brand_kit = await service.get(current_user.sub, brand_kit_id)
         typo_data = brand_kit.get("typography", {})
@@ -758,9 +766,9 @@ async def update_voice(
     brand_kit_id: str,
     voice: BrandVoice,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> VoiceResponse:
     """Update brand voice configuration."""
-    service = get_brand_kit_service()
     try:
         await service.update_voice(
             current_user.sub, brand_kit_id, voice.model_dump()
@@ -787,9 +795,9 @@ async def update_voice(
 async def get_voice(
     brand_kit_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> VoiceResponse:
     """Get brand voice configuration."""
-    service = get_brand_kit_service()
     try:
         brand_kit = await service.get(current_user.sub, brand_kit_id)
         voice_data = brand_kit.get("voice", {})
@@ -819,9 +827,9 @@ async def update_guidelines(
     brand_kit_id: str,
     guidelines: BrandGuidelines,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> GuidelinesResponse:
     """Update brand usage guidelines."""
-    service = get_brand_kit_service()
     try:
         await service.update_guidelines(
             current_user.sub, brand_kit_id, guidelines.model_dump()
@@ -848,9 +856,9 @@ async def update_guidelines(
 async def get_guidelines(
     brand_kit_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: BrandKitServiceDep = None,
 ) -> GuidelinesResponse:
     """Get brand usage guidelines."""
-    service = get_brand_kit_service()
     try:
         brand_kit = await service.get(current_user.sub, brand_kit_id)
         guidelines_data = brand_kit.get("guidelines", {})
