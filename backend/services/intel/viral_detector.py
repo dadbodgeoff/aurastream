@@ -32,8 +32,9 @@ VIRAL_ANALYSIS_CACHE_KEY = "viral:analysis:{category}"
 ANALYSIS_CACHE_TTL = 1800  # 30 minutes
 DATA_STALENESS_THRESHOLD_HOURS = 6  # Data older than this = low confidence
 
-# Approximate baseline velocities (views per hour for "normal" performance)
-VELOCITY_BASELINES: Dict[str, float] = {
+# Default baseline velocities (views per hour for "normal" performance)
+# These are fallbacks - dynamic baselines are calculated from historical data
+DEFAULT_VELOCITY_BASELINES: Dict[str, float] = {
     "fortnite": 5000,
     "valorant": 3000,
     "minecraft": 4000,
@@ -56,6 +57,11 @@ VELOCITY_BASELINES: Dict[str, float] = {
     "pokemon": 3000,
     "default": 1000,
 }
+
+# Redis key for storing dynamic baselines
+DYNAMIC_BASELINE_KEY = "viral:baseline:{category}"
+BASELINE_HISTORY_KEY = "viral:baseline_history:{category}"
+BASELINE_HISTORY_MAX = 168  # 7 days of hourly samples
 
 # Stop words for topic extraction
 STOP_WORDS: Set[str] = {
@@ -143,10 +149,14 @@ class ViralDetector:
     - Rising content (velocity > p75)
     - Trending topics and tags
     - Overall category opportunity score
+    
+    Uses dynamic baselines calculated from historical velocity data
+    rather than hardcoded values for more accurate opportunity scoring.
     """
 
     def __init__(self):
         self._redis: Optional[redis.Redis] = None
+        self._baseline_cache: Dict[str, float] = {}
 
     async def _get_redis(self) -> redis.Redis:
         """Get or create Redis connection."""
@@ -157,7 +167,7 @@ class ViralDetector:
     async def close(self):
         """Close Redis connection."""
         if self._redis:
-            await self._redis.close()
+            await self._redis.aclose()
             self._redis = None
 
     async def analyze_category(self, category_key: str) -> ViralOpportunityAnalysis:
@@ -271,10 +281,12 @@ class ViralDetector:
         trending_topics = self._extract_trending_topics(trending_videos, videos)
         trending_tags = self._extract_trending_tags(trending_videos, videos)
 
-        # Calculate opportunity score
-        baseline = VELOCITY_BASELINES.get(
-            category_key, VELOCITY_BASELINES["default"]
-        )
+        # Get dynamic baseline (or fall back to default)
+        baseline = await self._get_dynamic_baseline(category_key, avg_velocity)
+        
+        # Update baseline history for future calculations
+        await self._update_baseline_history(category_key, avg_velocity)
+        
         opportunity_score = self._calculate_opportunity_score(
             viral_count=len(viral_videos),
             rising_count=len(rising_videos),
@@ -646,6 +658,113 @@ class ViralDetector:
             confidence=data.get("confidence", 0),
             analyzed_at=analyzed_at,
         )
+
+    async def _get_dynamic_baseline(
+        self,
+        category_key: str,
+        current_velocity: float,
+    ) -> float:
+        """
+        Get dynamic baseline velocity for a category.
+        
+        Uses historical velocity data to calculate a rolling median baseline.
+        Falls back to default baselines if insufficient history.
+        
+        Args:
+            category_key: The category identifier
+            current_velocity: Current average velocity (for fallback)
+            
+        Returns:
+            Baseline velocity for opportunity scoring
+        """
+        # Check in-memory cache first
+        if category_key in self._baseline_cache:
+            return self._baseline_cache[category_key]
+        
+        redis_client = await self._get_redis()
+        
+        try:
+            # Get historical velocity samples
+            history_key = BASELINE_HISTORY_KEY.format(category=category_key)
+            history_data = await redis_client.lrange(history_key, 0, -1)
+            
+            if history_data and len(history_data) >= 24:  # Need at least 24 hours
+                # Parse historical velocities
+                velocities = []
+                for item in history_data:
+                    try:
+                        sample = json.loads(item)
+                        velocities.append(sample.get("velocity", 0))
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+                
+                if len(velocities) >= 24:
+                    # Calculate rolling median (more stable than mean)
+                    sorted_velocities = sorted(velocities)
+                    mid = len(sorted_velocities) // 2
+                    if len(sorted_velocities) % 2 == 0:
+                        baseline = (sorted_velocities[mid - 1] + sorted_velocities[mid]) / 2
+                    else:
+                        baseline = sorted_velocities[mid]
+                    
+                    # Cache for this session
+                    self._baseline_cache[category_key] = baseline
+                    
+                    logger.debug(
+                        f"Dynamic baseline for {category_key}: {baseline:.0f} "
+                        f"(from {len(velocities)} samples)"
+                    )
+                    return baseline
+            
+            # Fall back to default baseline
+            baseline = DEFAULT_VELOCITY_BASELINES.get(
+                category_key, DEFAULT_VELOCITY_BASELINES["default"]
+            )
+            logger.debug(f"Using default baseline for {category_key}: {baseline}")
+            return baseline
+            
+        except Exception as e:
+            logger.warning(f"Error getting dynamic baseline for {category_key}: {e}")
+            return DEFAULT_VELOCITY_BASELINES.get(
+                category_key, DEFAULT_VELOCITY_BASELINES["default"]
+            )
+
+    async def _update_baseline_history(
+        self,
+        category_key: str,
+        avg_velocity: float,
+    ) -> None:
+        """
+        Update baseline history with current velocity sample.
+        
+        Maintains a rolling window of velocity samples for dynamic baseline calculation.
+        
+        Args:
+            category_key: The category identifier
+            avg_velocity: Current average velocity to record
+        """
+        if avg_velocity <= 0:
+            return
+        
+        redis_client = await self._get_redis()
+        
+        try:
+            history_key = BASELINE_HISTORY_KEY.format(category=category_key)
+            
+            sample = {
+                "velocity": avg_velocity,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            
+            # Push to list and trim to max size
+            await redis_client.lpush(history_key, json.dumps(sample))
+            await redis_client.ltrim(history_key, 0, BASELINE_HISTORY_MAX - 1)
+            
+            # Set TTL to 8 days (slightly longer than history window)
+            await redis_client.expire(history_key, 8 * 24 * 3600)
+            
+        except Exception as e:
+            logger.warning(f"Error updating baseline history for {category_key}: {e}")
 
 
 # ============================================================================

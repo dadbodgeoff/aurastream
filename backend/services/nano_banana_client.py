@@ -23,7 +23,7 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional
 
 import aiohttp
 
@@ -38,6 +38,25 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class ConversationTurn:
+    """Single turn in a multi-turn conversation."""
+    role: str  # "user" or "model"
+    text: Optional[str] = None
+    image_data: Optional[bytes] = None
+    image_mime_type: str = "image/png"
+
+
+@dataclass
+class MediaAssetInput:
+    """A media asset to be included in generation."""
+    image_data: bytes
+    mime_type: str = "image/png"
+    asset_id: str = ""
+    display_name: str = ""
+    asset_type: str = "image"  # logo, face, character, etc.
+
+
+@dataclass
 class GenerationRequest:
     """Request parameters for image generation."""
     prompt: str
@@ -47,6 +66,10 @@ class GenerationRequest:
     seed: Optional[int] = None
     input_image: Optional[bytes] = None  # Optional input image for image-to-image
     input_mime_type: str = "image/png"   # MIME type of input image
+    # Multi-turn conversation support for refinements
+    conversation_history: Optional[list] = None  # List of ConversationTurn or dicts
+    # Media assets to include in generation (logos, faces, characters, etc.)
+    media_assets: Optional[List["MediaAssetInput"]] = None
 
 
 @dataclass
@@ -199,8 +222,82 @@ class NanoBananaClient:
             width=request.width,
             height=request.height,
             input_image=request.input_image,
-            input_mime_type=request.input_mime_type
+            input_mime_type=request.input_mime_type,
+            conversation_history=request.conversation_history,
+            media_assets=request.media_assets,
         )
+    
+    def _build_multi_turn_contents(
+        self,
+        conversation_history: list,
+        refinement_prompt: str,
+        width: int,
+        height: int,
+    ) -> list:
+        """
+        Build multi-turn contents array from conversation history.
+        
+        This enables cheaper refinements by maintaining context of previous
+        generations without re-uploading images.
+        
+        Args:
+            conversation_history: List of previous turns (user prompts + model images)
+            refinement_prompt: The new refinement request
+            width: Target width
+            height: Target height
+            
+        Returns:
+            List of content objects for Gemini API
+        """
+        contents = []
+        
+        # Add previous turns from history
+        for turn in conversation_history:
+            if isinstance(turn, dict):
+                role = turn.get("role", "user")
+                parts = []
+                
+                # Add text if present
+                if turn.get("text"):
+                    parts.append({"text": turn["text"]})
+                
+                # Add image if present (for model responses)
+                if turn.get("image_data"):
+                    image_data = turn["image_data"]
+                    # Handle both bytes and base64 string
+                    if isinstance(image_data, bytes):
+                        image_b64 = base64.b64encode(image_data).decode()
+                    else:
+                        image_b64 = image_data
+                    
+                    parts.append({
+                        "inlineData": {
+                            "mimeType": turn.get("image_mime_type", "image/png"),
+                            "data": image_b64,
+                        }
+                    })
+                
+                if parts:
+                    contents.append({"role": role, "parts": parts})
+        
+        # Add the new refinement request
+        # For refinements, we use a lighter constraint since context is established
+        refinement_constraint = """Apply this refinement to the previous image while maintaining:
+- The same overall composition and layout
+- The same style and artistic approach
+- Any text exactly as it was (unless the refinement specifically changes it)
+- The same dimensions and aspect ratio
+
+Refinement request: """
+        
+        contents.append({
+            "role": "user",
+            "parts": [{
+                "text": f"{refinement_constraint}{refinement_prompt}\n\nKeep the image at {width}x{height} pixels."
+            }]
+        })
+        
+        return contents
     
     async def _request_with_retry(
         self,
@@ -210,7 +307,9 @@ class NanoBananaClient:
         width: int,
         height: int,
         input_image: Optional[bytes] = None,
-        input_mime_type: str = "image/png"
+        input_mime_type: str = "image/png",
+        conversation_history: Optional[list] = None,
+        media_assets: Optional[List["MediaAssetInput"]] = None,
     ) -> GenerationResponse:
         """
         Execute generation request with exponential backoff retry.
@@ -226,7 +325,9 @@ class NanoBananaClient:
                     width=width,
                     height=height,
                     input_image=input_image,
-                    input_mime_type=input_mime_type
+                    input_mime_type=input_mime_type,
+                    conversation_history=conversation_history,
+                    media_assets=media_assets,
                 )
             
             except ContentPolicyError:
@@ -274,37 +375,67 @@ class NanoBananaClient:
         width: int,
         height: int,
         input_image: Optional[bytes] = None,
-        input_mime_type: str = "image/png"
+        input_mime_type: str = "image/png",
+        conversation_history: Optional[list] = None,
+        media_assets: Optional[List["MediaAssetInput"]] = None,
     ) -> GenerationResponse:
         """
         Execute a single generation request using Gemini REST API.
+        
+        Supports multi-turn conversations for refinements. When conversation_history
+        is provided, the prompt is treated as a refinement of the previous generation.
+        
+        Media assets (logos, faces, characters, etc.) are attached as inline images
+        and referenced in the prompt by their index and type.
         """
         generation_id = str(uuid.uuid4())
         used_seed = seed if seed is not None else int(time.time() * 1000) % (2**31)
         start_time = time.time()
         
-        # Prepend strict content constraint to prevent hallucination
-        constrained_prompt = f"{self.STRICT_CONTENT_CONSTRAINT}{prompt}"
-        
-        # Build the parts array - text prompt first
-        parts = [{
-            "text": f"{constrained_prompt}\n\nGenerate this as a {width}x{height} pixel image."
-        }]
-        
-        # Add input image if provided (for image-to-image transformation)
-        if input_image is not None:
-            parts.append({
-                "inlineData": {
-                    "mimeType": input_mime_type,
-                    "data": base64.b64encode(input_image).decode()
-                }
-            })
+        # Build contents array based on whether this is multi-turn or single-turn
+        if conversation_history and len(conversation_history) > 0:
+            # Multi-turn: Build from conversation history + new refinement
+            contents = self._build_multi_turn_contents(
+                conversation_history=conversation_history,
+                refinement_prompt=prompt,
+                width=width,
+                height=height,
+            )
+        else:
+            # Single-turn: Original behavior
+            # Prepend strict content constraint to prevent hallucination
+            constrained_prompt = f"{self.STRICT_CONTENT_CONSTRAINT}{prompt}"
+            
+            # Build the parts array - text prompt first
+            parts = [{
+                "text": f"{constrained_prompt}\n\nGenerate this as a {width}x{height} pixel image."
+            }]
+            
+            # Add input image if provided (for image-to-image transformation)
+            if input_image is not None:
+                parts.append({
+                    "inlineData": {
+                        "mimeType": input_mime_type,
+                        "data": base64.b64encode(input_image).decode()
+                    }
+                })
+            
+            # Add media assets (logos, faces, characters, etc.)
+            # These are referenced in the prompt by index: "Image 1 is the user's logo..."
+            if media_assets:
+                for asset in media_assets:
+                    parts.append({
+                        "inlineData": {
+                            "mimeType": asset.mime_type,
+                            "data": base64.b64encode(asset.image_data).decode()
+                        }
+                    })
+            
+            contents = [{"parts": parts}]
         
         # Build the request body for image generation
         request_body = {
-            "contents": [{
-                "parts": parts
-            }],
+            "contents": contents,
             "generationConfig": {
                 "responseModalities": ["IMAGE", "TEXT"],
                 "responseMimeType": "text/plain",
@@ -445,8 +576,10 @@ def get_nano_banana_client() -> NanoBananaClient:
 
 
 __all__ = [
+    "ConversationTurn",
     "GenerationRequest",
     "GenerationResponse",
+    "MediaAssetInput",
     "NanoBananaClient",
     "create_nano_banana_client",
     "get_nano_banana_client",

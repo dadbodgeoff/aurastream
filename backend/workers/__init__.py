@@ -28,6 +28,22 @@ from backend.workers.playbook_worker import (
     GENERATION_INTERVAL as PLAYBOOK_GENERATION_INTERVAL,
 )
 
+from backend.workers.creator_intel_worker import (
+    run_generation_sync as run_creator_intel_generation,
+    run_continuous as run_creator_intel_worker,
+    run_once as run_creator_intel_once,
+    GENERATION_INTERVAL as CREATOR_INTEL_GENERATION_INTERVAL,
+    TRACKED_GAMES as CREATOR_INTEL_TRACKED_GAMES,
+)
+
+from backend.workers.twitch_streams_worker import (
+    run_fetch_sync as run_twitch_streams_fetch,
+    run_continuous as run_twitch_streams_worker,
+    run_once as run_twitch_streams_once,
+    FETCH_INTERVAL as TWITCH_STREAMS_FETCH_INTERVAL,
+    TRACKED_GAMES as TWITCH_STREAMS_TRACKED_GAMES,
+)
+
 __all__ = [
     # Generation worker
     "enqueue_generation_job",
@@ -47,4 +63,16 @@ __all__ = [
     "run_playbook_worker",
     "run_playbook_once",
     "PLAYBOOK_GENERATION_INTERVAL",
+    # Creator Intel worker
+    "run_creator_intel_generation",
+    "run_creator_intel_worker",
+    "run_creator_intel_once",
+    "CREATOR_INTEL_GENERATION_INTERVAL",
+    "CREATOR_INTEL_TRACKED_GAMES",
+    # Twitch Streams worker
+    "run_twitch_streams_fetch",
+    "run_twitch_streams_worker",
+    "run_twitch_streams_once",
+    "TWITCH_STREAMS_FETCH_INTERVAL",
+    "TWITCH_STREAMS_TRACKED_GAMES",
 ]

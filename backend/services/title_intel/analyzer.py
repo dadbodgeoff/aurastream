@@ -401,7 +401,7 @@ class TitleIntelAnalyzer:
     
     async def close(self):
         if self._redis:
-            await self._redis.close()
+            await self._redis.aclose()
             self._redis = None
     
     async def analyze_game(self, game_key: str) -> Optional[GameTitleIntel]:

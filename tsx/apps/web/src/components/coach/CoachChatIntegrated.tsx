@@ -94,11 +94,19 @@ export interface CoachChatIntegratedProps {
   onEndSession?: () => void;
   /** Initial request for starting a new session */
   initialRequest?: StartCoachRequest;
+  /** Selected media assets for injection (max 2) */
+  selectedMediaAssets?: MediaAsset[];
+  /** Media asset placements with precise positioning */
+  mediaAssetPlacements?: AssetPlacement[];
   /** Additional CSS classes */
   className?: string;
   /** Test ID for testing */
   testId?: string;
 }
+
+// Import media types
+import type { MediaAsset } from '@aurastream/api-client';
+import type { AssetPlacement } from '../media-library/placement';
 
 // ============================================================================
 // Helper Functions
@@ -541,6 +549,8 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
   onGenerateComplete,
   onEndSession,
   initialRequest,
+  selectedMediaAssets,
+  mediaAssetPlacements,
   className,
   testId = 'coach-chat-integrated',
 }: CoachChatIntegratedProps) {
@@ -677,16 +687,38 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     try {
       // Map the coach asset type to the backend generation asset type
       const backendAssetType = mapAssetTypeForGeneration(assetType);
+      
+      // Serialize media asset placements if provided
+      const serializedPlacements = mediaAssetPlacements?.map(p => ({
+        assetId: p.assetId,
+        displayName: p.asset.displayName,
+        assetType: p.asset.assetType,
+        url: p.asset.processedUrl || p.asset.url,
+        x: p.position.x,
+        y: p.position.y,
+        width: p.size.width,
+        height: p.size.height,
+        sizeUnit: p.size.unit,
+        zIndex: p.zIndex,
+        rotation: p.rotation,
+        opacity: p.opacity,
+      }));
+      
       log.info('Triggering generation with:', {
         assetType: backendAssetType,
         customPrompt: refinedDescription,
         brandKitId,
+        mediaAssetCount: selectedMediaAssets?.length || 0,
+        hasPlacement: !!serializedPlacements?.length,
       });
       
       await triggerGeneration({
         assetType: backendAssetType as any,
         customPrompt: refinedDescription,
         brandKitId,
+        // Pass media assets if selected
+        mediaAssetIds: selectedMediaAssets?.map(a => a.id),
+        mediaAssetPlacements: serializedPlacements,
       });
       
       log.info('Generation triggered successfully');
@@ -694,7 +726,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
       log.error('Generation failed:', err);
       setLocalError(err instanceof Error ? err.message : 'Generation failed');
     }
-  }, [refinedDescription, isGenerationReady, isStreaming, triggerGeneration, assetType, brandKitId]);
+  }, [refinedDescription, isGenerationReady, isStreaming, triggerGeneration, assetType, brandKitId, selectedMediaAssets, mediaAssetPlacements]);
 
   // Handle end session
   const handleEndSession = useCallback(async () => {

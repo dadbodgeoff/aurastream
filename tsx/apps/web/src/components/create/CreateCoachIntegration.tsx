@@ -44,9 +44,17 @@ export interface CreateCoachIntegrationProps {
   onGenerateComplete?: (asset: Asset) => void;
   /** Callback when session ends */
   onEndSession?: () => void;
+  /** Selected media assets for injection (max 2) */
+  selectedMediaAssets?: MediaAsset[];
+  /** Media asset placements with precise positioning */
+  mediaAssetPlacements?: AssetPlacement[];
   /** Additional CSS classes */
   className?: string;
 }
+
+// Import media types
+import type { MediaAsset } from '@aurastream/api-client';
+import type { AssetPlacement } from '../media-library/placement';
 
 // ============================================================================
 // Icons
@@ -265,6 +273,8 @@ export function CreateCoachIntegration({
   onGenerateNow,
   onGenerateComplete,
   onEndSession,
+  selectedMediaAssets,
+  mediaAssetPlacements,
   className,
 }: CreateCoachIntegrationProps) {
   const { data: brandKitsData, isLoading: isLoadingBrandKits } = useBrandKits();
@@ -329,6 +339,7 @@ export function CreateCoachIntegration({
   if (COACH_UX_2025_ENABLED) {
     log.info('Using CoachChatIntegrated (new UX)');
     log.debug('initialRequest:', initialRequest);
+    log.debug('selectedMediaAssets:', selectedMediaAssets?.length || 0);
     return (
       <CoachChatIntegrated
         assetType={assetType}
@@ -337,6 +348,8 @@ export function CreateCoachIntegration({
         onGenerateComplete={handleGenerateComplete}
         onEndSession={onEndSession}
         initialRequest={initialRequest ?? undefined}
+        selectedMediaAssets={selectedMediaAssets}
+        mediaAssetPlacements={mediaAssetPlacements}
         className={className}
         testId="create-coach-integration"
       />

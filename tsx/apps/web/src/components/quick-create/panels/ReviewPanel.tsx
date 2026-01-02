@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { SectionCard } from '../shared';
 import { ChevronLeftIcon, SparklesIcon } from '../icons';
 import type { QuickTemplate, VibeOption } from '../types';
-import type { ClassifiedError } from '@aurastream/api-client';
+import type { ClassifiedError, MediaAsset } from '@aurastream/api-client';
 
 interface ReviewPanelProps {
   template: QuickTemplate;
@@ -21,6 +21,8 @@ interface ReviewPanelProps {
   isGenerating: boolean;
   error: Error | null;
   classifiedError?: ClassifiedError | null;
+  // Media Library - read-only display
+  selectedMediaAssets?: MediaAsset[];
 }
 
 /**
@@ -36,7 +38,8 @@ const PROGRESS_STAGES = [
 export function ReviewPanel(props: ReviewPanelProps) {
   const { 
     template, formValues, selectedVibe, brandKitName, includeLogo, logoPosition, logoSize,
-    onBack, onGenerate, onRetry, isGenerating, error, classifiedError 
+    onBack, onGenerate, onRetry, isGenerating, error, classifiedError,
+    selectedMediaAssets = [],
   } = props;
 
   // Progress stage animation during generation
@@ -206,6 +209,30 @@ export function ReviewPanel(props: ReviewPanelProps) {
               )}
             </div>
           </div>
+
+          {/* Media Library Assets - Read-only summary */}
+          {selectedMediaAssets.length > 0 && (
+            <div className="bg-background-base rounded-xl p-4 mb-4">
+              <h4 className="text-sm font-medium text-text-tertiary uppercase tracking-wider mb-3">Your Assets</h4>
+              <div className="flex flex-wrap gap-2">
+                {selectedMediaAssets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-interactive-500/10 border border-interactive-500/20"
+                  >
+                    <img
+                      src={asset.thumbnailUrl || asset.url}
+                      alt={asset.displayName}
+                      className="w-6 h-6 rounded object-cover"
+                    />
+                    <span className="text-sm text-text-primary truncate max-w-[120px]">
+                      {asset.displayName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Preview hint */}
           <div className="bg-interactive-600/5 border border-interactive-600/20 rounded-xl p-4">

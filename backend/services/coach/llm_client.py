@@ -12,7 +12,7 @@ Features:
 
 Environment Variables:
 - GOOGLE_GEMINI_API_KEY: API key for Gemini (falls back to GOOGLE_API_KEY)
-- COACH_LLM_MODEL: Model to use (default: gemini-1.5-flash)
+- COACH_LLM_MODEL: Model to use (default: gemini-2.0-flash)
 """
 
 import asyncio
@@ -20,7 +20,8 @@ import os
 from dataclasses import dataclass
 from typing import AsyncGenerator, List, Dict, Optional, Tuple
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 
 @dataclass
@@ -57,7 +58,7 @@ class CoachLLMClient:
             print(token, end="")
     """
     
-    DEFAULT_MODEL = "gemini-3-flash-preview"
+    DEFAULT_MODEL = "gemini-2.0-flash"
     
     def __init__(
         self,
@@ -69,7 +70,7 @@ class CoachLLMClient:
         
         Args:
             api_key: Google API key (defaults to GOOGLE_GEMINI_API_KEY or GOOGLE_API_KEY env var)
-            model: Model to use (defaults to COACH_LLM_MODEL env var or gemini-1.5-flash)
+            model: Model to use (defaults to COACH_LLM_MODEL env var or gemini-2.0-flash)
         
         Raises:
             ValueError: If no API key is provided or found in environment
@@ -82,11 +83,8 @@ class CoachLLMClient:
         
         self.model_name = model or os.environ.get("COACH_LLM_MODEL", self.DEFAULT_MODEL)
         
-        # Configure the Google Generative AI SDK
-        genai.configure(api_key=self.api_key)
-        
-        # Initialize the model
-        self._model = genai.GenerativeModel(self.model_name)
+        # Initialize the new google.genai client
+        self._client = genai.Client(api_key=self.api_key)
     
     async def stream_chat(
         self,
@@ -106,9 +104,8 @@ class CoachLLMClient:
             Exception: If the API call fails
         """
         # Convert messages to Gemini format
-        # Gemini uses 'user' and 'model' roles, and system prompt is separate
         system_prompt = None
-        chat_history = []
+        contents = []
         
         for msg in messages:
             role = msg.get("role", "user")
@@ -117,41 +114,25 @@ class CoachLLMClient:
             if role == "system":
                 system_prompt = content
             elif role == "assistant":
-                chat_history.append({"role": "model", "parts": [content]})
+                contents.append(types.Content(role="model", parts=[types.Part(text=content)]))
             else:  # user
-                chat_history.append({"role": "user", "parts": [content]})
+                contents.append(types.Content(role="user", parts=[types.Part(text=content)]))
         
-        # Create chat with system instruction if provided
-        generation_config = genai.GenerationConfig(
+        # Build generation config
+        config = types.GenerateContentConfig(
             temperature=0.7,
             max_output_tokens=2048,
+            system_instruction=system_prompt,
         )
         
-        if system_prompt:
-            model = genai.GenerativeModel(
-                self.model_name,
-                system_instruction=system_prompt,
-                generation_config=generation_config,
-            )
-        else:
-            model = genai.GenerativeModel(
-                self.model_name,
-                generation_config=generation_config,
-            )
-        
-        # Start chat with history (excluding the last user message)
-        chat = model.start_chat(history=chat_history[:-1] if len(chat_history) > 1 else [])
-        
-        # Get the last user message
-        last_message = chat_history[-1]["parts"][0] if chat_history else ""
-        
-        # Stream the response
-        response = chat.send_message(last_message, stream=True)
-        
-        for chunk in response:
+        # Stream the response using async API
+        async for chunk in self._client.aio.models.generate_content_stream(
+            model=self.model_name,
+            contents=contents,
+            config=config,
+        ):
             if chunk.text:
                 yield chunk.text
-                await asyncio.sleep(0)  # Yield control back to event loop
     
     async def stream_chat_with_usage(
         self,
@@ -181,7 +162,7 @@ class CoachLLMClient:
         """
         # Convert messages to Gemini format
         system_prompt = None
-        chat_history = []
+        contents = []
         
         for msg in messages:
             role = msg.get("role", "user")
@@ -190,47 +171,32 @@ class CoachLLMClient:
             if role == "system":
                 system_prompt = content
             elif role == "assistant":
-                chat_history.append({"role": "model", "parts": [content]})
+                contents.append(types.Content(role="model", parts=[types.Part(text=content)]))
             else:  # user
-                chat_history.append({"role": "user", "parts": [content]})
+                contents.append(types.Content(role="user", parts=[types.Part(text=content)]))
         
-        # Create chat with system instruction if provided
-        generation_config = genai.GenerationConfig(
+        # Build generation config
+        config = types.GenerateContentConfig(
             temperature=0.7,
             max_output_tokens=2048,
+            system_instruction=system_prompt,
         )
         
-        if system_prompt:
-            model = genai.GenerativeModel(
-                self.model_name,
-                system_instruction=system_prompt,
-                generation_config=generation_config,
-            )
-        else:
-            model = genai.GenerativeModel(
-                self.model_name,
-                generation_config=generation_config,
-            )
-        
-        # Start chat with history (excluding the last user message)
-        chat = model.start_chat(history=chat_history[:-1] if len(chat_history) > 1 else [])
-        
-        # Get the last user message
-        last_message = chat_history[-1]["parts"][0] if chat_history else ""
-        
-        # Stream the response
-        response = chat.send_message(last_message, stream=True)
-        
-        # Create usage accessor that holds reference to response
-        usage_accessor = UsageAccessor(response)
+        # Create usage accessor to collect usage data
+        usage_accessor = UsageAccessor()
         
         async def token_generator() -> AsyncGenerator[str, None]:
-            """Inner generator that yields tokens and marks completion."""
-            for chunk in response:
+            """Inner generator that yields tokens and collects usage."""
+            async for chunk in self._client.aio.models.generate_content_stream(
+                model=self.model_name,
+                contents=contents,
+                config=config,
+            ):
                 if chunk.text:
                     yield chunk.text
-                    await asyncio.sleep(0)  # Yield control back to event loop
-            # Mark iteration as complete so usage can be accessed
+                # Collect usage metadata from the last chunk
+                if hasattr(chunk, 'usage_metadata') and chunk.usage_metadata:
+                    usage_accessor._update_usage(chunk.usage_metadata)
             usage_accessor._iteration_complete = True
         
         return token_generator(), usage_accessor
@@ -240,20 +206,21 @@ class UsageAccessor:
     """
     Accessor for token usage metadata after streaming completes.
     
-    The Gemini SDK only provides usage_metadata after the response
-    has been fully iterated. This class holds a reference to the
-    response and provides access to usage after iteration.
+    The Gemini SDK provides usage_metadata in response chunks.
+    This class collects and provides access to usage after iteration.
     """
     
-    def __init__(self, response):
-        """
-        Initialize with a Gemini response object.
-        
-        Args:
-            response: The streaming response from Gemini
-        """
-        self._response = response
+    def __init__(self):
+        """Initialize the usage accessor."""
+        self._tokens_in = 0
+        self._tokens_out = 0
         self._iteration_complete = False
+    
+    def _update_usage(self, usage_metadata) -> None:
+        """Update usage from a chunk's usage_metadata."""
+        if usage_metadata:
+            self._tokens_in = getattr(usage_metadata, 'prompt_token_count', 0) or 0
+            self._tokens_out = getattr(usage_metadata, 'candidates_token_count', 0) or 0
     
     def get_usage(self) -> TokenUsage:
         """
@@ -265,18 +232,7 @@ class UsageAccessor:
         Returns:
             TokenUsage with tokens_in and tokens_out
         """
-        try:
-            usage_metadata = getattr(self._response, 'usage_metadata', None)
-            if usage_metadata is None:
-                return TokenUsage(tokens_in=0, tokens_out=0)
-            
-            tokens_in = getattr(usage_metadata, 'prompt_token_count', 0) or 0
-            tokens_out = getattr(usage_metadata, 'candidates_token_count', 0) or 0
-            
-            return TokenUsage(tokens_in=tokens_in, tokens_out=tokens_out)
-        except Exception:
-            # If anything goes wrong, return zeros
-            return TokenUsage(tokens_in=0, tokens_out=0)
+        return TokenUsage(tokens_in=self._tokens_in, tokens_out=self._tokens_out)
 
 
 # Singleton instance

@@ -42,6 +42,8 @@ from backend.api.schemas.coach import (
     EndSessionResponse,
     GenerateFromSessionRequest,
     GenerateFromSessionResponse,
+    RefineImageRequest,
+    RefineImageResponse,
     SessionAssetsResponse,
     SessionAssetResponse,
     SessionListResponse,
@@ -67,8 +69,8 @@ router = APIRouter()
 
 TIER_ACCESS = {
     "free": {"coach_access": True, "feature": "full_coach", "grounding": False},  # Limited by monthly quota
-    "pro": {"coach_access": True, "feature": "full_coach", "grounding": False},
-    "studio": {"coach_access": True, "feature": "full_coach", "grounding": True},
+    "pro": {"coach_access": True, "feature": "full_coach", "grounding": True},   # Pro gets grounding
+    "studio": {"coach_access": True, "feature": "full_coach", "grounding": True},  # Studio placeholder (not active yet)
 }
 
 
@@ -378,6 +380,17 @@ async def start_coach_session(
         "logo_url": None,
     }
     
+    # Add media assets to brand context for session storage
+    if data.media_asset_ids:
+        brand_context_data["media_asset_ids"] = data.media_asset_ids
+    if data.media_asset_placements:
+        brand_context_data["media_asset_placements"] = [
+            p.model_dump() for p in data.media_asset_placements
+        ]
+    
+    # Extract preferences for coach service
+    preferences_data = data.preferences.model_dump() if data.preferences else None
+    
     async def event_generator():
         """Generate SSE events from coach service."""
         try:
@@ -406,6 +419,7 @@ async def start_coach_session(
                 game_id=data.game_id,
                 game_name=data.game_name,
                 tier="pro" if tier in ("free", "pro") else tier,  # All users get pro-level coach access
+                preferences=preferences_data,
             ):
                 event_data = json.dumps({
                     "type": chunk.type,
@@ -762,12 +776,15 @@ async def end_coach_session(
     - job_id: UUID of the generation job for polling
     - status: Initial job status (queued)
     - message: Status message
+    - quality_warning: Optional warning if prompt quality is low
     
     **Flow:**
     1. Validates session ownership and status
-    2. Creates generation job with session's refined prompt
-    3. Enqueues job for background processing
-    4. Links generated asset to session when complete
+    2. Checks prompt quality (warns if below threshold)
+    3. Creates generation job with session's refined prompt
+    4. Records analytics for learning loop
+    5. Enqueues job for background processing
+    6. Links generated asset to session when complete
     
     **Polling:**
     Use GET /api/v1/jobs/{job_id} to poll for completion.
@@ -795,9 +812,15 @@ async def generate_from_session(
     
     Usage is counted here (not at session start) - users only lose
     a creation when they actually generate an image.
+    
+    Media assets can be injected either from:
+    1. Session context (set at session start)
+    2. Request body (overrides session defaults)
     """
     from backend.services.generation_service import get_generation_service
     from backend.workers.generation_worker import enqueue_generation_job
+    from backend.services.coach.analytics_service import get_analytics_service, SessionOutcome
+    from backend.services.coach.validator import get_validator
     
     tier = current_user.tier or "free"
     
@@ -842,10 +865,44 @@ async def generate_from_session(
             },
         )
     
+    # Quality gate: Validate prompt quality and warn if low
+    validator = get_validator()
+    validation_result = validator.validate(
+        session.current_prompt_draft,
+        session.asset_type or "thumbnail",
+    )
+    quality_warning = None
+    if validation_result.quality_score < 0.7:
+        quality_warning = {
+            "score": validation_result.quality_score,
+            "message": "Your prompt may produce suboptimal results. Consider refining further.",
+            "issues": [
+                {"severity": i.severity.value, "message": i.message, "suggestion": i.suggestion}
+                for i in validation_result.issues[:3]  # Top 3 issues
+            ],
+        }
+    
     # Get brand kit ID from session context
     brand_kit_id = None
     if session.brand_context:
         brand_kit_id = session.brand_context.get("brand_kit_id")
+    
+    # Get media assets - request overrides session defaults
+    media_asset_ids = data.media_asset_ids
+    media_asset_placements = None
+    
+    # If not provided in request, check session context
+    if media_asset_ids is None and session.brand_context:
+        media_asset_ids = session.brand_context.get("media_asset_ids")
+        # Also get placements from session if using session assets
+        if media_asset_ids:
+            session_placements = session.brand_context.get("media_asset_placements")
+            if session_placements:
+                media_asset_placements = session_placements
+    
+    # Use request placements if provided
+    if data.media_asset_placements:
+        media_asset_placements = [p.model_dump() for p in data.media_asset_placements]
     
     # Build parameters for generation
     parameters = {
@@ -857,7 +914,7 @@ async def generate_from_session(
     if brand_kit_id:
         parameters["brand_kit_id"] = brand_kit_id
     
-    # Create generation job
+    # Create generation job with media assets
     generation_service = get_generation_service()
     job = await generation_service.create_job(
         user_id=current_user.sub,
@@ -865,10 +922,37 @@ async def generate_from_session(
         asset_type=session.asset_type or "thumbnail",
         custom_prompt=session.current_prompt_draft,
         parameters=parameters,
+        media_asset_ids=media_asset_ids,
+        media_asset_placements=media_asset_placements,
     )
     
     # Increment usage counter NOW - when image generation is triggered
     await increment_coach_usage(current_user.sub)
+    
+    # Record analytics for learning loop
+    try:
+        analytics = get_analytics_service()
+        outcome = SessionOutcome(
+            session_id=session_id,
+            user_id=current_user.sub,
+            asset_id=None,  # Will be updated when job completes
+            generation_completed=True,
+            turns_used=session.turns_used,
+            grounding_used=session.grounding_calls > 0,
+            refinements_count=len(session.prompt_history),
+            quality_score=validation_result.quality_score,
+            final_intent=session.current_prompt_draft,
+            asset_type=session.asset_type or "thumbnail",
+            mood=session.mood,
+            game_context=session.game_context,
+        )
+        outcome_id = await analytics.record_outcome(outcome)
+        # Store outcome_id in job parameters for later viral score update
+        parameters["analytics_outcome_id"] = outcome_id
+    except Exception as e:
+        # Analytics failure should not block generation
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to record analytics: {e}")
     
     # Enqueue for background processing
     enqueue_generation_job(job.id, current_user.sub)
@@ -884,6 +968,8 @@ async def generate_from_session(
             "job_id": job.id,
             "asset_type": session.asset_type,
             "include_logo": data.include_logo,
+            "media_asset_count": len(media_asset_ids) if media_asset_ids else 0,
+            "quality_score": validation_result.quality_score,
         },
         ip_address=request.client.host if request.client else None,
     )
@@ -892,6 +978,186 @@ async def generate_from_session(
         job_id=job.id,
         status="queued",
         message="Generation started",
+        quality_warning=quality_warning,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/refine",
+    response_model=RefineImageResponse,
+    summary="Refine generated image",
+    description="""
+    Refine the last generated image using multi-turn conversation.
+    
+    This uses Gemini's conversation context to make changes without
+    re-uploading the image, making refinements ~60-80% cheaper.
+    
+    **Tier Access:**
+    - Free: Cannot refine (must regenerate)
+    - Pro: 5 free refinements/month, then counts as creation
+    - Studio: Unlimited refinements
+    
+    **Requirements:**
+    - Session must have at least one generated image
+    - Session must be active (not ended/expired)
+    
+    **Returns:**
+    - job_id: UUID for polling generation status
+    - refinements_used: Total refinements this month
+    - refinements_remaining: Free refinements left (-1 = unlimited)
+    - counted_as_creation: Whether this used a creation credit
+    """,
+    responses={
+        200: {"description": "Refinement job created"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Refinement not available for tier or limit exceeded"},
+        404: {"description": "Session not found"},
+        400: {"description": "No image to refine"},
+    },
+)
+async def refine_image(
+    request: Request,
+    session_id: str,
+    data: RefineImageRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+) -> RefineImageResponse:
+    """
+    Refine the last generated image using multi-turn conversation.
+    
+    Uses Gemini's conversation history to apply refinements without
+    re-uploading the image, significantly reducing costs.
+    """
+    from backend.services.generation_service import get_generation_service
+    from backend.workers.generation_worker import enqueue_generation_job
+    from backend.services.usage_limit_service import get_usage_limit_service, TIER_LIMITS
+    
+    tier = current_user.tier or "free"
+    
+    # Free tier cannot refine
+    if tier == "free":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "upgrade_required",
+                "message": "Image refinement requires Pro or Studio subscription. Upgrade to refine your images!",
+                "feature": "refinements",
+            },
+        )
+    
+    session_manager = get_session_manager()
+    
+    try:
+        session = await session_manager.get_or_raise(session_id, current_user.sub)
+    except SessionNotFoundError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=e.to_dict(),
+        )
+    except SessionExpiredError as e:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=e.to_dict(),
+        )
+    
+    # Check if session has a generated image to refine
+    if not session.last_generated_asset_id and not session.gemini_history:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "no_image",
+                "message": "No image to refine. Generate an image first.",
+            },
+        )
+    
+    # Check refinement limits
+    usage_service = get_usage_limit_service()
+    refinement_check = await usage_service.check_limit(current_user.sub, "refinements")
+    
+    # Determine if this counts as a creation (Pro users after 5 free)
+    counted_as_creation = False
+    tier_limits = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
+    refinement_limit = tier_limits.get("refinements", 0)
+    
+    if refinement_limit != -1 and not refinement_check.can_use:
+        # Pro user exceeded free refinements - check if they have creations left
+        creation_check = await usage_service.check_limit(current_user.sub, "creations")
+        if not creation_check.can_use:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "limit_exceeded",
+                    "message": f"You've used all {refinement_limit} free refinements and all {creation_check.limit} creations this month.",
+                    "refinements_used": refinement_check.used,
+                    "creations_used": creation_check.used,
+                    "resets_at": refinement_check.resets_at.isoformat() if refinement_check.resets_at else None,
+                },
+            )
+        counted_as_creation = True
+    
+    # Get brand kit ID from session context
+    brand_kit_id = None
+    if session.brand_context:
+        brand_kit_id = session.brand_context.get("brand_kit_id")
+    
+    # Build parameters for refinement job
+    parameters = {
+        "coach_session_id": session_id,
+        "is_refinement": True,
+        "refinement_text": data.refinement,
+        "conversation_history": session.gemini_history,
+    }
+    if brand_kit_id:
+        parameters["brand_kit_id"] = brand_kit_id
+    
+    # Create generation job with refinement flag
+    generation_service = get_generation_service()
+    job = await generation_service.create_job(
+        user_id=current_user.sub,
+        brand_kit_id=brand_kit_id,
+        asset_type=session.asset_type or "thumbnail",
+        custom_prompt=data.refinement,  # The refinement text
+        parameters=parameters,
+    )
+    
+    # Increment appropriate usage counter
+    if counted_as_creation:
+        await usage_service.increment(current_user.sub, "creations")
+    else:
+        await usage_service.increment(current_user.sub, "refinements")
+    
+    # Update session refinement count
+    session.refinements_used += 1
+    await session_manager._save(session)
+    
+    # Enqueue for background processing
+    enqueue_generation_job(job.id, current_user.sub)
+    
+    # Audit log
+    audit = get_audit_service()
+    await audit.log(
+        user_id=current_user.sub,
+        action="coach.refine",
+        resource_type="coach_session",
+        resource_id=session_id,
+        details={
+            "job_id": job.id,
+            "refinement": data.refinement[:100],
+            "counted_as_creation": counted_as_creation,
+            "refinements_used": session.refinements_used,
+        },
+        ip_address=request.client.host if request.client else None,
+    )
+    
+    # Calculate remaining refinements
+    refinements_remaining = -1 if refinement_limit == -1 else max(0, refinement_limit - refinement_check.used - 1)
+    
+    return RefineImageResponse(
+        job_id=job.id,
+        status="queued",
+        message="Refinement started",
+        refinements_used=refinement_check.used + 1,
+        refinements_remaining=refinements_remaining,
+        counted_as_creation=counted_as_creation,
     )
 
 

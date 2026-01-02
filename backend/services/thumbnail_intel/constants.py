@@ -69,7 +69,8 @@ GAMING_CATEGORIES: Dict[str, Dict] = {
 }
 
 # Number of thumbnails to analyze per category
-THUMBNAILS_PER_CATEGORY = 3
+# Increased from 3 to 10 for better pattern detection (cost: ~$0.01/run)
+THUMBNAILS_PER_CATEGORY = 10
 
 # Minimum view count to consider a video "top performing"
 # Lower threshold since we filter by recency

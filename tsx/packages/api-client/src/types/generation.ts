@@ -7,6 +7,7 @@ import type {
   LogoSize,
   LogoType,
 } from './brand-kit-enhanced';
+import type { SerializedPlacement } from './creatorMedia';
 
 export type AssetType = 
   | 'thumbnail' 
@@ -56,6 +57,10 @@ export interface GenerateRequest {
   customPrompt?: string;
   // Full brand customization (preferred)
   brandCustomization?: BrandCustomization;
+  // Creator Media Library assets to inject (max 2, Pro/Studio only)
+  mediaAssetIds?: string[];
+  // Asset placements with precise positioning (optional)
+  mediaAssetPlacements?: SerializedPlacement[];
   // Legacy logo options (deprecated, use brandCustomization instead)
   includeLogo?: boolean;
   logoPosition?: LogoPosition;

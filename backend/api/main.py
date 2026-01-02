@@ -598,8 +598,8 @@ def create_app() -> FastAPI:
         "/health",
         tags=["Health"],
         summary="Health Check",
-        description="Returns the health status of the API service.",
-        response_description="Health status with version and environment info",
+        description="Returns the health status of the API service including Redis connectivity.",
+        response_description="Health status with version, environment, and service health info",
     )
     async def health_check() -> dict:
         """
@@ -607,16 +607,34 @@ def create_app() -> FastAPI:
         
         Returns:
             dict: Health status including:
-                - status: "healthy" if service is operational
+                - status: "healthy" if all services operational, "degraded" if Redis down
                 - version: Current API version
                 - timestamp: Current UTC timestamp in ISO format
                 - environment: Current deployment environment
+                - services: Health status of dependent services (Redis)
         """
+        from backend.database.redis_client import get_resilient_redis_client
+        
+        # Check Redis health
+        redis_client = get_resilient_redis_client()
+        redis_health = await redis_client.health_check()
+        
+        # Determine overall status
+        overall_status = "healthy" if redis_health.is_healthy else "degraded"
+        
         return {
-            "status": "healthy",
+            "status": overall_status,
             "version": APP_VERSION,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "environment": settings.APP_ENV,
+            "services": {
+                "redis": {
+                    "status": "healthy" if redis_health.is_healthy else "unhealthy",
+                    "latency_ms": redis_health.latency_ms,
+                    "circuit_state": redis_health.circuit_state.value,
+                    "error": redis_health.error,
+                }
+            }
         }
     
     # =========================================================================
@@ -657,6 +675,8 @@ def create_app() -> FastAPI:
     from api.routes.thumbnail_recreate import router as thumbnail_recreate_router
     from api.routes.clip_radar import router as clip_radar_router
     from api.routes.intel import router as intel_router
+    from api.routes.creator_media import router as creator_media_router
+    from backend.services.intel.api.routes import router as intel_v2_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -692,6 +712,8 @@ def create_app() -> FastAPI:
     app.include_router(thumbnail_recreate_router, prefix="/api/v1", tags=["Thumbnail Recreation"])
     app.include_router(clip_radar_router, prefix="/api/v1", tags=["Clip Radar"])
     app.include_router(intel_router, prefix="/api/v1", tags=["Creator Intel"])
+    app.include_router(intel_v2_router, tags=["Creator Intel V2"])
+    app.include_router(creator_media_router, prefix="/api/v1", tags=["Creator Media Library"])
     
     return app
 

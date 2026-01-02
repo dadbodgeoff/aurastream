@@ -3,7 +3,7 @@
  * @module create/types
  */
 
-import type { LogoPosition, LogoSize } from '@aurastream/api-client';
+import type { LogoPosition, LogoSize, LogoType, BrandIntensity } from '@aurastream/api-client';
 
 export type Platform = 'general' | 'twitch' | 'youtube' | 'tiktok';
 export type AssetCategory = 'thumbnails' | 'overlays' | 'social' | 'channel';
@@ -30,6 +30,12 @@ export interface LogoOptions {
   includeLogo: boolean;
   logoPosition: LogoPosition;
   logoSize: LogoSize;
+  logoType: LogoType;
+}
+
+export interface BrandOptions {
+  brandIntensity: BrandIntensity;
+  logoOptions: LogoOptions;
 }
 
 export interface CreateContext {
@@ -37,5 +43,5 @@ export interface CreateContext {
   assetType: string;
   brandKitId: string;
   prompt: string;
-  logoOptions: LogoOptions;
+  brandOptions: BrandOptions;
 }

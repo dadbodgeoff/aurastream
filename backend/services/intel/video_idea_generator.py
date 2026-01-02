@@ -406,8 +406,9 @@ class VideoIdeaGenerator:
         """Generate a single idea for a specific topic."""
         templates = FORMAT_TEMPLATES[format_type]
         
-        # Deterministic selection based on topic hash
-        topic_hash = sum(ord(c) for c in topic)
+        # Deterministic selection based on topic hash (using proper hash function)
+        import hashlib
+        topic_hash = int(hashlib.md5(topic.encode()).hexdigest(), 16)
         concept_idx = topic_hash % len(templates["concepts"])
         hook_idx = topic_hash % len(templates["hooks"])
         

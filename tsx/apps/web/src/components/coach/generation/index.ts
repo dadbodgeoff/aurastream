@@ -7,7 +7,7 @@
  * @module coach/generation
  */
 
-// Hook
+// Hooks
 export { useInlineGeneration } from './useInlineGeneration';
 export type {
   Asset,
@@ -16,6 +16,13 @@ export type {
   UseInlineGenerationOptions,
   UseInlineGenerationResult,
 } from './useInlineGeneration';
+
+export { useRefinement } from './useRefinement';
+export type {
+  RefinementState,
+  UseRefinementOptions,
+  UseRefinementResult,
+} from './useRefinement';
 
 // Components
 export { GenerationProgress } from './GenerationProgress';
@@ -26,3 +33,12 @@ export type { GenerationResultProps } from './GenerationResult';
 
 export { InlineGenerationCard } from './InlineGenerationCard';
 export type { InlineGenerationCardProps } from './InlineGenerationCard';
+
+export { RefinementChoice } from './RefinementChoice';
+export type { RefinementChoiceProps } from './RefinementChoice';
+
+export { RefineInput } from './RefineInput';
+export type { RefineInputProps } from './RefineInput';
+
+export { GenerationResultWithRefinement } from './GenerationResultWithRefinement';
+export type { GenerationResultWithRefinementProps } from './GenerationResultWithRefinement';

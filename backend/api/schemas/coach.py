@@ -41,6 +41,10 @@ AssetTypeEnum = Literal[
 
 MoodEnum = Literal["hype", "cozy", "rage", "chill", "custom"]
 
+CoachVerbosityEnum = Literal["concise", "balanced", "detailed"]
+
+CoachStyleEnum = Literal["friendly", "professional", "creative", "technical"]
+
 ValidationSeverityEnum = Literal["error", "warning", "info"]
 
 StreamChunkTypeEnum = Literal[
@@ -155,8 +159,130 @@ class BrandContext(BaseModel):
 
 
 # ============================================================================
+# Coach Preferences
+# ============================================================================
+
+class CoachPreferences(BaseModel):
+    """User preferences for coach interaction style.
+    
+    Allows users to customize how the coach communicates with them.
+    These preferences can be passed per-session or stored per-user.
+    """
+    verbosity: CoachVerbosityEnum = Field(
+        default="balanced",
+        description="How detailed the coach's responses should be"
+    )
+    style: CoachStyleEnum = Field(
+        default="friendly",
+        description="Communication style of the coach"
+    )
+    show_tips: bool = Field(
+        default=True,
+        description="Whether to show helpful tips during coaching"
+    )
+    auto_suggest: bool = Field(
+        default=True,
+        description="Whether to proactively suggest improvements"
+    )
+    emoji_level: Literal["none", "minimal", "normal"] = Field(
+        default="normal",
+        description="How many emojis to use in responses"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "verbosity": "balanced",
+                    "style": "friendly",
+                    "show_tips": True,
+                    "auto_suggest": True,
+                    "emoji_level": "normal"
+                },
+                {
+                    "verbosity": "concise",
+                    "style": "professional",
+                    "show_tips": False,
+                    "auto_suggest": False,
+                    "emoji_level": "none"
+                }
+            ]
+        }
+    }
+
+
+# ============================================================================
 # Request Schemas
 # ============================================================================
+
+class MediaAssetPlacement(BaseModel):
+    """
+    Precise placement data for a media asset on the generation canvas.
+    
+    Matches the generation.py schema exactly for consistency.
+    Allows users to specify exact position, size, rotation, and opacity
+    for their media assets in the generated output.
+    """
+    asset_id: str = Field(
+        ...,
+        description="ID of the media asset to place"
+    )
+    display_name: str = Field(
+        ...,
+        description="Display name of the asset"
+    )
+    asset_type: str = Field(
+        ...,
+        description="Type of the asset (face, logo, character, etc.)"
+    )
+    url: str = Field(
+        ...,
+        description="URL of the asset (preferably processed/transparent version)"
+    )
+    x: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="X position as percentage (0-100) from left edge"
+    )
+    y: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Y position as percentage (0-100) from top edge"
+    )
+    width: float = Field(
+        ...,
+        gt=0,
+        description="Width value (percentage or pixels based on size_unit)"
+    )
+    height: float = Field(
+        ...,
+        gt=0,
+        description="Height value (percentage or pixels based on size_unit)"
+    )
+    size_unit: Literal["percent", "px"] = Field(
+        default="percent",
+        description="Unit for width/height values"
+    )
+    z_index: int = Field(
+        default=1,
+        ge=1,
+        description="Layer order (higher = on top)"
+    )
+    rotation: float = Field(
+        default=0,
+        ge=0,
+        le=360,
+        description="Rotation in degrees"
+    )
+    opacity: float = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Opacity percentage (0-100)"
+    )
+
 
 class StartCoachRequest(BaseModel):
     """
@@ -166,6 +292,7 @@ class StartCoachRequest(BaseModel):
     asset type selection, mood, and initial description.
     
     Brand context is optional - users can start sessions without a brand kit.
+    Media assets can be pre-selected for injection into the generated asset.
     """
     brand_context: Optional[BrandContext] = Field(
         default_factory=BrandContext,
@@ -204,6 +331,23 @@ class StartCoachRequest(BaseModel):
         max_length=500,
         description="User's description of what they want",
         examples=["Victory royale celebration emote"]
+    )
+    # Creator Media Library integration
+    media_asset_ids: Optional[List[str]] = Field(
+        None,
+        max_length=2,
+        description="Media asset UUIDs to inject into generation (max 2)",
+        examples=[["550e8400-e29b-41d4-a716-446655440000"]]
+    )
+    media_asset_placements: Optional[List[MediaAssetPlacement]] = Field(
+        None,
+        max_length=2,
+        description="Placement configurations for media assets"
+    )
+    # Coach preferences for this session
+    preferences: Optional[CoachPreferences] = Field(
+        None,
+        description="Optional coach interaction preferences for this session"
     )
 
     @model_validator(mode='after')
@@ -593,6 +737,17 @@ class GenerateFromSessionRequest(BaseModel):
         description="Logo position on the asset",
         examples=["bottom-right", "bottom-left", "top-right", "top-left"]
     )
+    # Creator Media Library integration - can override session defaults
+    media_asset_ids: Optional[List[str]] = Field(
+        None,
+        max_length=2,
+        description="Media asset UUIDs to inject (overrides session defaults if provided)"
+    )
+    media_asset_placements: Optional[List[MediaAssetPlacement]] = Field(
+        None,
+        max_length=2,
+        description="Placement configurations for media assets"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -604,10 +759,106 @@ class GenerateFromSessionRequest(BaseModel):
                     "include_logo": True,
                     "logo_type": "primary",
                     "logo_position": "bottom-right"
+                },
+                {
+                    "include_logo": False,
+                    "media_asset_ids": ["550e8400-e29b-41d4-a716-446655440000"],
+                    "media_asset_placements": [
+                        {
+                            "asset_id": "550e8400-e29b-41d4-a716-446655440000",
+                            "position": "bottom-right",
+                            "size": "small",
+                            "opacity": 0.9
+                        }
+                    ]
                 }
             ]
         }
     }
+
+
+class RefineImageRequest(BaseModel):
+    """Request to refine a generated image using multi-turn conversation."""
+    refinement: str = Field(
+        ...,
+        min_length=3,
+        max_length=500,
+        description="What to change about the image",
+        examples=["Make the armor gold", "Add more sparkles", "Make it brighter", "Change the background to blue"]
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"refinement": "Make the colors more vibrant"},
+                {"refinement": "Add a subtle glow effect"},
+                {"refinement": "Make the character's expression more intense"},
+            ]
+        }
+    }
+
+
+class RefineImageResponse(BaseModel):
+    """Response after triggering image refinement."""
+    job_id: str = Field(
+        ...,
+        description="Generation job UUID for polling",
+        examples=["770e8400-e29b-41d4-a716-446655440002"]
+    )
+    status: str = Field(
+        default="queued",
+        description="Initial job status",
+        examples=["queued"]
+    )
+    message: str = Field(
+        default="Refinement started",
+        description="Status message"
+    )
+    refinements_used: int = Field(
+        ...,
+        description="Total refinements used this month"
+    )
+    refinements_remaining: int = Field(
+        ...,
+        description="Free refinements remaining (-1 for unlimited)"
+    )
+    counted_as_creation: bool = Field(
+        default=False,
+        description="Whether this refinement counted as a creation (Pro users after 5 free)"
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "job_id": "770e8400-e29b-41d4-a716-446655440002",
+                    "status": "queued",
+                    "message": "Refinement started",
+                    "refinements_used": 2,
+                    "refinements_remaining": 3,
+                    "counted_as_creation": False
+                }
+            ]
+        }
+    }
+
+
+class QualityWarning(BaseModel):
+    """Warning about prompt quality before generation."""
+    score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Quality score (0.0-1.0)"
+    )
+    message: str = Field(
+        ...,
+        description="Warning message"
+    )
+    issues: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="List of quality issues found"
+    )
 
 
 class GenerateFromSessionResponse(BaseModel):
@@ -626,6 +877,10 @@ class GenerateFromSessionResponse(BaseModel):
         default="Generation started",
         description="Status message"
     )
+    quality_warning: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Warning if prompt quality is below threshold (score < 0.7)"
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -633,7 +888,20 @@ class GenerateFromSessionResponse(BaseModel):
                 {
                     "job_id": "770e8400-e29b-41d4-a716-446655440002",
                     "status": "queued",
-                    "message": "Generation started"
+                    "message": "Generation started",
+                    "quality_warning": None
+                },
+                {
+                    "job_id": "770e8400-e29b-41d4-a716-446655440003",
+                    "status": "queued",
+                    "message": "Generation started",
+                    "quality_warning": {
+                        "score": 0.55,
+                        "message": "Your prompt may produce suboptimal results. Consider refining further.",
+                        "issues": [
+                            {"severity": "warning", "message": "Missing subject element", "suggestion": "Add a clear subject to your prompt"}
+                        ]
+                    }
                 }
             ]
         }
@@ -706,6 +974,8 @@ __all__ = [
     # Type definitions
     "AssetTypeEnum",
     "MoodEnum",
+    "CoachVerbosityEnum",
+    "CoachStyleEnum",
     "ValidationSeverityEnum",
     "StreamChunkTypeEnum",
     # Color and Font models
@@ -713,10 +983,15 @@ __all__ = [
     "FontInfo",
     # Brand context
     "BrandContext",
+    # Coach preferences
+    "CoachPreferences",
+    # Media asset placement
+    "MediaAssetPlacement",
     # Request schemas
     "StartCoachRequest",
     "ContinueChatRequest",
     "GenerateFromSessionRequest",
+    "RefineImageRequest",
     # Validation models
     "ValidationIssue",
     "ValidationResult",
@@ -728,6 +1003,7 @@ __all__ = [
     "SessionStateResponse",
     "EndSessionResponse",
     "GenerateFromSessionResponse",
+    "RefineImageResponse",
     "SessionAssetResponse",
     "SessionAssetsResponse",
     "SessionSummary",

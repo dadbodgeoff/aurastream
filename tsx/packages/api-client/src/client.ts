@@ -347,12 +347,30 @@ export class APIClient {
         };
       }
 
+      // Transform media asset placements from camelCase to snake_case
+      const mediaAssetPlacements = data.mediaAssetPlacements?.map(p => ({
+        asset_id: p.assetId,
+        display_name: p.displayName,
+        asset_type: p.assetType,
+        url: p.url,
+        x: p.x,
+        y: p.y,
+        width: p.width,
+        height: p.height,
+        size_unit: p.sizeUnit,
+        z_index: p.zIndex,
+        rotation: p.rotation,
+        opacity: p.opacity,
+      }));
+
       return this.request<JobResponse>('POST', '/api/v1/generate', {
         body: {
           asset_type: data.assetType,
           brand_kit_id: data.brandKitId,
           custom_prompt: data.customPrompt,
           brand_customization: brandCustomization,
+          media_asset_ids: data.mediaAssetIds,
+          media_asset_placements: mediaAssetPlacements,
         },
         requiresAuth: true,
       });
@@ -389,6 +407,33 @@ export class APIClient {
      */
     getJobAssets: async (jobId: string): Promise<AssetResponse[]> => {
       return this.request<AssetResponse[]>('GET', `/api/v1/jobs/${jobId}/assets`, {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Refine a completed job with a simple tweak instruction.
+     * Creates a new job with the original parameters + refinement.
+     * 
+     * This is the "Almost... tweak it" flow for Quick Create.
+     * 
+     * Tier access:
+     * - Free: Cannot refine (upgrade required)
+     * - Pro: 5 free refinements/month, then counts as creation
+     * - Studio: Unlimited refinements
+     */
+    refineJob: async (
+      jobId: string,
+      data: { refinement: string }
+    ): Promise<{
+      newJob: JobResponse;
+      originalJobId: string;
+      refinementText: string;
+    }> => {
+      return this.request('POST', `/api/v1/jobs/${jobId}/refine`, {
+        body: {
+          refinement: data.refinement,
+        },
         requiresAuth: true,
       });
     },
@@ -884,6 +929,134 @@ export class APIClient {
      */
     unlikePost: async (postId: string): Promise<void> => {
       return this.request('DELETE', `/api/v1/community/posts/${postId}/like`, {
+        requiresAuth: true,
+      });
+    },
+  };
+
+  // ==========================================================================
+  // Coach Namespace
+  // ==========================================================================
+
+  coach = {
+    /**
+     * Refine a generated image using multi-turn conversation.
+     * Uses Gemini's conversation context for cheaper refinements (~60-80% savings).
+     * 
+     * Tier access:
+     * - Free: Cannot refine
+     * - Pro: 5 free refinements/month, then counts as creation
+     * - Studio: Unlimited refinements
+     */
+    refineImage: async (
+      sessionId: string,
+      data: { refinement: string }
+    ): Promise<{
+      jobId: string;
+      status: string;
+      message: string;
+      refinementsUsed: number;
+      refinementsRemaining: number;
+      countedAsCreation: boolean;
+    }> => {
+      return this.request('POST', `/api/v1/coach/sessions/${sessionId}/refine`, {
+        body: {
+          refinement: data.refinement,
+        },
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Generate an asset from a coach session
+     */
+    generateFromSession: async (
+      sessionId: string,
+      data?: {
+        includeLogo?: boolean;
+        logoType?: string;
+        logoPosition?: string;
+        mediaAssetIds?: string[];
+        mediaAssetPlacements?: Array<{
+          assetId: string;
+          displayName: string;
+          assetType: string;
+          url: string;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          sizeUnit?: 'percent' | 'px';
+          zIndex?: number;
+          rotation?: number;
+          opacity?: number;
+        }>;
+      }
+    ): Promise<{
+      jobId: string;
+      status: string;
+      message: string;
+    }> => {
+      const body: Record<string, unknown> = {
+        include_logo: data?.includeLogo ?? false,
+      };
+      
+      if (data?.logoType) body.logo_type = data.logoType;
+      if (data?.logoPosition) body.logo_position = data.logoPosition;
+      if (data?.mediaAssetIds) body.media_asset_ids = data.mediaAssetIds;
+      if (data?.mediaAssetPlacements) {
+        body.media_asset_placements = data.mediaAssetPlacements.map(p => ({
+          asset_id: p.assetId,
+          display_name: p.displayName,
+          asset_type: p.assetType,
+          url: p.url,
+          x: p.x,
+          y: p.y,
+          width: p.width,
+          height: p.height,
+          size_unit: p.sizeUnit ?? 'percent',
+          z_index: p.zIndex ?? 1,
+          rotation: p.rotation ?? 0,
+          opacity: p.opacity ?? 100,
+        }));
+      }
+
+      return this.request('POST', `/api/v1/coach/sessions/${sessionId}/generate`, {
+        body,
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get session state
+     */
+    getSession: async (sessionId: string): Promise<{
+      sessionId: string;
+      status: 'active' | 'ended' | 'expired';
+      turnsUsed: number;
+      turnsRemaining: number;
+      currentPrompt?: string;
+      promptVersions: number;
+    }> => {
+      return this.request('GET', `/api/v1/coach/sessions/${sessionId}`, {
+        requiresAuth: true,
+      });
+    },
+
+    /**
+     * Get assets generated from a coach session
+     */
+    getSessionAssets: async (sessionId: string): Promise<{
+      assets: Array<{
+        id: string;
+        url: string;
+        assetType: string;
+        width: number;
+        height: number;
+        createdAt: string;
+      }>;
+    }> => {
+      return this.request('GET', `/api/v1/coach/sessions/${sessionId}/assets`, {
         requiresAuth: true,
       });
     },

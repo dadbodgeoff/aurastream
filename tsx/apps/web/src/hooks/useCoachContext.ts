@@ -67,6 +67,25 @@ export interface StartCoachRequest {
   game_id?: string | null;
   game_name?: string | null;
   description: string;  // min 5, max 500 chars
+  // Creator Media Library integration
+  media_asset_ids?: string[] | null;  // Max 2 assets
+  media_asset_placements?: SerializedMediaPlacement[] | null;  // Precise placement data
+}
+
+/** Serialized media placement for API transmission */
+export interface SerializedMediaPlacement {
+  asset_id: string;
+  display_name: string;
+  asset_type: string;
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  size_unit: 'percent' | 'px';
+  z_index: number;
+  rotation: number;
+  opacity: number;
 }
 
 /** Game selection state */

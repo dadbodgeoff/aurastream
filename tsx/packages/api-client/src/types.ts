@@ -176,3 +176,34 @@ export interface Asset {
 export type SubscriptionTier = User['subscriptionTier'];
 export type SubscriptionStatus = User['subscriptionStatus'];
 export type JobStatus = GenerationJob['status'];
+
+// ============================================================================
+// Quick Create Refinement Types
+// ============================================================================
+
+export interface RefineJobRequest {
+  /** What to change about the generated asset (3-300 chars) */
+  refinement: string;
+}
+
+export interface RefineJobResponse {
+  /** The newly created refinement job */
+  newJob: GenerationJob;
+  /** ID of the original job that was refined */
+  originalJobId: string;
+  /** The refinement instruction applied */
+  refinementText: string;
+}
+
+export interface RefinementUsageInfo {
+  /** Whether user can refine */
+  canRefine: boolean;
+  /** Free refinements remaining (Pro tier) */
+  freeRemaining: number;
+  /** Whether refinements are unlimited (Studio tier) */
+  isUnlimited: boolean;
+  /** User's tier */
+  tier: SubscriptionTier;
+  /** Human-readable message */
+  message: string;
+}

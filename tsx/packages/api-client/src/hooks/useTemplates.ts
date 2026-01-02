@@ -18,6 +18,12 @@ export interface FieldOption {
   value: string;
 }
 
+export interface ColorPreset {
+  label: string;
+  value: string;
+  category?: string;
+}
+
 export interface TemplateField {
   id: string;
   label: string;
@@ -30,6 +36,9 @@ export interface TemplateField {
   options?: FieldOption[];
   default?: string;
   showForVibes?: string[];
+  // Color picker presets
+  presets?: ColorPreset[];
+  showPresets?: boolean;
 }
 
 export interface VibeOption {
@@ -75,6 +84,9 @@ function transformField(field: any): TemplateField {
     options: field.options,
     default: field.default,
     showForVibes: field.show_for_vibes,
+    // Color picker presets
+    presets: field.presets,
+    showPresets: field.show_presets,
   };
 }
 

@@ -3,8 +3,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useBrandKits, useLogos, useGenerateAsset, useTemplate } from '@aurastream/api-client';
-import type { LogoPosition, LogoSize, ClassifiedError } from '@aurastream/api-client';
+import type { LogoPosition, LogoSize, LogoType, BrandIntensity, ClassifiedError, MediaAsset } from '@aurastream/api-client';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
+import type { AssetPlacement } from '../media-library/placement';
+import { serializePlacements } from '@aurastream/api-client';
 
 import { StepIndicator } from './shared';
 import { BoltIcon } from './icons';
@@ -40,6 +42,13 @@ export function QuickCreateWizard() {
   const [includeLogo, setIncludeLogo] = useState(false);
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('bottom-right');
   const [logoSize, setLogoSize] = useState<LogoSize>('medium');
+  const [logoType, setLogoType] = useState<LogoType>('primary');
+  const [brandIntensity, setBrandIntensity] = useState<BrandIntensity>('balanced');
+  
+  // Media Library assets for injection (Pro/Studio only)
+  const [selectedMediaAssets, setSelectedMediaAssets] = useState<MediaAsset[]>([]);
+  // Asset placements with precise positioning
+  const [mediaAssetPlacements, setMediaAssetPlacements] = useState<AssetPlacement[]>([]);
 
   // Handle generation errors with appropriate toasts
   const handleGenerationError = useCallback((error: ClassifiedError) => {
@@ -94,10 +103,12 @@ export function QuickCreateWizard() {
     if (!template) return null;
     if (!backendTemplate) return template;
 
-    // Merge fields: use backend fields, but keep frontend-only fields (like dynamic_select)
+    // Merge fields: use backend fields, but keep frontend-only fields
+    // This includes platform/size for emotes (dynamic_select)
     const backendFieldIds = new Set(backendTemplate.fields.map(f => f.id));
+    // Keep ALL frontend fields that don't exist in backend
     const frontendOnlyFields = template.fields.filter(f => 
-      !backendFieldIds.has(f.id) && (f.type === 'dynamic_select' || f.dependsOn)
+      !backendFieldIds.has(f.id)
     );
 
     // Convert backend fields to frontend format
@@ -113,6 +124,9 @@ export function QuickCreateWizard() {
       options: f.options,
       default: f.default,
       showForVibes: f.showForVibes,
+      // Color picker presets
+      presets: f.presets,
+      showPresets: f.showPresets,
     }));
 
     // Merge vibes: use backend vibes but add UI metadata from frontend
@@ -216,17 +230,29 @@ export function QuickCreateWizard() {
       assetType = `${formValues.platform}_emote_${formValues.size}`;
     }
     
+    // Extract media asset IDs for injection (fallback if no placements)
+    const mediaAssetIds = selectedMediaAssets.length > 0 && mediaAssetPlacements.length === 0
+      ? selectedMediaAssets.map(a => a.id) 
+      : undefined;
+    
+    // Serialize placements for API if present
+    const serializedPlacements = mediaAssetPlacements.length > 0
+      ? serializePlacements(mediaAssetPlacements)
+      : undefined;
+    
     generateMutation.mutate({
       assetType: assetType as any,
       brandKitId: brandKitId || undefined,
       customPrompt: buildPrompt(),
       brandCustomization: brandKitId ? {
         include_logo: includeLogo && hasLogo,
-        logo_type: 'primary' as const,
+        logo_type: logoType,
         logo_position: logoPosition,
         logo_size: logoSize,
-        brand_intensity: 'balanced' as const,
+        brand_intensity: brandIntensity,
       } : undefined,
+      mediaAssetIds,
+      mediaAssetPlacements: serializedPlacements,
     });
   };
 
@@ -270,10 +296,18 @@ export function QuickCreateWizard() {
           onLogoPositionChange={(v) => setLogoPosition(v as LogoPosition)}
           logoSize={logoSize}
           onLogoSizeChange={(v) => setLogoSize(v as LogoSize)}
+          logoType={logoType}
+          onLogoTypeChange={(v) => setLogoType(v as LogoType)}
+          brandIntensity={brandIntensity}
+          onBrandIntensityChange={(v) => setBrandIntensity(v as BrandIntensity)}
           isFormValid={isFormValid}
           onBack={() => { setStep('select'); setTemplate(null); setSelectedVibe(''); }}
           onNext={() => setStep('review')}
           isLoading={isLoading}
+          selectedMediaAssets={selectedMediaAssets}
+          onMediaAssetsChange={setSelectedMediaAssets}
+          mediaAssetPlacements={mediaAssetPlacements}
+          onMediaAssetPlacementsChange={setMediaAssetPlacements}
         />
       )}
 
@@ -292,6 +326,7 @@ export function QuickCreateWizard() {
           isGenerating={generateMutation.isPending}
           error={generateMutation.error}
           classifiedError={generateMutation.classifiedError}
+          selectedMediaAssets={selectedMediaAssets}
         />
       )}
     </div>

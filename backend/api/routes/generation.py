@@ -20,6 +20,8 @@ from backend.api.schemas.generation import (
     GenerateRequest,
     JobResponse,
     JobListResponse,
+    RefineJobRequest,
+    RefineJobResponse,
 )
 from backend.api.schemas.asset import AssetResponse
 from backend.services.jwt_service import TokenPayload
@@ -146,6 +148,9 @@ async def create_generation_job(
             asset_type=data.asset_type,
             custom_prompt=data.custom_prompt,
             parameters=parameters if parameters else None,
+            media_asset_ids=data.media_asset_ids,
+            media_asset_placements=[p.model_dump() for p in data.media_asset_placements] if data.media_asset_placements else None,
+            user_tier=getattr(current_user, "tier", "free"),
         )
         
         # Increment usage counter
@@ -165,6 +170,8 @@ async def create_generation_job(
                 "asset_type": data.asset_type, 
                 "brand_kit_id": data.brand_kit_id,
                 "include_logo": parameters.get("include_logo", False),
+                "media_asset_ids": data.media_asset_ids,
+                "has_placements": data.media_asset_placements is not None,
             },
             ip_address=request.client.host if request.client else None,
         )
@@ -254,6 +261,152 @@ async def list_jobs(
         limit=limit,
         offset=offset,
     )
+
+
+@router.post(
+    "/jobs/{job_id}/refine",
+    response_model=RefineJobResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Refine a completed job",
+    description="""
+    Create a new generation job based on an existing completed job with a refinement instruction.
+    
+    This is the "Almost... tweak it" flow for Quick Create. Takes the original job's
+    parameters and creates a new job with the refinement appended to the prompt.
+    
+    **Tier Access:**
+    - Free: Cannot refine (upgrade required)
+    - Pro: 5 free refinements/month, then counts as creation
+    - Studio: Unlimited refinements
+    """,
+)
+async def refine_job(
+    request: Request,
+    job_id: str,
+    data: RefineJobRequest,
+    current_user: TokenPayload = Depends(get_current_user),
+) -> RefineJobResponse:
+    """
+    Refine a completed generation job.
+    
+    Creates a new job with the original parameters + refinement instruction.
+    """
+    from backend.services.usage_limit_service import get_usage_limit_service
+    
+    service = get_generation_service()
+    usage_service = get_usage_limit_service()
+    
+    # Get the original job
+    try:
+        original_job = await service.get_job(current_user.sub, job_id)
+    except JobNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.to_dict())
+    except AuthorizationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.to_dict())
+    
+    # Verify job is completed
+    job_status = original_job.status.value if hasattr(original_job.status, 'value') else original_job.status
+    if job_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "invalid_job_status",
+                "message": "Can only refine completed jobs",
+                "current_status": job_status,
+            },
+        )
+    
+    # Get user tier
+    user_tier = getattr(current_user, "tier", "free")
+    
+    # Check tier access for refinements
+    if user_tier == "free":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "tier_restricted",
+                "message": "Refinements require Pro or Studio tier. Upgrade to unlock!",
+                "required_tier": "pro",
+            },
+        )
+    
+    # Check refinement limits (Pro gets 5 free/month, Studio unlimited)
+    if user_tier == "pro":
+        refinement_usage = await usage_service.check_limit(current_user.sub, "refinements")
+        if not refinement_usage.can_use:
+            # Pro users can still refine, but it counts as a creation
+            creation_usage = await usage_service.check_limit(current_user.sub, "creations")
+            if not creation_usage.can_use:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "limit_exceeded",
+                        "message": "You've used all your refinements and creations this month. Upgrade to Studio for unlimited!",
+                        "refinements_used": refinement_usage.used,
+                        "creations_used": creation_usage.used,
+                    },
+                )
+            # Will count as creation - increment later
+            counts_as_creation = True
+        else:
+            counts_as_creation = False
+    else:
+        # Studio tier - unlimited
+        counts_as_creation = False
+    
+    # Get original job parameters
+    original_prompt = original_job.prompt or ""
+    original_parameters = original_job.parameters or {}
+    
+    # Build refined prompt - append refinement instruction
+    refined_prompt = f"{original_prompt}\n\n[USER REFINEMENT REQUEST]: {data.refinement}"
+    
+    try:
+        # Create new job with refined prompt
+        # Note: media_asset_ids and media_asset_placements are stored in parameters
+        new_job = await service.create_job(
+            user_id=current_user.sub,
+            brand_kit_id=original_job.brand_kit_id,
+            asset_type=original_job.asset_type,
+            custom_prompt=refined_prompt,
+            parameters=original_parameters,
+        )
+        
+        # Increment appropriate counter
+        if counts_as_creation:
+            await usage_service.increment(current_user.sub, "creations")
+        else:
+            await usage_service.increment(current_user.sub, "refinements")
+        
+        # Enqueue job for background processing
+        enqueue_generation_job(new_job.id, current_user.sub)
+        
+        # Audit log
+        audit = get_audit_service()
+        await audit.log(
+            user_id=current_user.sub,
+            action="generation.refine",
+            resource_type="generation_job",
+            resource_id=new_job.id,
+            details={
+                "original_job_id": job_id,
+                "refinement": data.refinement,
+                "asset_type": original_job.asset_type,
+                "counts_as_creation": counts_as_creation,
+            },
+            ip_address=request.client.host if request.client else None,
+        )
+        
+        return RefineJobResponse(
+            new_job=_job_to_response(new_job),
+            original_job_id=job_id,
+            refinement_text=data.refinement,
+        )
+        
+    except BrandKitNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.to_dict())
+    except AuthorizationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.to_dict())
 
 
 @router.get(

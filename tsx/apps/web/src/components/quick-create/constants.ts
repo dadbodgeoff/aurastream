@@ -5,6 +5,7 @@ export const CATEGORIES: { id: TemplateCategory; label: string; emoji: string }[
   { id: 'stream', label: 'Stream', emoji: '🎮' },
   { id: 'social', label: 'Social', emoji: '📱' },
   { id: 'twitch', label: 'Twitch', emoji: '💜' },
+  { id: 'branding', label: 'Branding', emoji: '🎨' },
 ];
 
 // UI metadata for vibes (gradients, icons, taglines)
@@ -28,6 +29,14 @@ const EMOTE_VIBES: VibeOption[] = [
   { id: 'vaporwave', name: 'Vaporwave', tagline: 'Neon wireframe with cyber aesthetics', icon: '🌃', gradient: 'from-primary-600 to-fuchsia-500' },
   { id: 'tactical', name: 'Tactical Patch', tagline: 'Embroidered fabric with realistic threads', icon: '🎖️', gradient: 'from-stone-600 to-zinc-700' },
   { id: 'kawaii', name: 'Kawaii Blob', tagline: 'Ultra-cute squishy blob characters', icon: '🩷', gradient: 'from-pink-400 to-rose-400' },
+];
+
+const LOGO_VIBES: VibeOption[] = [
+  { id: 'studio-minimalist', name: 'Studio Minimalist', tagline: 'Clean, professional icon', icon: '🎯', gradient: 'from-slate-600 to-zinc-800' },
+  { id: 'collectible', name: 'Collectible', tagline: 'Designer vinyl toy aesthetic', icon: '🧸', gradient: 'from-rose-500 to-orange-500' },
+  { id: 'stealth-pro', name: 'Stealth Pro', tagline: 'Obsidian and neon esports', icon: '🌙', gradient: 'from-emerald-600 to-slate-800' },
+  { id: 'liquid-flow', name: 'Liquid Flow', tagline: 'Organic chrome reflections', icon: '💧', gradient: 'from-sky-400 to-blue-600' },
+  { id: 'heavy-metal', name: 'Heavy Metal', tagline: 'Esports championship badge', icon: '🛡️', gradient: 'from-amber-500 to-yellow-600' },
 ];
 
 const THUMBNAIL_VIBES: VibeOption[] = [
@@ -65,32 +74,23 @@ const EMOTE_SIZES = {
 /**
  * TEMPLATES - UI metadata for Quick Create templates
  * 
- * NOTE: The `fields` array here is a FALLBACK. The frontend should fetch
- * fields dynamically from /api/v1/templates/{id} to get the latest
- * placeholders from the YAML files.
+ * Fields are fetched dynamically from /api/v1/templates/{id} to get the latest
+ * placeholders from the backend YAML files.
  * 
- * This allows the backend to add new optional fields (like character_description,
- * accent_color) without requiring frontend changes.
+ * Only frontend-only fields (like platform/size for emotes) are defined here.
+ * All other fields (emotion, text, character_description, etc.) come from backend.
  */
 export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'going-live', name: 'Going Live', tagline: 'Stream announcement', category: 'stream',
     assetType: 'story_graphic', dimensions: '1080×1920', emoji: '🔴',
-    // Fallback fields - prefer fetching from backend
-    fields: [
-      { id: 'title', label: 'Stream Title', type: 'text', placeholder: 'Ranked Grind', required: true, maxLength: 50 },
-      { id: 'game', label: 'Game', type: 'text', placeholder: 'Valorant', maxLength: 30 },
-      { id: 'time', label: 'Time', type: 'text', placeholder: '7 PM EST', maxLength: 20 },
-    ],
+    fields: [], // All fields come from backend
     previewStyle: 'Vertical story graphic optimized for Instagram & TikTok', vibes: STANDARD_VIBES,
   },
   {
     id: 'schedule', name: 'Weekly Schedule', tagline: 'Streaming calendar', category: 'stream',
     assetType: 'banner', dimensions: '1200×480', emoji: '📅',
-    fields: [
-      { id: 'days', label: 'Streaming Days', type: 'text', placeholder: 'Mon, Wed, Fri', required: true, maxLength: 50, hint: 'Enter your streaming days separated by commas' },
-      { id: 'times', label: 'Stream Time', type: 'text', placeholder: '7 PM EST', maxLength: 30, hint: 'Your typical stream time' },
-    ],
+    fields: [], // All fields come from backend
     previewStyle: 'Horizontal banner for Twitch panels & social headers',
     vibes: [
       { id: 'pro', name: 'Clean Minimalist', tagline: 'Professional desk flat-lay', icon: '🎯', gradient: 'from-slate-600 to-zinc-800' },
@@ -101,7 +101,7 @@ export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'starting-soon', name: 'Starting Soon', tagline: 'Pre-stream screen', category: 'stream',
     assetType: 'overlay', dimensions: '1920×1080', emoji: '⏳',
-    fields: [{ id: 'message', label: 'Message', type: 'text', placeholder: 'Starting in 5 min!' }],
+    fields: [], // All fields come from backend
     previewStyle: 'Full HD overlay for OBS/Streamlabs',
     vibes: [
       { id: 'pro', name: 'Command Center', tagline: 'Futuristic tech UI', icon: '🎯', gradient: 'from-slate-600 to-zinc-800' },
@@ -112,10 +112,7 @@ export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'clip-highlight', name: 'Clip Highlight', tagline: 'Share moments', category: 'social',
     assetType: 'clip_cover', dimensions: '1080×1080', emoji: '🎬',
-    fields: [
-      { id: 'title', label: 'Clip Title', type: 'text', placeholder: '1v5 Clutch', required: true },
-      { id: 'game', label: 'Game', type: 'text', placeholder: 'Valorant' },
-    ],
+    fields: [], // All fields come from backend
     previewStyle: 'Square format for Instagram, Twitter, Discord',
     vibes: [
       { id: 'pro', name: 'Action Freeze', tagline: 'High-impact action shot', icon: '💥', gradient: 'from-slate-600 to-zinc-800' },
@@ -126,12 +123,7 @@ export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'milestone', name: 'Milestone', tagline: 'Celebrate achievements', category: 'social',
     assetType: 'story_graphic', dimensions: '1080×1920', emoji: '🎉',
-    fields: [
-      { id: 'type', label: 'Type', type: 'select', required: true, options: [
-        { value: 'followers', label: 'Followers' }, { value: 'subs', label: 'Subscribers' }, { value: 'viewers', label: 'Peak Viewers' },
-      ]},
-      { id: 'count', label: 'Number', type: 'text', placeholder: '10,000', required: true },
-    ],
+    fields: [], // All fields come from backend
     previewStyle: 'Vertical celebration graphic for stories',
     vibes: [
       { id: 'pro', name: 'Golden Trophy', tagline: 'Luxury esports stage', icon: '🏆', gradient: 'from-amber-500 to-yellow-600' },
@@ -142,23 +134,17 @@ export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'thumbnail', name: 'YouTube Thumbnail', tagline: 'Video cover art', category: 'social',
     assetType: 'thumbnail', dimensions: '1280×720', emoji: '▶️',
-    fields: [
-      { id: 'title', label: 'Title', type: 'text', placeholder: 'I Hit Radiant!', required: true },
-      { id: 'subtitle', label: 'Subtitle', type: 'text', placeholder: 'After 500 hours...' },
-    ],
+    fields: [], // All fields come from backend
     previewStyle: 'Click-worthy thumbnail optimized for YouTube',
     vibes: THUMBNAIL_VIBES,
   },
   {
     id: 'emote', name: 'Custom Emote', tagline: 'Chat expression', category: 'twitch',
     assetType: 'twitch_emote', dimensions: '112×112', emoji: '😀',
+    // Frontend-only fields for platform/size selection (dimension selection)
+    // Backend fields (emotion, text, character_description, background_color, accent_color) are fetched dynamically
     fields: [
       { id: 'platform', label: 'Platform', type: 'select', required: true, options: EMOTE_PLATFORMS },
-      { id: 'emotion', label: 'Emotion', type: 'select', required: true, options: [
-        { value: 'hype', label: 'Hype' }, { value: 'sad', label: 'Sad' }, { value: 'laugh', label: 'Laugh' }, { value: 'love', label: 'Love' },
-        { value: 'comfy', label: 'Comfy' }, { value: 'rage', label: 'Rage' }, { value: 'pog', label: 'Pog' }, { value: 'gg', label: 'GG' },
-      ]},
-      { id: 'text', label: 'Text (optional)', type: 'text', placeholder: 'GG', maxLength: 10 },
       { id: 'size', label: 'Size', type: 'dynamic_select', required: true, dependsOn: 'platform', optionsMap: EMOTE_SIZES },
     ],
     previewStyle: 'Platform-ready emote, readable at all sizes', vibes: EMOTE_VIBES,
@@ -166,9 +152,7 @@ export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'panel', name: 'Channel Panel', tagline: 'Profile section', category: 'twitch',
     assetType: 'twitch_panel', dimensions: '320×160', emoji: '📋',
-    fields: [{ id: 'type', label: 'Panel Type', type: 'select', required: true, options: [
-      { value: 'about', label: 'About Me' }, { value: 'schedule', label: 'Schedule' }, { value: 'rules', label: 'Rules' }, { value: 'donate', label: 'Support' },
-    ]}],
+    fields: [], // All fields come from backend
     previewStyle: 'Twitch profile panel header',
     vibes: [
       { id: 'pro', name: 'Matte Hardware', tagline: 'Minimalist premium', icon: '🎮', gradient: 'from-slate-600 to-zinc-800' },
@@ -179,16 +163,25 @@ export const TEMPLATES: QuickTemplate[] = [
   {
     id: 'offline', name: 'Offline Screen', tagline: 'When away', category: 'twitch',
     assetType: 'twitch_offline', dimensions: '1920×1080', emoji: '📺',
-    fields: [
-      { id: 'message', label: 'Message', type: 'text', placeholder: 'Currently Offline' },
-      { id: 'schedule', label: 'Next Stream', type: 'text', placeholder: 'Back Monday 7PM' },
-    ],
+    fields: [], // All fields come from backend
     previewStyle: 'Full HD offline banner for Twitch channel',
     vibes: [
       { id: 'pro', name: 'Tech Glitch', tagline: 'Professional RGB effects', icon: '📡', gradient: 'from-slate-600 to-zinc-800' },
       { id: 'anime', name: 'Anime Away', tagline: 'Cute chibi waving', icon: '👋', gradient: 'from-primary-600 to-pink-600' },
       { id: 'playful', name: 'Cozy Desk', tagline: 'Moonlight ambiance', icon: '🌙', gradient: 'from-primary-600 to-primary-700' },
     ],
+  },
+  {
+    id: 'logo',
+    name: 'Logo / Avatar',
+    tagline: 'Brand identity',
+    category: 'branding',
+    assetType: 'logo',
+    dimensions: '512×512',
+    emoji: '🎨',
+    fields: [], // All fields come from backend
+    previewStyle: 'Square logo for Discord, Twitter, Twitch avatars',
+    vibes: LOGO_VIBES,
   },
 ];
 

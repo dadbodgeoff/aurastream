@@ -205,6 +205,10 @@ export type {
   CoachTipsResponse,
   CoachSessionStateResponse,
   CoachEndSessionResponse,
+  // Refinement types (multi-turn image editing)
+  RefineImageRequest,
+  RefineImageResponse,
+  RefinementUsageStatus,
 } from './types/coach';
 
 // Twitch type exports
@@ -740,6 +744,76 @@ export type {
   AllGamesIntelSummary,
 } from './hooks/useIntel';
 
+// Creator Media Library type exports
+export type {
+  MediaAssetType,
+  MediaAsset,
+  MediaSummary,
+  MediaForPrompt,
+  UploadMediaRequest,
+  UpdateMediaRequest,
+  ListMediaParams,
+  UploadMediaResponse,
+  ListMediaResponse,
+  MediaLibrarySummaryResponse,
+  DeleteMediaResponse,
+  BulkDeleteMediaResponse,
+  AssetTypesResponse,
+  SelectedMediaForGeneration,
+  LogoMetadata,
+  FaceMetadata,
+  CharacterMetadata,
+  GameSkinMetadata,
+  ObjectMetadata,
+  BackgroundMetadata,
+  ReferenceMetadata,
+  MediaAccessResponse,
+} from './types/creatorMedia';
+
+export {
+  MEDIA_ASSET_TYPES,
+  ASSET_TYPE_LABELS as MEDIA_ASSET_TYPE_LABELS,
+  ASSET_TYPE_DESCRIPTIONS as MEDIA_ASSET_TYPE_DESCRIPTIONS,
+  TOTAL_ASSET_LIMIT,
+  MAX_PROMPT_INJECTION_ASSETS,
+  ALLOWED_TIERS as MEDIA_ALLOWED_TIERS,
+  BG_REMOVAL_DEFAULT_TYPES,
+  BG_REMOVAL_EXCLUDED_TYPES,
+  shouldRemoveBackgroundByDefault,
+  canRemoveBackground,
+  serializePlacements,
+} from './types/creatorMedia';
+
+// Asset Placement type exports
+export type {
+  PositionAnchor,
+  SizeUnit,
+  AssetPosition,
+  AssetSize,
+  AssetPlacement,
+  SerializedPlacement,
+} from './types/creatorMedia';
+
+// Creator Media Library hooks exports
+export {
+  creatorMediaKeys,
+  useMediaAccess,
+  useMediaLibrary,
+  useInfiniteMediaLibrary,
+  useMediaAsset,
+  useMediaSummary,
+  useAssetTypes,
+  usePrimaryAsset,
+  useUploadMedia,
+  useUpdateMedia,
+  useDeleteMedia,
+  useBulkDeleteMedia,
+  useToggleFavorite,
+  useSetPrimary,
+  useMediaForPrompt,
+  useGetMediaForPrompt,
+} from './hooks/useCreatorMedia';
+
 // Trends type exports
 export type {
   DailyBrief,
@@ -879,3 +953,64 @@ export type {
   SortBy,
   SortOrder,
 } from './types/trends';
+
+
+// Intel V2 type exports (Creator Intel V2 - Enterprise Analytics)
+export type {
+  // Common types
+  IntelConfidence,
+  
+  // Content Format types
+  DurationBucket,
+  FormatComparison,
+  ContentFormatIntel,
+  
+  // Description types
+  HashtagAnalysis,
+  TimestampPattern,
+  SponsorPattern,
+  DescriptionIntel,
+  
+  // Semantic types
+  TopicCluster,
+  TagCluster as SemanticTagCluster,
+  SemanticIntel,
+  
+  // Regional types
+  LanguageMetrics,
+  RegionalIntel,
+  
+  // Live Stream types
+  PremiereAnalysis,
+  ScheduleTimeSlot,
+  DurationComparison,
+  LiveStreamIntel,
+  
+  // Combined types
+  CombinedIntel,
+  
+  // Health types
+  ComponentHealth,
+  IntelHealth,
+  
+  // Orchestrator types
+  TaskStatus,
+  QuotaStatus,
+  OrchestratorMetrics,
+  OrchestratorStatus,
+  IntelCategory,
+} from './hooks/useIntelV2';
+
+// Intel V2 hooks exports (Creator Intel V2 - Enterprise Analytics)
+export {
+  intelV2Keys,
+  useContentFormatIntel,
+  useDescriptionIntel,
+  useSemanticIntel,
+  useRegionalIntel,
+  useLiveStreamIntel,
+  useCombinedIntel,
+  useIntelHealth,
+  useOrchestratorStatus,
+  useIntelCategories,
+} from './hooks/useIntelV2';

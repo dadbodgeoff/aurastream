@@ -4,7 +4,7 @@
  */
 
 import type { AssetType, Platform } from './types';
-import type { LogoPosition, LogoSize } from '@aurastream/api-client';
+import type { LogoPosition, LogoSize, LogoType, BrandIntensity } from '@aurastream/api-client';
 
 export const ASSET_TYPES: AssetType[] = [
   // Thumbnails & Covers
@@ -25,6 +25,13 @@ export const ASSET_TYPES: AssetType[] = [
   // Twitch Specific
   { id: 'twitch_emote', label: 'Emote', description: 'Chat emotes', dimensions: '512×512', platform: ['twitch'], category: 'channel' },
   { id: 'twitch_badge', label: 'Badge', description: 'Sub badges', dimensions: '72×72', platform: ['twitch'], category: 'channel' },
+  
+  // TikTok Specific
+  { id: 'tiktok_emote', label: 'TikTok Emote', description: 'TikTok chat emotes', dimensions: '300×300', platform: ['tiktok'], category: 'channel' },
+  
+  // Profile & Branding
+  { id: 'profile_picture', label: 'Profile Picture', description: 'Profile avatar', dimensions: '400×400', platform: ['general', 'twitch', 'youtube', 'tiktok'], category: 'channel' },
+  { id: 'streamer_logo', label: 'Streamer Logo', description: 'Brand logo', dimensions: '512×512', platform: ['general'], category: 'channel' },
 ];
 
 export const PLATFORMS: { id: Platform; label: string; icon: string }[] = [
@@ -46,4 +53,18 @@ export const LOGO_SIZES: { id: LogoSize; label: string }[] = [
   { id: 'small', label: 'Small' },
   { id: 'medium', label: 'Medium' },
   { id: 'large', label: 'Large' },
+];
+
+export const LOGO_TYPES: { id: LogoType; label: string; description: string }[] = [
+  { id: 'primary', label: 'Primary', description: 'Full color logo' },
+  { id: 'secondary', label: 'Secondary', description: 'Alternative version' },
+  { id: 'icon', label: 'Icon Only', description: 'Symbol without text' },
+  { id: 'monochrome', label: 'Monochrome', description: 'Single color version' },
+  { id: 'watermark', label: 'Watermark', description: 'Subtle overlay' },
+];
+
+export const BRAND_INTENSITIES: { id: BrandIntensity; label: string; description: string }[] = [
+  { id: 'subtle', label: 'Subtle', description: 'Light brand presence' },
+  { id: 'balanced', label: 'Balanced', description: 'Moderate brand presence' },
+  { id: 'strong', label: 'Strong', description: 'Bold brand presence' },
 ];

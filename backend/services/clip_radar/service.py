@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict
 
-from backend.services.clip_radar.models import TrackedClip, ViralClip, CategoryClipStats
+from backend.services.clip_radar.models import TrackedClip, ViralClip, CategoryClipStats, PollResult
 from backend.services.clip_radar.constants import (
     TRACKED_CATEGORIES,
     CLIP_LOOKBACK_MINUTES,
@@ -67,6 +67,9 @@ class ClipRadarService:
         
         Returns:
             Dict mapping game_id to CategoryClipStats
+            
+        Note: Each CategoryClipStats now includes fetch_error and fetch_success
+        fields to distinguish API failures from legitimately empty results.
         """
         logger.info("Starting clip radar poll...")
         
@@ -75,6 +78,7 @@ class ClipRadarService:
         
         results: Dict[str, CategoryClipStats] = {}
         all_viral: List[ViralClip] = []
+        failed_categories: List[str] = []
         
         for game_id, game_name in TRACKED_CATEGORIES.items():
             try:
@@ -124,19 +128,36 @@ class ClipRadarService:
                     avg_velocity=avg_velocity,
                     top_clip=top_clip,
                     viral_clips=category_viral,
+                    fetch_error=None,
+                    fetch_success=True,
                 )
                 
                 logger.info(f"  {game_name}: {len(tracked_clips)} clips, {len(category_viral)} viral")
                 
             except Exception as e:
-                logger.error(f"Failed to poll clips for {game_name}: {e}")
+                error_msg = str(e)
+                logger.error(f"Failed to poll clips for {game_name}: {error_msg}")
+                failed_categories.append(game_id)
                 results[game_id] = CategoryClipStats(
                     game_id=game_id,
                     game_name=game_name,
                     total_clips=0,
                     total_views=0,
                     avg_velocity=0,
+                    fetch_error=error_msg,
+                    fetch_success=False,
                 )
+        
+        # Log summary with failure info
+        success_count = len(TRACKED_CATEGORIES) - len(failed_categories)
+        success_rate = success_count / len(TRACKED_CATEGORIES) * 100 if TRACKED_CATEGORIES else 0
+        
+        if failed_categories:
+            logger.warning(
+                f"Poll completed with {len(failed_categories)} failures: "
+                f"{', '.join(TRACKED_CATEGORIES.get(gid, gid) for gid in failed_categories)}. "
+                f"Success rate: {success_rate:.1f}%"
+            )
         
         # Update viral clips sorted set
         await self._update_viral_clips(all_viral)
@@ -144,7 +165,8 @@ class ClipRadarService:
         # Record poll timestamp
         self.redis.set(REDIS_LAST_POLL_KEY, now.isoformat())
         
-        # Track for daily recap
+        # Track for daily recap with error info
+        recap_error = None
         try:
             from backend.services.clip_radar.recap_service import get_recap_service
             recap_service = get_recap_service()
@@ -176,6 +198,8 @@ class ClipRadarService:
                     "avg_velocity": stats.avg_velocity,
                     "viral_clips": [clip_to_dict(c) for c in stats.viral_clips],
                     "top_clip": clip_to_dict(stats.top_clip),
+                    "fetch_error": stats.fetch_error,
+                    "fetch_success": stats.fetch_success,
                 }
                 for gid, stats in results.items()
             }
@@ -185,9 +209,24 @@ class ClipRadarService:
             
             await recap_service.track_poll_results(category_stats_dict, viral_clips_dicts)
         except Exception as e:
-            logger.warning(f"Failed to track poll for recap: {e}")
+            recap_error = str(e)
+            logger.warning(f"Failed to track poll for recap: {recap_error}")
         
-        logger.info(f"Clip radar poll complete. {len(all_viral)} viral clips detected.")
+        # Store poll metadata for monitoring
+        poll_metadata = {
+            "timestamp": now.isoformat(),
+            "total_categories": len(TRACKED_CATEGORIES),
+            "successful_categories": success_count,
+            "failed_categories": failed_categories,
+            "total_clips": sum(s.total_clips for s in results.values()),
+            "total_viral": len(all_viral),
+            "success_rate": success_rate,
+            "recap_tracked": recap_error is None,
+            "recap_error": recap_error,
+        }
+        self.redis.set(f"{REDIS_LAST_POLL_KEY}:metadata", json.dumps(poll_metadata))
+        
+        logger.info(f"Clip radar poll complete. {len(all_viral)} viral clips detected. Success rate: {success_rate:.1f}%")
         return results
     
     async def _process_clip(self, clip, game_name: str) -> TrackedClip:
@@ -424,11 +463,110 @@ class ClipRadarService:
             return datetime.fromisoformat(ts)
         return None
     
-    async def cleanup_old_data(self):
-        """Remove clip data older than TTL."""
-        # This would scan Redis and remove old entries
-        # For now, we rely on the fact that we only track recent clips
-        pass
+    async def cleanup_old_data(self, max_age_hours: int = None):
+        """
+        Remove clip data older than TTL from Redis.
+        
+        Args:
+            max_age_hours: Maximum age in hours (defaults to CLIP_TTL_HOURS)
+        """
+        if max_age_hours is None:
+            max_age_hours = CLIP_TTL_HOURS
+            
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(hours=max_age_hours)
+        
+        cleaned_count = 0
+        error_count = 0
+        
+        try:
+            # Get all clip IDs from the views hash
+            clip_ids = self.redis.hkeys(REDIS_CLIP_VIEWS_KEY)
+            
+            for clip_id in clip_ids:
+                try:
+                    # Get clip data to check age
+                    data_str = self.redis.hget(REDIS_CLIP_DATA_KEY, clip_id)
+                    if data_str:
+                        data = json.loads(data_str)
+                        first_seen = data.get("first_seen_at")
+                        if first_seen:
+                            first_seen_dt = datetime.fromisoformat(first_seen)
+                            if first_seen_dt < cutoff:
+                                # Remove from both hashes
+                                self.redis.hdel(REDIS_CLIP_VIEWS_KEY, clip_id)
+                                self.redis.hdel(REDIS_CLIP_DATA_KEY, clip_id)
+                                cleaned_count += 1
+                    else:
+                        # No data, remove orphaned view count
+                        self.redis.hdel(REDIS_CLIP_VIEWS_KEY, clip_id)
+                        cleaned_count += 1
+                        
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.warning(f"Error parsing clip data for {clip_id}: {e}")
+                    error_count += 1
+                    
+            logger.info(
+                f"Cleanup complete: removed {cleaned_count} old clips, "
+                f"{error_count} errors, {len(clip_ids) - cleaned_count - error_count} retained"
+            )
+            
+        except Exception as e:
+            logger.error(f"Cleanup failed: {e}")
+            raise
+    
+    def get_poll_health(self) -> Dict:
+        """
+        Get health status of the clip radar polling.
+        
+        Returns:
+            Dict with health metrics including last poll time, success rate, etc.
+        """
+        health = {
+            "status": "unknown",
+            "last_poll": None,
+            "last_poll_age_minutes": None,
+            "success_rate": None,
+            "failed_categories": [],
+            "recap_healthy": None,
+        }
+        
+        try:
+            # Get last poll time
+            last_poll = self.get_last_poll_time()
+            if last_poll:
+                health["last_poll"] = last_poll.isoformat()
+                age = (datetime.now(timezone.utc) - last_poll).total_seconds() / 60
+                health["last_poll_age_minutes"] = round(age, 1)
+            
+            # Get poll metadata
+            metadata_str = self.redis.get(f"{REDIS_LAST_POLL_KEY}:metadata")
+            if metadata_str:
+                metadata = json.loads(metadata_str)
+                health["success_rate"] = metadata.get("success_rate")
+                health["failed_categories"] = metadata.get("failed_categories", [])
+                health["recap_healthy"] = metadata.get("recap_tracked", False)
+                health["total_clips"] = metadata.get("total_clips", 0)
+                health["total_viral"] = metadata.get("total_viral", 0)
+            
+            # Determine overall status
+            if health["last_poll_age_minutes"] is None:
+                health["status"] = "no_data"
+            elif health["last_poll_age_minutes"] > 15:  # More than 3x poll interval
+                health["status"] = "stale"
+            elif health["success_rate"] is not None and health["success_rate"] < 50:
+                health["status"] = "degraded"
+            elif health["failed_categories"]:
+                health["status"] = "partial"
+            else:
+                health["status"] = "healthy"
+                
+        except Exception as e:
+            logger.error(f"Failed to get poll health: {e}")
+            health["status"] = "error"
+            health["error"] = str(e)
+        
+        return health
 
 
 # Singleton instance

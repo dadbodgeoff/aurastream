@@ -35,6 +35,7 @@ from backend.services.generation_service import (
 from backend.services.nano_banana_client import (
     get_nano_banana_client,
     GenerationRequest,
+    MediaAssetInput,
 )
 from backend.services.storage_service import get_storage_service
 from backend.services.logo_service import get_logo_service
@@ -66,6 +67,72 @@ TWITCH_EMOTE_SIZES = [112, 56, 28]
 def is_twitch_emote(asset_type: str) -> bool:
     """Check if asset type is a Twitch emote that needs multi-size processing."""
     return asset_type in {"twitch_emote", "twitch_emote_112"}
+
+
+async def download_media_assets(
+    placements: List[dict],
+    timeout: float = 30.0,
+) -> List[MediaAssetInput]:
+    """
+    Download media assets from their URLs for attachment to Nano Banana.
+    
+    Args:
+        placements: List of placement dictionaries containing asset URLs
+        timeout: HTTP timeout in seconds
+        
+    Returns:
+        List of MediaAssetInput objects with downloaded image data
+    """
+    import httpx
+    
+    media_assets = []
+    
+    # Sort by z_index for consistent ordering (matches prompt formatter)
+    sorted_placements = sorted(placements, key=lambda p: p.get('zIndex') or p.get('z_index', 1))
+    
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for placement in sorted_placements:
+            url = placement.get('url', '')
+            if not url:
+                logger.warning(f"Skipping placement with no URL: {placement.get('displayName', 'unknown')}")
+                continue
+            
+            try:
+                # Use processed_url (background removed) if available, otherwise original
+                processed_url = placement.get('processedUrl') or placement.get('processed_url')
+                fetch_url = processed_url if processed_url else url
+                
+                response = await client.get(fetch_url)
+                if response.status_code == 200:
+                    # Determine MIME type from response or default to PNG
+                    content_type = response.headers.get('content-type', 'image/png')
+                    if ';' in content_type:
+                        content_type = content_type.split(';')[0].strip()
+                    
+                    media_assets.append(MediaAssetInput(
+                        image_data=response.content,
+                        mime_type=content_type,
+                        asset_id=placement.get('assetId') or placement.get('asset_id', ''),
+                        display_name=placement.get('displayName') or placement.get('display_name', 'asset'),
+                        asset_type=placement.get('assetType') or placement.get('asset_type', 'image'),
+                    ))
+                    logger.info(
+                        f"Downloaded media asset: name={placement.get('displayName', 'unknown')}, "
+                        f"type={placement.get('assetType', 'unknown')}, "
+                        f"size={len(response.content)} bytes"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to download media asset: status={response.status_code}, "
+                        f"name={placement.get('displayName', 'unknown')}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Error downloading media asset: error={e}, "
+                    f"name={placement.get('displayName', 'unknown')}"
+                )
+    
+    return media_assets
 
 
 async def process_twitch_emote_sizes(
@@ -230,12 +297,36 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
             except Exception as e:
                 logger.warning(f"Error downloading reference thumbnail: {e}")
         
+        # Check if this is a refinement (multi-turn)
+        conversation_history = None
+        if job_params.get("is_refinement") and job_params.get("conversation_history"):
+            conversation_history = job_params["conversation_history"]
+            logger.info(f"Refinement mode: using conversation history with {len(conversation_history)} turns")
+        
+        # Download media assets if placements provided
+        # These will be attached to the Nano Banana request so the AI can see them
+        media_assets = None
+        if job_params.get("media_placements"):
+            logger.info(f"Downloading media assets for generation: job_id={job_id}")
+            try:
+                media_assets = await download_media_assets(job_params["media_placements"])
+                if media_assets:
+                    logger.info(
+                        f"Media assets downloaded: job_id={job_id}, "
+                        f"count={len(media_assets)}, "
+                        f"types={[a.asset_type for a in media_assets]}"
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to download media assets, continuing without: {e}")
+        
         generation_request = GenerationRequest(
             prompt=job.prompt, 
             width=width, 
             height=height,
             input_image=input_image,
-            input_mime_type="image/jpeg" if input_image else "image/png"
+            input_mime_type="image/jpeg" if input_image else "image/png",
+            conversation_history=conversation_history,
+            media_assets=media_assets,
         )
         generation_response = await nano_banana_client.generate(generation_request)
         
@@ -271,6 +362,11 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
             except Exception as e:
                 # Log but don't fail the job if logo compositing fails
                 logger.error(f"Logo compositing failed, continuing without logo: job_id={job_id}, error={e}")
+        
+        # NOTE: Media asset placement is now handled by Nano Banana directly.
+        # The assets are downloaded and attached to the generation request,
+        # and the prompt tells Nano Banana where to place them.
+        # The old PIL-based compositor has been removed.
         
         # Step 6 & 7: Process and upload assets
         # For Twitch emotes, create all 3 required sizes (112, 56, 28)
@@ -374,6 +470,15 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
                     }).execute()
                     
                     logger.info(f"Linked asset to coach session: asset_id={asset.id}, session_id={coach_session_id}")
+                    
+                    # Update session's gemini_history for multi-turn refinements
+                    await _update_session_gemini_history(
+                        session_id=coach_session_id,
+                        user_id=user_id,
+                        prompt=job.prompt,
+                        image_data=image_data,
+                        asset_id=asset.id,
+                    )
                 except Exception as e:
                     logger.warning(f"Failed to link asset to coach session: {e}")
         
@@ -433,6 +538,68 @@ async def _fail_job(generation_service, job_id: str, error_message: str) -> None
         )
     except Exception as e:
         logger.error(f"Failed to update job status: job_id={job_id}, error={str(e)}")
+
+
+async def _update_session_gemini_history(
+    session_id: str,
+    user_id: str,
+    prompt: str,
+    image_data: bytes,
+    asset_id: str,
+) -> None:
+    """
+    Update the coach session's gemini_history for multi-turn refinements.
+    
+    This stores the conversation context so future refinements can use
+    multi-turn without re-uploading the image.
+    
+    Args:
+        session_id: Coach session UUID
+        user_id: User ID for ownership verification
+        prompt: The prompt used for generation
+        image_data: The generated image bytes
+        asset_id: The created asset ID
+    """
+    import base64
+    
+    try:
+        from backend.services.coach import get_session_manager
+        
+        session_manager = get_session_manager()
+        session = await session_manager.get(session_id)
+        
+        if session is None or session.user_id != user_id:
+            logger.warning(f"Session not found for gemini history update: {session_id}")
+            return
+        
+        # Add the user prompt turn
+        session.gemini_history.append({
+            "role": "user",
+            "text": prompt,
+        })
+        
+        # Add the model response turn (with image)
+        # Store image as base64 for JSON serialization
+        image_b64 = base64.b64encode(image_data).decode()
+        session.gemini_history.append({
+            "role": "model",
+            "image_data": image_b64,
+            "image_mime_type": "image/png",
+        })
+        
+        # Update last generated asset ID
+        session.last_generated_asset_id = asset_id
+        
+        # Save the updated session
+        await session_manager._save(session)
+        
+        logger.info(
+            f"Updated session gemini history: session_id={session_id}, "
+            f"history_turns={len(session.gemini_history)}"
+        )
+        
+    except Exception as e:
+        logger.warning(f"Failed to update session gemini history: {e}")
 
 
 def process_generation_job_sync(job_id: str, user_id: str) -> dict:

@@ -16,9 +16,12 @@ This prevents hallucination while avoiding unnecessary searches.
 import json
 import re
 import hashlib
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, asdict
 from typing import Optional, List, Dict, Any
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class ConfidenceLevel(str, Enum):
@@ -54,6 +57,129 @@ class GroundingResult:
     context: str
     sources: List[str]
     query: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GroundingResult":
+        """Create from dictionary."""
+        return cls(
+            context=data["context"],
+            sources=data["sources"],
+            query=data["query"],
+        )
+
+
+class GroundingCache:
+    """Redis-backed cache for grounding search results."""
+    
+    # Game-specific TTLs in seconds
+    GAME_TTLS = {
+        "fortnite": 3600,       # 1 hour - updates frequently
+        "apex legends": 3600,
+        "valorant": 7200,       # 2 hours
+        "league of legends": 7200,
+        "overwatch": 7200,
+        "call of duty": 3600,
+        "warzone": 3600,
+        "minecraft": 86400,     # 24 hours - stable
+        "default": 7200,        # 2 hours default
+    }
+    
+    KEY_PREFIX = "grounding:cache:"
+    
+    def __init__(self, redis_client=None):
+        self._redis = redis_client
+    
+    @property
+    def redis(self):
+        if self._redis is None:
+            from backend.database.redis_client import get_redis_client
+            self._redis = get_redis_client()
+        return self._redis
+    
+    def _cache_key(self, game: str, query: str) -> str:
+        """Generate cache key from game and query."""
+        normalized_query = " ".join(query.lower().split())
+        query_hash = hashlib.sha256(normalized_query.encode()).hexdigest()[:16]
+        game_normalized = game.lower().replace(" ", "_")
+        return f"{self.KEY_PREFIX}{game_normalized}:{query_hash}"
+    
+    def _get_ttl(self, game: str) -> int:
+        """Get TTL for a game."""
+        game_lower = game.lower()
+        return self.GAME_TTLS.get(game_lower, self.GAME_TTLS["default"])
+    
+    async def get(self, game: str, query: str) -> Optional[GroundingResult]:
+        """Get cached grounding result."""
+        try:
+            cache_key = self._cache_key(game, query)
+            cached_data = await self.redis.get(cache_key)
+            
+            if cached_data is None:
+                logger.debug(f"Cache miss for game={game}, query_hash={cache_key[-16:]}")
+                return None
+            
+            data = json.loads(cached_data)
+            logger.debug(f"Cache hit for game={game}, query_hash={cache_key[-16:]}")
+            return GroundingResult.from_dict(data)
+            
+        except Exception as e:
+            # Cache errors should not break the flow
+            logger.warning(f"Cache get error: {e}")
+            return None
+    
+    async def set(self, game: str, query: str, result: GroundingResult) -> None:
+        """Cache a grounding result."""
+        try:
+            cache_key = self._cache_key(game, query)
+            ttl = self._get_ttl(game)
+            data = json.dumps(result.to_dict())
+            
+            await self.redis.setex(cache_key, ttl, data)
+            logger.debug(f"Cached grounding result for game={game}, ttl={ttl}s")
+            
+        except Exception as e:
+            # Cache errors should not break the flow
+            logger.warning(f"Cache set error: {e}")
+    
+    async def invalidate(self, game: str) -> int:
+        """Invalidate all cache entries for a game. Returns count deleted."""
+        try:
+            game_normalized = game.lower().replace(" ", "_")
+            pattern = f"{self.KEY_PREFIX}{game_normalized}:*"
+            
+            # Use SCAN to find matching keys
+            cursor = 0
+            deleted_count = 0
+            
+            while True:
+                cursor, keys = await self.redis.scan(cursor, match=pattern, count=100)
+                if keys:
+                    deleted_count += await self.redis.delete(*keys)
+                if cursor == 0:
+                    break
+            
+            logger.info(f"Invalidated {deleted_count} cache entries for game={game}")
+            return deleted_count
+            
+        except Exception as e:
+            logger.warning(f"Cache invalidate error: {e}")
+            return 0
+
+
+# Singleton instance for grounding cache
+_grounding_cache: Optional[GroundingCache] = None
+
+
+def get_grounding_cache(redis_client=None) -> GroundingCache:
+    """Get or create the grounding cache singleton."""
+    global _grounding_cache
+    if _grounding_cache is None or redis_client is not None:
+        _grounding_cache = GroundingCache(redis_client=redis_client)
+    return _grounding_cache
 
 
 class GroundingStrategy:
@@ -289,20 +415,37 @@ class GroundingOrchestrator:
     Orchestrates the grounding flow:
     1. Quick pattern check (skip obvious cases)
     2. LLM self-assessment (should I search?)
-    3. If yes: search, then answer with context
+    3. If yes: check cache first, then search if needed
     4. If no: answer directly
     """
     
-    def __init__(self, strategy: GroundingStrategy, search_service=None):
+    def __init__(self, strategy: GroundingStrategy, search_service=None, cache: Optional[GroundingCache] = None):
         """
         Initialize the orchestrator.
         
         Args:
             strategy: GroundingStrategy instance
             search_service: Web search service (optional)
+            cache: GroundingCache instance (optional, will use singleton if not provided)
         """
         self.strategy = strategy
         self.search = search_service
+        self._cache = cache
+    
+    @property
+    def cache(self) -> GroundingCache:
+        """Get the grounding cache (lazy initialization)."""
+        if self._cache is None:
+            self._cache = get_grounding_cache()
+        return self._cache
+    
+    def _extract_game_from_query(self, query: str) -> str:
+        """Extract game name from query for cache key."""
+        query_lower = query.lower()
+        for game in GroundingStrategy.FREQUENTLY_UPDATING_GAMES:
+            if game in query_lower:
+                return game
+        return "default"
     
     async def process_with_grounding(
         self,
@@ -328,12 +471,26 @@ class GroundingOrchestrator:
             "search_results": None,
             "assessment": decision.assessment,
             "reason": decision.reason,
+            "cache_hit": False,
         }
         
         if not decision.should_ground:
             return result
         
-        # Step 2: Perform search if we have a search service
+        # Step 2: Check cache first
+        if decision.query:
+            game = self._extract_game_from_query(decision.query)
+            cached_result = await self.cache.get(game, decision.query)
+            
+            if cached_result is not None:
+                logger.debug(f"Using cached grounding result for query: {decision.query}")
+                result["grounded"] = True
+                result["search_query"] = decision.query
+                result["search_results"] = cached_result.context
+                result["cache_hit"] = True
+                return result
+        
+        # Step 3: Perform search if we have a search service
         if decision.query and self.search is not None:
             try:
                 search_results = await self.search.search(
@@ -342,12 +499,26 @@ class GroundingOrchestrator:
                 )
                 
                 if search_results:
+                    formatted_results = self._format_results(search_results)
+                    sources = [getattr(r, 'url', str(r)) for r in search_results[:3]]
+                    
                     result["grounded"] = True
                     result["search_query"] = decision.query
-                    result["search_results"] = self._format_results(search_results)
-            except Exception:
+                    result["search_results"] = formatted_results
+                    
+                    # Cache the result
+                    game = self._extract_game_from_query(decision.query)
+                    grounding_result = GroundingResult(
+                        context=formatted_results,
+                        sources=sources,
+                        query=decision.query,
+                    )
+                    await self.cache.set(game, decision.query, grounding_result)
+                    logger.debug(f"Cached new grounding result for query: {decision.query}")
+                    
+            except Exception as e:
                 # Search failed, continue without grounding
-                pass
+                logger.warning(f"Search failed: {e}")
         
         return result
     
@@ -376,7 +547,8 @@ def get_grounding_strategy(llm_client=None) -> GroundingStrategy:
 
 def get_grounding_orchestrator(
     strategy: Optional[GroundingStrategy] = None,
-    search_service=None
+    search_service=None,
+    cache: Optional[GroundingCache] = None,
 ) -> GroundingOrchestrator:
     """
     Get or create the grounding orchestrator singleton.
@@ -397,6 +569,7 @@ def get_grounding_orchestrator(
         _grounding_orchestrator = GroundingOrchestrator(
             strategy=strategy or get_grounding_strategy(),
             search_service=search_service,
+            cache=cache,
         )
     return _grounding_orchestrator
 
@@ -406,8 +579,10 @@ __all__ = [
     "GroundingAssessment",
     "GroundingDecision",
     "GroundingResult",
+    "GroundingCache",
     "GroundingStrategy",
     "GroundingOrchestrator",
     "get_grounding_strategy",
     "get_grounding_orchestrator",
+    "get_grounding_cache",
 ]

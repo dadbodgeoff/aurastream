@@ -186,6 +186,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         game_id: Optional[str] = None,
         game_name: Optional[str] = None,
         tier: str = "studio",
+        preferences: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Start a creative director session with pre-loaded context.
@@ -203,6 +204,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             game_id: Optional game ID
             game_name: Optional game name
             tier: User's subscription tier
+            preferences: Optional coach preferences (verbosity, style, etc.)
             
         Yields:
             StreamChunk objects with tokens, intent_ready status, etc.
@@ -252,6 +254,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             mood=mood,
             custom_mood=custom_mood,
             game_context=game_context,
+            preferences=preferences,
         )
         
         # Create session with context
@@ -592,8 +595,9 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         mood: str,
         custom_mood: Optional[str],
         game_context: str,
+        preferences: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """Build system prompt for creative director mode."""
+        """Build system prompt for creative director mode with optional preferences."""
         colors = brand_context.get("colors", [])
         color_list = ", ".join([
             f"{c.get('name', 'Color')} ({c.get('hex', '#000000')})"
@@ -614,6 +618,12 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             color_list=color_list,
         )
         
+        # Apply preferences to modify coach behavior
+        if preferences:
+            pref_additions = self._build_preference_instructions(preferences)
+            if pref_additions:
+                system_prompt = system_prompt + "\n\n" + pref_additions
+        
         # Log the system prompt for debugging
         prompt_logger.info(
             "=== COACH SYSTEM PROMPT ===\n"
@@ -622,11 +632,45 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             f"Colors: {color_list}\n"
             f"Mood: {mood_section}\n"
             f"Game Context: {game_section}\n"
+            f"Preferences: {preferences}\n"
             f"Full System Prompt:\n{system_prompt}\n"
             "=== END SYSTEM PROMPT ==="
         )
         
         return system_prompt
+    
+    def _build_preference_instructions(self, preferences: Dict[str, Any]) -> str:
+        """Build additional instructions based on user preferences."""
+        instructions = []
+        
+        verbosity = preferences.get("verbosity", "balanced")
+        if verbosity == "concise":
+            instructions.append("Keep responses very brief - 1-2 sentences max.")
+        elif verbosity == "detailed":
+            instructions.append("Provide detailed explanations and multiple suggestions.")
+        
+        style = preferences.get("style", "friendly")
+        if style == "professional":
+            instructions.append("Use a professional, business-like tone.")
+        elif style == "creative":
+            instructions.append("Be creative and enthusiastic in your suggestions.")
+        elif style == "technical":
+            instructions.append("Focus on technical details and specific terminology.")
+        # friendly is the default, no extra instruction needed
+        
+        emoji_level = preferences.get("emoji_level", "normal")
+        if emoji_level == "none":
+            instructions.append("Do not use any emojis.")
+        elif emoji_level == "minimal":
+            instructions.append("Use emojis sparingly - only for key moments.")
+        
+        if not preferences.get("show_tips", True):
+            instructions.append("Skip tips and focus only on the task at hand.")
+        
+        if not preferences.get("auto_suggest", True):
+            instructions.append("Only respond to what the user asks - don't proactively suggest changes.")
+        
+        return " ".join(instructions) if instructions else ""
     
     def _build_system_prompt_from_session(self, session: CoachSession) -> str:
         """Rebuild system prompt from session data."""

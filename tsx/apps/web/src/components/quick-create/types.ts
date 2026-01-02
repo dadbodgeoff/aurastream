@@ -2,7 +2,7 @@
  * Quick Create - Type Definitions
  */
 
-export type TemplateCategory = 'all' | 'stream' | 'social' | 'twitch';
+export type TemplateCategory = 'all' | 'stream' | 'social' | 'twitch' | 'branding';
 export type WizardStep = 'select' | 'customize' | 'review';
 
 /** Vibe preset identifiers - maps to backend YAML vibes */
@@ -28,6 +28,9 @@ export interface TemplateField {
   optionsMap?: Record<string, { value: string; label: string }[]>;
   /** Only show this field when one of these vibes is selected */
   showForVibes?: string[];
+  /** Color presets for color picker fields */
+  presets?: { label: string; value: string; category?: string }[];
+  showPresets?: boolean;
 }
 
 /** Vibe option shown to user (no prompt exposed) */
@@ -43,7 +46,7 @@ export interface QuickTemplate {
   id: string;
   name: string;
   tagline: string;
-  category: 'stream' | 'social' | 'twitch';
+  category: 'stream' | 'social' | 'twitch' | 'branding';
   assetType: string;
   dimensions: string;
   emoji: string;

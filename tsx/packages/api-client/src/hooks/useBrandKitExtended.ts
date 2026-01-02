@@ -4,6 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../client';
 import type {
   ColorPaletteInput,
   ColorPaletteResponseData,
@@ -30,8 +31,7 @@ const API_BASE = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_
   : 'http://localhost:8000';
 
 function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('access_token');
+  return apiClient.getAccessToken();
 }
 
 // ============================================================================

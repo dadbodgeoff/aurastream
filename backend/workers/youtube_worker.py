@@ -281,7 +281,7 @@ async def fetch_all_trending() -> dict:
         }
         
     finally:
-        await redis_client.close()
+        await redis_client.aclose()
         await collector.close()
 
 
@@ -306,7 +306,7 @@ async def fetch_all_games(force: bool = False) -> dict:
     quota_today = await _get_quota_used_today(redis_client)
     if quota_today > 8500:
         logger.warning(f"Quota usage high ({quota_today}/10000). Skipping game fetch.")
-        await redis_client.close()
+        await redis_client.aclose()
         return {
             "status": "skipped",
             "reason": "quota_limit",
@@ -343,7 +343,7 @@ async def fetch_all_games(force: bool = False) -> dict:
         }
         
     finally:
-        await redis_client.close()
+        await redis_client.aclose()
         await collector.close()
 
 
@@ -364,7 +364,7 @@ async def get_cached_trending(category: TrendCategory) -> Optional[dict]:
         return None
         
     finally:
-        await redis_client.close()
+        await redis_client.aclose()
 
 
 async def get_cached_game_videos(game_key: str) -> Optional[dict]:
@@ -385,7 +385,7 @@ async def get_cached_game_videos(game_key: str) -> Optional[dict]:
         return None
         
     finally:
-        await redis_client.close()
+        await redis_client.aclose()
 
 
 async def get_quota_status() -> dict:
@@ -403,7 +403,7 @@ async def get_quota_status() -> dict:
         }
         
     finally:
-        await redis_client.close()
+        await redis_client.aclose()
 
 
 # ============================================================================

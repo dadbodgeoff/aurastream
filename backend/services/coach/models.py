@@ -84,6 +84,7 @@ class CoachSession:
     - Token usage for billing
     - Prompt evolution history
     - Grounding call tracking
+    - Multi-turn image refinement history
     
     Sessions are stored in Redis with TTL for automatic expiration.
     """
@@ -117,6 +118,12 @@ class CoachSession:
     
     # Generic metadata for extensions (e.g., profile creator)
     metadata: Optional[Dict[str, Any]] = None
+    
+    # NEW: Multi-turn image refinement support
+    # Stores Gemini conversation history for cheaper refinements
+    gemini_history: List[Dict[str, Any]] = field(default_factory=list)
+    refinements_used: int = 0
+    last_generated_asset_id: Optional[str] = None
     
     # Timestamps
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
@@ -235,6 +242,10 @@ class CoachSession:
             "current_prompt_draft": self.current_prompt_draft,
             "brand_aesthetic": self.brand_aesthetic,
             "metadata": self.metadata,
+            # Multi-turn refinement fields
+            "gemini_history": self.gemini_history,
+            "refinements_used": self.refinements_used,
+            "last_generated_asset_id": self.last_generated_asset_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -276,6 +287,10 @@ class CoachSession:
             current_prompt_draft=data.get("current_prompt_draft"),
             brand_aesthetic=data.get("brand_aesthetic"),
             metadata=data.get("metadata"),
+            # Multi-turn refinement fields
+            gemini_history=data.get("gemini_history", []),
+            refinements_used=data.get("refinements_used", 0),
+            last_generated_asset_id=data.get("last_generated_asset_id"),
             created_at=data.get("created_at", datetime.now().timestamp()),
             updated_at=data.get("updated_at", datetime.now().timestamp()),
         )

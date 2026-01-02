@@ -50,7 +50,13 @@ export interface GenerateOptions {
   brandKitId?: string;
   /** Custom prompt for generation */
   customPrompt?: string;
+  /** Media asset IDs to inject (max 2) */
+  mediaAssetIds?: string[];
+  /** Media asset placements with precise positioning */
+  mediaAssetPlacements?: SerializedPlacement[];
 }
+
+import type { SerializedPlacement } from '@aurastream/api-client';
 
 /**
  * Generation status states
@@ -290,6 +296,9 @@ export function useInlineGeneration(
         assetType: generateOptions.assetType,
         brandKitId: generateOptions.brandKitId,
         customPrompt: generateOptions.customPrompt,
+        // Pass media assets if provided
+        mediaAssetIds: generateOptions.mediaAssetIds,
+        mediaAssetPlacements: generateOptions.mediaAssetPlacements,
       });
 
       if (!isMountedRef.current) {

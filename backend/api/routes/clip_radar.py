@@ -95,6 +95,43 @@ class RadarStatusResponse(BaseModel):
     category_list: List[dict]
 
 
+class RadarHealthResponse(BaseModel):
+    """Clip radar health status."""
+    status: str = Field(description="Health status: healthy, partial, degraded, stale, no_data, error")
+    last_poll: Optional[str] = None
+    last_poll_age_minutes: Optional[float] = None
+    success_rate: Optional[float] = None
+    failed_categories: List[str] = []
+    recap_healthy: Optional[bool] = None
+    total_clips: Optional[int] = None
+    total_viral: Optional[int] = None
+    error: Optional[str] = None
+
+
+class CategoryStatsWithErrorResponse(BaseModel):
+    """Category stats including error tracking."""
+    game_id: str
+    game_name: str
+    total_clips: int
+    total_views: int
+    avg_velocity: float
+    viral_count: int
+    fetch_success: bool = True
+    fetch_error: Optional[str] = None
+
+
+class PollResultResponse(BaseModel):
+    """Result of a poll operation with error tracking."""
+    success: bool
+    message: str
+    categories: int
+    total_clips: int
+    viral_clips: int
+    success_rate: float
+    failed_categories: List[str] = []
+    by_category: List[CategoryStatsWithErrorResponse]
+
+
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -240,43 +277,78 @@ async def get_radar_status():
     )
 
 
-@router.post("/poll")
+@router.post("/poll", response_model=PollResultResponse)
 async def trigger_poll():
     """
     Manually trigger a clip radar poll.
     
     Normally runs automatically every 5 minutes via background worker.
     Use this for testing or to force an immediate update.
+    
+    Returns detailed results including any failed categories.
     """
     service = get_clip_radar_service()
     
     try:
         results = await service.poll_clips()
         
-        # Summarize results
+        # Summarize results with error tracking
         total_clips = sum(r.total_clips for r in results.values())
         total_viral = sum(len(r.viral_clips) for r in results.values())
+        failed_categories = [gid for gid, stats in results.items() if not stats.fetch_success]
+        success_count = len(results) - len(failed_categories)
+        success_rate = success_count / len(results) * 100 if results else 0
         
-        return {
-            "success": True,
-            "message": f"Poll complete. {total_clips} clips scanned, {total_viral} viral detected.",
-            "categories": len(results),
-            "total_clips": total_clips,
-            "viral_clips": total_viral,
-            "by_category": [
-                {
-                    "game_id": gid,
-                    "game_name": stats.game_name,
-                    "clips": stats.total_clips,
-                    "viral": len(stats.viral_clips),
-                    "avg_velocity": round(stats.avg_velocity, 2),
-                }
+        return PollResultResponse(
+            success=len(failed_categories) == 0,
+            message=f"Poll complete. {total_clips} clips scanned, {total_viral} viral detected. "
+                    f"Success rate: {success_rate:.1f}%",
+            categories=len(results),
+            total_clips=total_clips,
+            viral_clips=total_viral,
+            success_rate=success_rate,
+            failed_categories=failed_categories,
+            by_category=[
+                CategoryStatsWithErrorResponse(
+                    game_id=gid,
+                    game_name=stats.game_name,
+                    total_clips=stats.total_clips,
+                    total_views=stats.total_views,
+                    avg_velocity=round(stats.avg_velocity, 2),
+                    viral_count=len(stats.viral_clips),
+                    fetch_success=stats.fetch_success,
+                    fetch_error=stats.fetch_error,
+                )
                 for gid, stats in results.items()
             ],
-        }
+        )
     except Exception as e:
         logger.error(f"Poll failed: {e}")
         raise HTTPException(status_code=500, detail=f"Poll failed: {str(e)}")
+
+
+@router.get("/health", response_model=RadarHealthResponse)
+async def get_radar_health():
+    """
+    Get clip radar health status.
+    
+    Returns detailed health metrics including:
+    - Last poll time and age
+    - Success rate of last poll
+    - Failed categories
+    - Recap tracking status
+    
+    Status values:
+    - healthy: All systems operational
+    - partial: Some categories failed but majority succeeded
+    - degraded: Less than 50% success rate
+    - stale: Last poll was more than 15 minutes ago
+    - no_data: No poll data available
+    - error: Error retrieving health status
+    """
+    service = get_clip_radar_service()
+    health = service.get_poll_health()
+    return RadarHealthResponse(**health)
 
 
 @router.get("/categories")
@@ -291,6 +363,29 @@ async def get_tracked_categories():
         ],
         "total": len(TRACKED_CATEGORIES),
     }
+
+
+@router.post("/cleanup")
+async def trigger_cleanup(
+    max_age_hours: int = Query(24, ge=1, le=168, description="Maximum age in hours for data to keep"),
+):
+    """
+    Manually trigger cleanup of old clip data from Redis.
+    
+    Removes clip tracking data older than the specified age.
+    This helps prevent Redis memory from growing unbounded.
+    """
+    service = get_clip_radar_service()
+    
+    try:
+        await service.cleanup_old_data(max_age_hours=max_age_hours)
+        return {
+            "success": True,
+            "message": f"Cleanup complete. Removed data older than {max_age_hours} hours.",
+        }
+    except Exception as e:
+        logger.error(f"Cleanup failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 
 # =============================================================================

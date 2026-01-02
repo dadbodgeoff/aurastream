@@ -69,3 +69,17 @@ class CategoryClipStats:
     avg_velocity: float
     top_clip: Optional[TrackedClip] = None
     viral_clips: List[ViralClip] = field(default_factory=list)
+    # Error tracking for silent failure detection
+    fetch_error: Optional[str] = None  # Error message if fetch failed
+    fetch_success: bool = True  # False if API call failed
+
+
+@dataclass
+class PollResult:
+    """Result of a complete poll operation with error tracking."""
+    category_stats: dict  # game_id -> CategoryClipStats
+    total_clips: int
+    total_viral: int
+    failed_categories: List[str]  # game_ids that failed
+    success_rate: float  # percentage of categories that succeeded
+    poll_timestamp: datetime = field(default_factory=lambda: datetime.now(__import__('datetime').timezone.utc))

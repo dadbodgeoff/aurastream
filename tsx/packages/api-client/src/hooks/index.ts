@@ -152,3 +152,23 @@ export {
   useUnfollowUser,
   useReportPost,
 } from './useCommunity';
+
+// Creator Media Library hooks
+export {
+  creatorMediaKeys,
+  useMediaAccess,
+  useMediaLibrary,
+  useInfiniteMediaLibrary,
+  useMediaAsset,
+  useMediaSummary,
+  useAssetTypes,
+  usePrimaryAsset,
+  useUploadMedia,
+  useUpdateMedia,
+  useDeleteMedia,
+  useBulkDeleteMedia,
+  useToggleFavorite,
+  useSetPrimary,
+  useMediaForPrompt,
+  useGetMediaForPrompt,
+} from './useCreatorMedia';

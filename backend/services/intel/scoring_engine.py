@@ -65,7 +65,7 @@ class ScoringEngine:
     async def close(self) -> None:
         """Close Redis connection and clear caches."""
         if self._redis:
-            await self._redis.close()
+            await self._redis.aclose()
             self._redis = None
         self._stats_cache.clear()
     

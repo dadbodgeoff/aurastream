@@ -3,7 +3,11 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { ChevronLeftIcon, CheckIcon, ImageIcon } from '../icons';
+import { MediaAssetPicker } from '../../media-library/MediaAssetPicker';
+import { ColorPickerField } from '../ColorPickerField';
 import type { QuickTemplate, VibeOption } from '../types';
+import type { MediaAsset } from '@aurastream/api-client';
+import type { AssetPlacement } from '../../media-library/placement';
 
 interface CustomizeFormProps {
   template: QuickTemplate;
@@ -21,14 +25,36 @@ interface CustomizeFormProps {
   onLogoPositionChange: (v: string) => void;
   logoSize: string;
   onLogoSizeChange: (v: string) => void;
+  logoType?: string;
+  onLogoTypeChange?: (v: string) => void;
+  brandIntensity?: string;
+  onBrandIntensityChange?: (v: string) => void;
   isFormValid: boolean;
   onBack: () => void;
   onNext: () => void;
   isLoading: boolean;
+  // Media Library integration (optional)
+  selectedMediaAssets?: MediaAsset[];
+  onMediaAssetsChange?: (assets: MediaAsset[]) => void;
+  // Asset placements (optional)
+  mediaAssetPlacements?: AssetPlacement[];
+  onMediaAssetPlacementsChange?: (placements: AssetPlacement[]) => void;
 }
 
 const LOGO_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'];
 const LOGO_SIZES = ['small', 'medium', 'large'];
+const LOGO_TYPES = [
+  { id: 'primary', label: 'Primary' },
+  { id: 'secondary', label: 'Secondary' },
+  { id: 'icon', label: 'Icon' },
+  { id: 'monochrome', label: 'Mono' },
+  { id: 'watermark', label: 'Watermark' },
+];
+const BRAND_INTENSITIES = [
+  { id: 'subtle', label: 'Subtle' },
+  { id: 'balanced', label: 'Balanced' },
+  { id: 'strong', label: 'Strong' },
+];
 
 function VibeCard({ vibe, selected, onClick, compact }: { vibe: VibeOption; selected: boolean; onClick: () => void; compact?: boolean }) {
   return (
@@ -72,7 +98,11 @@ export function CustomizeForm(props: CustomizeFormProps) {
     selectedVibe, onVibeChange,
     brandKits, selectedBrandKitId, onBrandKitChange,
     includeLogo, onIncludeLogoChange, hasLogo, logoPosition, onLogoPositionChange,
-    logoSize, onLogoSizeChange, isFormValid, onBack, onNext, isLoading 
+    logoSize, onLogoSizeChange, logoType = 'primary', onLogoTypeChange,
+    brandIntensity = 'balanced', onBrandIntensityChange,
+    isFormValid, onBack, onNext, isLoading,
+    selectedMediaAssets = [], onMediaAssetsChange,
+    mediaAssetPlacements = [], onMediaAssetPlacementsChange,
   } = props;
 
   const hasLotsOfVibes = template.vibes.length > 6;
@@ -133,6 +163,26 @@ export function CustomizeForm(props: CustomizeFormProps) {
                 if (field.type === 'dynamic_select' && field.dependsOn && field.optionsMap) {
                   const parentValue = formValues[field.dependsOn] || '';
                   options = field.optionsMap[parentValue] || [];
+                }
+                
+                // Handle color picker fields
+                if (field.type === 'color') {
+                  return (
+                    <div key={field.id}>
+                      <label className="block text-micro font-medium text-text-secondary mb-1">
+                        {field.label}
+                        {field.required && <span className="text-error-light ml-0.5">*</span>}
+                      </label>
+                      <ColorPickerField
+                        value={formValues[field.id] || field.default || ''}
+                        onChange={(color) => onFieldChange(field.id, color)}
+                        presets={field.presets}
+                      />
+                      {field.hint && (
+                        <p className="text-micro text-text-muted mt-0.5">{field.hint}</p>
+                      )}
+                    </div>
+                  );
                 }
                 
                 return (
@@ -235,8 +285,33 @@ export function CustomizeForm(props: CustomizeFormProps) {
 
           {/* Logo Options - Compact */}
           {selectedBrandKitId && (
-            <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
-              <div className="flex items-center justify-between">
+            <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle space-y-2">
+              {/* Brand Intensity */}
+              {onBrandIntensityChange && (
+                <div>
+                  <label className="block text-micro font-medium text-text-secondary mb-1">Brand Intensity</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {BRAND_INTENSITIES.map(i => (
+                      <button
+                        key={i.id}
+                        type="button"
+                        onClick={() => onBrandIntensityChange(i.id)}
+                        className={cn(
+                          "px-2 py-1.5 text-xs rounded-lg border transition-all",
+                          brandIntensity === i.id
+                            ? "border-interactive-600 bg-interactive-600/10 text-text-primary"
+                            : "border-border-subtle text-text-secondary hover:border-border-default"
+                        )}
+                      >
+                        {i.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Logo Toggle */}
+              <div className="flex items-center justify-between pt-1">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-background-elevated rounded flex items-center justify-center text-text-muted"><ImageIcon /></div>
                   <span className="text-xs font-medium text-text-primary">Include Logo</span>
@@ -251,21 +326,64 @@ export function CustomizeForm(props: CustomizeFormProps) {
                 </button>
               </div>
               {includeLogo && hasLogo && (
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div>
-                    <label className="block text-micro font-medium text-text-secondary mb-1">Position</label>
-                    <select value={logoPosition} onChange={(e) => onLogoPositionChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
-                      {LOGO_POSITIONS.map(p => <option key={p} value={p}>{p.replace('-', ' ')}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-micro font-medium text-text-secondary mb-1">Size</label>
-                    <select value={logoSize} onChange={(e) => onLogoSizeChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
-                      {LOGO_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                <div className="space-y-2 pt-1">
+                  {/* Logo Type */}
+                  {onLogoTypeChange && (
+                    <div>
+                      <label className="block text-micro font-medium text-text-secondary mb-1">Logo Type</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {LOGO_TYPES.slice(0, 3).map(t => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => onLogoTypeChange(t.id)}
+                            className={cn(
+                              "px-2 py-1 text-xs rounded border transition-all",
+                              logoType === t.id
+                                ? "border-interactive-600 bg-interactive-600/10 text-text-primary"
+                                : "border-border-subtle text-text-secondary hover:border-border-default"
+                            )}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Position & Size */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-micro font-medium text-text-secondary mb-1">Position</label>
+                      <select value={logoPosition} onChange={(e) => onLogoPositionChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
+                        {LOGO_POSITIONS.map(p => <option key={p} value={p}>{p.replace('-', ' ')}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-micro font-medium text-text-secondary mb-1">Size</label>
+                      <select value={logoSize} onChange={(e) => onLogoSizeChange(e.target.value)} className="w-full px-2 py-1.5 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary">
+                        {LOGO_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Your Assets - Optional (Pro/Studio) */}
+          {onMediaAssetsChange && (
+            <div className="p-2.5 bg-background-surface rounded-lg border border-border-subtle">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-semibold text-text-primary">Your Assets</h3>
+                <span className="text-micro text-text-muted">Optional</span>
+              </div>
+              <MediaAssetPicker
+                selectedAssets={selectedMediaAssets}
+                onSelectionChange={onMediaAssetsChange}
+                placements={mediaAssetPlacements}
+                onPlacementsChange={onMediaAssetPlacementsChange}
+                assetType={template.assetType}
+              />
             </div>
           )}
         </div>

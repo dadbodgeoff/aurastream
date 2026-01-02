@@ -27,6 +27,13 @@ class FieldOption(BaseModel):
     value: str
 
 
+class ColorPreset(BaseModel):
+    """Color preset for color picker fields."""
+    label: str
+    value: str
+    category: Optional[str] = None
+
+
 class TemplateField(BaseModel):
     """Field definition for a template."""
     id: str
@@ -40,6 +47,9 @@ class TemplateField(BaseModel):
     options: Optional[list[FieldOption]] = None
     default: Optional[str] = None
     show_for_vibes: Optional[list[str]] = None
+    # For color type fields
+    presets: Optional[list[ColorPreset]] = None
+    show_presets: Optional[bool] = None
 
 
 class VibeOption(BaseModel):
@@ -128,6 +138,18 @@ def load_template_meta(template_id: str) -> Optional[TemplateMeta]:
                     # Simple string option
                     options.append(FieldOption(label=str(opt), value=str(opt)))
             field.options = options
+        
+        # Handle color presets
+        if 'presets' in placeholder:
+            presets = []
+            for preset in placeholder['presets']:
+                presets.append(ColorPreset(
+                    label=preset.get('label', ''),
+                    value=preset.get('value', ''),
+                    category=preset.get('category'),
+                ))
+            field.presets = presets
+            field.show_presets = placeholder.get('show_presets', True)
         
         fields.append(field)
     

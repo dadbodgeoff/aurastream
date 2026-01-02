@@ -23,7 +23,7 @@ from datetime import datetime
 from backend.database.supabase_client import get_supabase_client
 
 
-FeatureType = Literal["vibe_branding", "aura_lab", "coach", "creations", "profile_creator"]
+FeatureType = Literal["vibe_branding", "aura_lab", "coach", "creations", "profile_creator", "refinements"]
 
 
 # Tier limits (mirrored from SQL for reference)
@@ -34,6 +34,7 @@ TIER_LIMITS = {
         "coach": 1,
         "creations": 3,
         "profile_creator": 1,
+        "refinements": 0,  # Free users can't refine
     },
     "pro": {
         "vibe_branding": 10,
@@ -41,6 +42,7 @@ TIER_LIMITS = {
         "coach": -1,  # unlimited (counted in creations)
         "creations": 50,
         "profile_creator": 5,
+        "refinements": 5,  # 5 free refinements/month, then counts as creation
     },
     "studio": {
         "vibe_branding": 10,
@@ -48,6 +50,7 @@ TIER_LIMITS = {
         "coach": -1,
         "creations": 50,
         "profile_creator": 10,
+        "refinements": -1,  # Unlimited refinements
     },
     "unlimited": {
         "vibe_branding": -1,  # -1 = unlimited
@@ -55,6 +58,7 @@ TIER_LIMITS = {
         "coach": -1,
         "creations": -1,
         "profile_creator": -1,
+        "refinements": -1,
     },
 }
 
@@ -88,6 +92,7 @@ class UsageStatus:
     coach: FeatureUsage
     creations: FeatureUsage
     profile_creator: FeatureUsage
+    refinements: FeatureUsage
     resets_at: Optional[datetime] = None
 
 
@@ -260,6 +265,7 @@ class UsageLimitService:
                 coach=self._parse_feature(data.get("coach", {})),
                 creations=self._parse_feature(data.get("creations", {})),
                 profile_creator=self._parse_feature(data.get("profile_creator", {})),
+                refinements=self._parse_feature(data.get("refinements", {})),
                 resets_at=resets_at,
             )
         except Exception as e:
@@ -285,6 +291,7 @@ class UsageLimitService:
             coach=FeatureUsage(0, limits["coach"], limits["coach"]),
             creations=FeatureUsage(0, limits["creations"], limits["creations"]),
             profile_creator=FeatureUsage(0, limits["profile_creator"], limits["profile_creator"]),
+            refinements=FeatureUsage(0, limits["refinements"], limits["refinements"]),
         )
     
     def get_limits_for_tier(self, tier: str) -> dict:

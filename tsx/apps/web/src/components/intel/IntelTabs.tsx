@@ -12,10 +12,11 @@ import {
   FolderOpen,
   UserCircle,
   Palette,
+  Library,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type IntelTab = 'brief' | 'thumbnails' | 'panels' | 'observatory' | 'create' | 'aura-lab' | 'assets' | 'logos' | 'brand-kits';
+export type IntelTab = 'brief' | 'thumbnails' | 'panels' | 'observatory' | 'create' | 'aura-lab' | 'assets' | 'media-library' | 'logos' | 'brand-kits';
 
 interface IntelTabsProps {
   activeTab?: IntelTab;
@@ -30,6 +31,7 @@ const TABS: { id: IntelTab; label: string; icon: React.ElementType; href: string
   { id: 'create', label: 'Create', icon: Sparkles, href: '/intel/create' },
   { id: 'aura-lab', label: 'Aura Lab', icon: FlaskConical, href: '/intel/aura-lab' },
   { id: 'assets', label: 'Assets', icon: FolderOpen, href: '/intel/assets' },
+  { id: 'media-library', label: 'Media Library', icon: Library, href: '/intel/media-library' },
   { id: 'brand-kits', label: 'Brand Kits', icon: Palette, href: '/intel/brand-kits' },
   { id: 'logos', label: 'Logos & PFP', icon: UserCircle, href: '/intel/logos' },
 ];
@@ -47,6 +49,7 @@ export function IntelTabs({ activeTab, onTabChange }: IntelTabsProps) {
     if (pathname.startsWith('/intel/create')) return 'create';
     if (pathname.startsWith('/intel/aura-lab')) return 'aura-lab';
     if (pathname.startsWith('/intel/assets')) return 'assets';
+    if (pathname.startsWith('/intel/media-library')) return 'media-library';
     if (pathname.startsWith('/intel/brand-kits')) return 'brand-kits';
     if (pathname.startsWith('/intel/logos')) return 'logos';
     return 'brief';

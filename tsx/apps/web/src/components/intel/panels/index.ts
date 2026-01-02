@@ -22,3 +22,7 @@ export { ViralHooksPanel } from './ViralHooksPanel';
 export { ThumbnailPatternsPanel } from './ThumbnailPatternsPanel';
 export { CompetitionMeterPanel } from './CompetitionMeterPanel';
 export { WeeklyHeatmapPanel } from './WeeklyHeatmapPanel';
+
+// Intel V2 panels (Enterprise Analytics)
+export { ContentFormatPanel } from './ContentFormatPanel';
+export { IntelHealthPanel } from './IntelHealthPanel';

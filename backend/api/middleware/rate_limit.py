@@ -77,6 +77,9 @@ API_RATE_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_API_WINDOW_SECONDS", "60")) 
 # Enable/disable rate limiting (useful for testing)
 RATE_LIMITING_ENABLED = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
 
+# Use Redis for rate limiting (recommended for production)
+USE_REDIS_RATE_LIMITING = os.getenv("USE_REDIS_RATE_LIMITING", "false").lower() == "true"
+
 
 # =============================================================================
 # Rate Limit Entry
@@ -715,6 +718,7 @@ __all__ = [
     "API_RATE_LIMITS",
     "API_RATE_WINDOW_SECONDS",
     "RATE_LIMITING_ENABLED",
+    "USE_REDIS_RATE_LIMITING",
     # Store
     "RateLimitStore",
     "RateLimitEntry",

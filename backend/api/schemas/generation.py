@@ -50,6 +50,79 @@ LogoSizeEnum = Literal["small", "medium", "large"]
 BrandIntensityEnum = Literal["subtle", "balanced", "strong"]
 TypographyLevelEnum = Literal["display", "headline", "subheadline", "body", "caption", "accent"]
 LogoTypeEnum = Literal["primary", "secondary", "icon", "watermark"]
+SizeUnitEnum = Literal["percent", "px"]
+
+
+# ============================================================================
+# Asset Placement Schemas
+# ============================================================================
+
+class MediaAssetPlacement(BaseModel):
+    """
+    Precise placement data for a media asset on the generation canvas.
+    
+    Allows users to specify exact position, size, rotation, and opacity
+    for their media assets in the generated output.
+    """
+    asset_id: str = Field(
+        ...,
+        description="ID of the media asset to place"
+    )
+    display_name: str = Field(
+        ...,
+        description="Display name of the asset"
+    )
+    asset_type: str = Field(
+        ...,
+        description="Type of the asset (face, logo, character, etc.)"
+    )
+    url: str = Field(
+        ...,
+        description="URL of the asset (preferably processed/transparent version)"
+    )
+    x: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="X position as percentage (0-100) from left edge"
+    )
+    y: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Y position as percentage (0-100) from top edge"
+    )
+    width: float = Field(
+        ...,
+        gt=0,
+        description="Width value (percentage or pixels based on size_unit)"
+    )
+    height: float = Field(
+        ...,
+        gt=0,
+        description="Height value (percentage or pixels based on size_unit)"
+    )
+    size_unit: SizeUnitEnum = Field(
+        default="percent",
+        description="Unit for width/height values"
+    )
+    z_index: int = Field(
+        default=1,
+        ge=1,
+        description="Layer order (higher = on top)"
+    )
+    rotation: float = Field(
+        default=0,
+        ge=0,
+        le=360,
+        description="Rotation in degrees"
+    )
+    opacity: float = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Opacity percentage (0-100)"
+    )
 
 
 # ============================================================================
@@ -180,6 +253,31 @@ class GenerateRequest(BaseModel):
         default=None,
         description="Specific brand elements to use (uses smart defaults if not specified)"
     )
+    media_asset_ids: Optional[List[str]] = Field(
+        default=None,
+        max_length=2,
+        description="IDs of Creator Media Library assets to inject (max 2). Pro/Studio only.",
+        examples=[["face-asset-id", "logo-asset-id"]]
+    )
+    media_asset_placements: Optional[List[MediaAssetPlacement]] = Field(
+        default=None,
+        max_length=2,
+        description="Precise placement data for media assets. Overrides media_asset_ids if provided.",
+        examples=[[{
+            "asset_id": "face-asset-id",
+            "display_name": "My Face",
+            "asset_type": "face",
+            "url": "https://...",
+            "x": 85,
+            "y": 90,
+            "width": 15,
+            "height": 15,
+            "size_unit": "percent",
+            "z_index": 1,
+            "rotation": 0,
+            "opacity": 100
+        }]]
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -199,6 +297,11 @@ class GenerateRequest(BaseModel):
                 {
                     "asset_type": "thumbnail",
                     "custom_prompt": "Vibrant gaming scene with neon colors"
+                },
+                {
+                    "asset_type": "thumbnail",
+                    "custom_prompt": "Thumbnail featuring my face and logo",
+                    "media_asset_ids": ["face-asset-uuid", "logo-asset-uuid"]
                 }
             ]
         }
@@ -251,6 +354,43 @@ class JobListResponse(BaseModel):
 
 
 # ============================================================================
+# Refinement Schemas
+# ============================================================================
+
+class RefineJobRequest(BaseModel):
+    """
+    Request body for refining a completed generation job.
+    
+    Creates a new job with the original parameters + refinement instruction.
+    Dead simple: just tell us what to change.
+    """
+    refinement: str = Field(
+        ...,
+        min_length=3,
+        max_length=300,
+        description="What to change about the generated asset",
+        examples=["Make it brighter", "Add more contrast", "Change the background to blue"]
+    )
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {"refinement": "Make it brighter"},
+                {"refinement": "Add a glow effect to the text"},
+                {"refinement": "Change the background to a darker shade"},
+            ]
+        }
+    }
+
+
+class RefineJobResponse(BaseModel):
+    """Response for job refinement - returns the new job."""
+    new_job: JobResponse = Field(..., description="The newly created refinement job")
+    original_job_id: str = Field(..., description="ID of the original job that was refined")
+    refinement_text: str = Field(..., description="The refinement instruction applied")
+
+
+# ============================================================================
 # Export all schemas
 # ============================================================================
 
@@ -262,6 +402,8 @@ __all__ = [
     "BrandIntensityEnum",
     "TypographyLevelEnum",
     "LogoTypeEnum",
+    "SizeUnitEnum",
+    "MediaAssetPlacement",
     "ColorSelection",
     "TypographySelection",
     "VoiceSelection",
@@ -269,4 +411,6 @@ __all__ = [
     "GenerateRequest",
     "JobResponse",
     "JobListResponse",
+    "RefineJobRequest",
+    "RefineJobResponse",
 ]

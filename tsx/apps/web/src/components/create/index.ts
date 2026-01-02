@@ -16,3 +16,4 @@ export * from './CreateCoachIntegration';
 export * from './CreateTabs';
 export * from './CreatePageContent';
 export * from './UnifiedCreateFlow';
+export * from './BrandCustomizationSection';

@@ -74,6 +74,7 @@ class ClipRadarRecapService:
         Track poll results for daily aggregation.
         
         Called after each poll to accumulate daily stats.
+        Now includes error tracking for failed categories.
         """
         today = self._get_today_key()
         now = datetime.now(timezone.utc)
@@ -95,14 +96,38 @@ class ClipRadarRecapService:
                 "total_views_tracked": 0,
                 "peak_velocity": 0,
                 "hourly_polls": [0] * 24,
+                "failed_polls": 0,
+                "category_failures": {},  # game_id -> failure count
             }
         
-        # Aggregate from category stats
-        total_clips = sum(cs.get("total_clips", 0) for cs in category_stats.values())
-        total_viral = sum(len(cs.get("viral_clips", [])) for cs in category_stats.values())
-        total_views = sum(cs.get("total_views", 0) for cs in category_stats.values())
+        # Track failed categories
+        failed_categories = [
+            gid for gid, cs in category_stats.items() 
+            if not cs.get("fetch_success", True)
+        ]
+        successful_categories = [
+            gid for gid, cs in category_stats.items() 
+            if cs.get("fetch_success", True)
+        ]
+        
+        # Aggregate from successful category stats only
+        total_clips = sum(
+            cs.get("total_clips", 0) 
+            for cs in category_stats.values() 
+            if cs.get("fetch_success", True)
+        )
+        total_viral = sum(
+            len(cs.get("viral_clips", [])) 
+            for cs in category_stats.values()
+            if cs.get("fetch_success", True)
+        )
+        total_views = sum(
+            cs.get("total_views", 0) 
+            for cs in category_stats.values()
+            if cs.get("fetch_success", True)
+        )
         max_velocity = max(
-            (cs.get("avg_velocity", 0) for cs in category_stats.values()),
+            (cs.get("avg_velocity", 0) for cs in category_stats.values() if cs.get("fetch_success", True)),
             default=0
         )
         
@@ -114,17 +139,33 @@ class ClipRadarRecapService:
         stats["peak_velocity"] = max(stats["peak_velocity"], max_velocity)
         stats["hourly_polls"][hour] += 1
         
+        # Track failures
+        if failed_categories:
+            stats["failed_polls"] = stats.get("failed_polls", 0) + 1
+            for gid in failed_categories:
+                if "category_failures" not in stats:
+                    stats["category_failures"] = {}
+                stats["category_failures"][gid] = stats["category_failures"].get(gid, 0) + 1
+        
         # Store with 48h TTL (enough time for recap job)
         self.redis.setex(stats_key, 48 * 3600, json.dumps(stats))
         
-        # Track top clips per category
+        # Track top clips per category (only successful ones)
         for game_id, cs in category_stats.items():
-            await self._track_category_clips(today, game_id, cs, hour)
+            if cs.get("fetch_success", True):
+                await self._track_category_clips(today, game_id, cs, hour)
         
         # Track viral clips
         await self._track_viral_clips(today, viral_clips)
         
-        logger.debug(f"Tracked poll results for {today}: {total_clips} clips, {total_viral} viral")
+        # Log with failure info
+        if failed_categories:
+            logger.warning(
+                f"Tracked poll results for {today}: {total_clips} clips, {total_viral} viral. "
+                f"Failed categories: {failed_categories}"
+            )
+        else:
+            logger.debug(f"Tracked poll results for {today}: {total_clips} clips, {total_viral} viral")
     
     async def _track_category_clips(
         self,

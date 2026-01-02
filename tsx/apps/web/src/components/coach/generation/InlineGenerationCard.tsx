@@ -5,6 +5,7 @@
  * 
  * Combined progress/result card for inline generation in coach chat.
  * Manages state transitions between queued, processing, completed, and failed states.
+ * Now includes refinement flow for multi-turn image editing.
  * 
  * @module coach/generation/InlineGenerationCard
  */
@@ -13,7 +14,7 @@ import React, { memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { CardBase } from '../cards/CardBase';
 import { GenerationProgress } from './GenerationProgress';
-import { GenerationResult } from './GenerationResult';
+import { GenerationResultWithRefinement } from './GenerationResultWithRefinement';
 import { useInlineGeneration } from './useInlineGeneration';
 import type { Asset } from './useInlineGeneration';
 
@@ -26,6 +27,10 @@ export interface InlineGenerationCardProps {
   jobId: string;
   /** Session ID for the coach session */
   sessionId: string;
+  /** User's subscription tier (for refinement limits) */
+  tier?: 'free' | 'pro' | 'studio';
+  /** Initial refinements used this month */
+  initialRefinementsUsed?: number;
   /** Callback when generation completes */
   onComplete?: (asset: Asset) => void;
   /** Callback when generation fails */
@@ -38,6 +43,10 @@ export interface InlineGenerationCardProps {
   onShare?: (asset: Asset) => void;
   /** Callback when regenerate is clicked */
   onRegenerate?: () => void;
+  /** Callback when user is satisfied and ends session */
+  onSatisfied?: (asset: Asset) => void;
+  /** Callback when refinement completes with new asset */
+  onRefinementComplete?: (asset: Asset) => void;
   /** Additional CSS classes */
   className?: string;
   /** Test ID for testing */
@@ -133,7 +142,7 @@ ErrorState.displayName = 'ErrorState';
  * States:
  * - **queued**: "Starting generation..." with skeleton
  * - **processing**: Progress bar + "Creating your asset..."
- * - **completed**: Image preview + actions
+ * - **completed**: Image preview + refinement choice + actions
  * - **failed**: Error message + retry button
  * 
  * @example
@@ -141,23 +150,29 @@ ErrorState.displayName = 'ErrorState';
  * <InlineGenerationCard
  *   jobId="job-123"
  *   sessionId="session-456"
+ *   tier="pro"
  *   onComplete={(asset) => console.log('Generated:', asset)}
  *   onViewFullscreen={(asset) => openLightbox(asset)}
  *   onDownload={(asset) => downloadAsset(asset)}
  *   onShare={(asset) => shareAsset(asset)}
  *   onRegenerate={() => startNewGeneration()}
+ *   onSatisfied={(asset) => endSession(asset)}
  * />
  * ```
  */
 export const InlineGenerationCard = memo(function InlineGenerationCard({
   jobId,
   sessionId,
+  tier = 'free',
+  initialRefinementsUsed = 0,
   onComplete,
   onError,
   onViewFullscreen,
   onDownload,
   onShare,
   onRegenerate,
+  onSatisfied,
+  onRefinementComplete,
   className,
   testId = 'inline-generation-card',
 }: InlineGenerationCardProps) {
@@ -180,31 +195,35 @@ export const InlineGenerationCard = memo(function InlineGenerationCard({
   }, [reset, onRegenerate]);
 
   // Handle download
-  const handleDownload = useCallback(() => {
-    if (asset) {
-      onDownload?.(asset);
-    }
-  }, [asset, onDownload]);
+  const handleDownload = useCallback((assetToDownload: Asset) => {
+    onDownload?.(assetToDownload);
+  }, [onDownload]);
 
   // Handle share
-  const handleShare = useCallback(() => {
-    if (asset) {
-      onShare?.(asset);
-    }
-  }, [asset, onShare]);
+  const handleShare = useCallback((assetToShare: Asset) => {
+    onShare?.(assetToShare);
+  }, [onShare]);
 
   // Handle view fullscreen
-  const handleViewFullscreen = useCallback(() => {
-    if (asset) {
-      onViewFullscreen?.(asset);
-    }
-  }, [asset, onViewFullscreen]);
+  const handleViewFullscreen = useCallback((assetToView: Asset) => {
+    onViewFullscreen?.(assetToView);
+  }, [onViewFullscreen]);
 
   // Handle regenerate
   const handleRegenerate = useCallback(() => {
     reset();
     onRegenerate?.();
   }, [reset, onRegenerate]);
+
+  // Handle satisfied
+  const handleSatisfied = useCallback((finalAsset: Asset) => {
+    onSatisfied?.(finalAsset);
+  }, [onSatisfied]);
+
+  // Handle refinement complete
+  const handleRefinementComplete = useCallback((refinedAsset: Asset) => {
+    onRefinementComplete?.(refinedAsset);
+  }, [onRefinementComplete]);
 
   // Determine card title and icon based on status
   const getCardConfig = () => {
@@ -259,12 +278,18 @@ export const InlineGenerationCard = memo(function InlineGenerationCard({
       case 'completed':
         if (asset) {
           return (
-            <GenerationResult
+            <GenerationResultWithRefinement
               asset={asset}
+              sessionId={sessionId}
+              tier={tier}
+              initialRefinementsUsed={initialRefinementsUsed}
               onDownload={handleDownload}
               onShare={handleShare}
               onRegenerate={handleRegenerate}
               onViewFullscreen={handleViewFullscreen}
+              onSatisfied={handleSatisfied}
+              onRefinementComplete={handleRefinementComplete}
+              onError={onError}
             />
           );
         }

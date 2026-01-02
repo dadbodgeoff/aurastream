@@ -7,7 +7,7 @@ import { apiClient } from '@aurastream/api-client';
 import { useAuth, createDevLogger } from '@aurastream/shared';
 import { useGenerationCelebration } from '@/hooks/useGenerationCelebration';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
-import { ErrorRecovery } from '@/components/ErrorRecovery';
+import { QuickRefinementChoice, QuickRefineInput } from '@/components/quick-create/refinement';
 
 // Dev logger for SSE debugging
 const log = createDevLogger({ prefix: '[SSE]' });
@@ -58,6 +58,10 @@ export default function GenerationProgressPage() {
   const [asset, setAsset] = useState<GenerationProgress['asset'] | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+
+  // Refinement flow state
+  const [refinementStep, setRefinementStep] = useState<'choice' | 'input' | 'satisfied'>('choice');
+  const [isRefining, setIsRefining] = useState(false);
 
   const { celebrateGeneration } = useGenerationCelebration();
   const celebrationTriggeredRef = useRef(false);
@@ -243,6 +247,38 @@ export default function GenerationProgressPage() {
     }
   };
 
+  // Refinement handlers
+  const handleLoveIt = useCallback(() => {
+    setRefinementStep('satisfied');
+  }, []);
+
+  const handleTweak = useCallback(() => {
+    setRefinementStep('input');
+  }, []);
+
+  const handleBackToChoice = useCallback(() => {
+    setRefinementStep('choice');
+  }, []);
+
+  const handleRefineSubmit = useCallback(async (refinement: string) => {
+    setIsRefining(true);
+    try {
+      const response = await apiClient.generation.refineJob(jobId, { refinement });
+      // Navigate to the new job's progress page
+      router.push(`/dashboard/generate/${response.newJob.id}`);
+      showSuccessToast('Tweaking your asset...', {
+        description: 'Creating a refined version based on your feedback.',
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to refine';
+      showErrorToast(
+        { code: 'REFINE_FAILED', message: errorMessage },
+        { onNavigate: (path) => router.push(path) }
+      );
+      setIsRefining(false);
+    }
+  }, [jobId, router]);
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-6">
       <div className="max-w-lg w-full">
@@ -279,78 +315,105 @@ export default function GenerationProgressPage() {
                 <span>{formatFileSize(asset.file_size)}</span>
               </div>
 
-              {/* Primary Actions */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <button
-                  onClick={handleDownload}
-                  className="flex-1 px-4 py-3 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download
-                </button>
-                <Link
-                  href="/dashboard/assets"
-                  className="flex-1 px-4 py-3 bg-background-elevated hover:bg-background-surface text-text-primary font-medium rounded-xl transition-colors text-center"
-                >
-                  View in Library
-                </Link>
-              </div>
+              {/* Refinement Flow - Show choice or input based on step */}
+              {refinementStep === 'choice' && (
+                <div className="mb-6">
+                  <QuickRefinementChoice
+                    onLoveIt={handleLoveIt}
+                    onTweak={handleTweak}
+                    tier={user?.subscriptionTier}
+                    disabled={isRefining}
+                  />
+                </div>
+              )}
 
-              {/* Social Share */}
-              <div className="flex gap-3 mb-6">
-                <button
-                  onClick={handleShareTwitter}
-                  className="flex-1 px-4 py-2.5 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                  aria-label="Share on Twitter"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                  </svg>
-                  Share
-                </button>
-                <button
-                  onClick={handleCopyLink}
-                  className={`flex-1 px-4 py-2.5 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 ${
-                    copySuccess
-                      ? 'bg-emerald-500/10 text-emerald-500'
-                      : 'bg-background-elevated hover:bg-background-surface text-text-primary'
-                  }`}
-                  aria-label="Copy link to clipboard"
-                >
-                  {copySuccess ? (
-                    <>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copy Link
-                    </>
-                  )}
-                </button>
-              </div>
+              {refinementStep === 'input' && (
+                <div className="mb-6">
+                  <QuickRefineInput
+                    onSubmit={handleRefineSubmit}
+                    onBack={handleBackToChoice}
+                    isSubmitting={isRefining}
+                  />
+                </div>
+              )}
 
-              {/* Create Another - Prominent CTA */}
-              <div className="pt-6 border-t border-border-subtle">
-                <Link
-                  href={isProfileCreatorAsset(asset.asset_type) ? '/dashboard/profile-creator' : '/dashboard/quick-create'}
-                  className="block w-full px-6 py-4 bg-interactive-600 hover:bg-interactive-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
-                >
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Create Another {isProfileCreatorAsset(asset.asset_type) ? 'Profile' : 'Asset'}
-                  </span>
-                </Link>
-              </div>
+              {/* Show actions only when satisfied or after refinement choice */}
+              {refinementStep === 'satisfied' && (
+                <>
+                  {/* Primary Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    <button
+                      onClick={handleDownload}
+                      className="flex-1 px-4 py-3 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Download
+                    </button>
+                    <Link
+                      href="/dashboard/assets"
+                      className="flex-1 px-4 py-3 bg-background-elevated hover:bg-background-surface text-text-primary font-medium rounded-xl transition-colors text-center"
+                    >
+                      View in Library
+                    </Link>
+                  </div>
+
+                  {/* Social Share */}
+                  <div className="flex gap-3 mb-6">
+                    <button
+                      onClick={handleShareTwitter}
+                      className="flex-1 px-4 py-2.5 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                      aria-label="Share on Twitter"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                      Share
+                    </button>
+                    <button
+                      onClick={handleCopyLink}
+                      className={`flex-1 px-4 py-2.5 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 ${
+                        copySuccess
+                          ? 'bg-emerald-500/10 text-emerald-500'
+                          : 'bg-background-elevated hover:bg-background-surface text-text-primary'
+                      }`}
+                      aria-label="Copy link to clipboard"
+                    >
+                      {copySuccess ? (
+                        <>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy Link
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Create Another - Prominent CTA */}
+                  <div className="pt-6 border-t border-border-subtle">
+                    <Link
+                      href={isProfileCreatorAsset(asset.asset_type) ? '/dashboard/profile-creator' : '/dashboard/quick-create'}
+                      className="block w-full px-6 py-4 bg-interactive-600 hover:bg-interactive-500 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                    >
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Create Another {isProfileCreatorAsset(asset.asset_type) ? 'Profile' : 'Asset'}
+                      </span>
+                    </Link>
+                  </div>
+                </>
+              )}
             </>
           ) : status === 'failed' ? (
             <>

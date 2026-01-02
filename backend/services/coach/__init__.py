@@ -101,6 +101,12 @@ from backend.services.coach.search_service import (
     get_search_service,
     reset_search_service,
 )
+from backend.services.coach.analytics_service import (
+    SessionOutcome,
+    SuccessPattern,
+    CoachAnalyticsService,
+    get_analytics_service,
+)
 
 __all__ = [
     # Models
@@ -167,4 +173,9 @@ __all__ = [
     "MockSearchService",
     "get_search_service",
     "reset_search_service",
+    # Analytics Service
+    "SessionOutcome",
+    "SuccessPattern",
+    "CoachAnalyticsService",
+    "get_analytics_service",
 ]

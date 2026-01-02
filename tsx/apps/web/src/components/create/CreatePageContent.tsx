@@ -19,7 +19,6 @@ import {
   useGenerateAsset,
   useGenerateTwitchAsset,
 } from '@aurastream/api-client';
-import type { LogoPosition, LogoSize } from '@aurastream/api-client';
 import { useUser, createDevLogger } from '@aurastream/shared';
 import { cn } from '@/lib/utils';
 import { Sparkles } from 'lucide-react';
@@ -35,8 +34,13 @@ import {
   SparklesIcon,
   ASSET_TYPES,
 } from './index';
+import { BrandCustomizationSection, type BrandCustomizationValue } from './BrandCustomizationSection';
 import { UsageDisplay } from '../usage';
 import { useUsageStats } from '../../hooks/useUsageStats';
+import { MediaAssetPicker } from '../media-library/MediaAssetPicker';
+import type { MediaAsset, serializePlacements } from '@aurastream/api-client';
+import { serializePlacements as serializePlacementsFn } from '@aurastream/api-client';
+import type { AssetPlacement } from '../media-library/placement';
 import type { Platform, CreatePhase, BrandKitOption } from './types';
 
 // =============================================================================
@@ -110,15 +114,24 @@ export function CreatePageContent({
   // Prompt state
   const [prompt, setPrompt] = useState('');
   
-  // Logo options
-  const [includeLogo, setIncludeLogo] = useState(false);
-  const [logoPosition, setLogoPosition] = useState<LogoPosition>('bottom-right');
-  const [logoSize, setLogoSize] = useState<LogoSize>('medium');
+  // Brand customization (full customization including colors, typography, voice, logo)
+  const [brandCustomization, setBrandCustomization] = useState<BrandCustomizationValue>({
+    include_logo: false,
+    logo_type: 'primary',
+    logo_position: 'bottom-right',
+    logo_size: 'medium',
+    brand_intensity: 'balanced',
+  });
+  
+  // Media Library assets for injection (Pro/Studio only)
+  const [selectedMediaAssets, setSelectedMediaAssets] = useState<MediaAsset[]>([]);
+  // Asset placements with precise positioning
+  const [mediaAssetPlacements, setMediaAssetPlacements] = useState<AssetPlacement[]>([]);
 
   const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
   const brandKits: BrandKitOption[] = brandKitsData?.brandKits ?? [];
   
-  // Fetch logos for selected brand kit
+  // Fetch logos for selected brand kit (used to check if logo exists)
   const { data: logosData } = useLogos(selectedBrandKitId || undefined);
   const hasLogo = logosData?.logos?.primary != null;
 
@@ -207,26 +220,58 @@ export function CreatePageContent({
     try {
       const isTwitchAsset = selectedAssetType.startsWith('twitch_');
       
+      // Extract media asset IDs for injection (fallback if no placements)
+      const mediaAssetIds = selectedMediaAssets.length > 0 && mediaAssetPlacements.length === 0
+        ? selectedMediaAssets.map(a => a.id) 
+        : undefined;
+      
+      // Serialize placements for API if present
+      const serializedPlacements = mediaAssetPlacements.length > 0
+        ? serializePlacementsFn(mediaAssetPlacements)
+        : undefined;
+      
       if (isTwitchAsset) {
         const result = await generateTwitchMutation.mutateAsync({
           assetType: selectedAssetType as any,
           brandKitId: selectedBrandKitId || undefined,
           customPrompt: finalPrompt || undefined,
-          includeLogo: includeLogo && hasLogo && !!selectedBrandKitId,
+          includeLogo: brandCustomization.include_logo && hasLogo && !!selectedBrandKitId,
         });
         router.push(`/dashboard/generate/${result.id}`);
       } else {
+        // Build colors only if primary_index is set (required by ColorSelection)
+        const colors = brandCustomization.colors?.primary_index !== undefined
+          ? {
+              primary_index: brandCustomization.colors.primary_index,
+              secondary_index: brandCustomization.colors.secondary_index,
+              accent_index: brandCustomization.colors.accent_index,
+              use_gradient: brandCustomization.colors.use_gradient,
+            }
+          : undefined;
+        
+        // Build voice only if use_tagline is set (required by VoiceSelection)
+        const voice = brandCustomization.voice?.use_tagline !== undefined
+          ? {
+              use_tagline: brandCustomization.voice.use_tagline,
+              use_catchphrase: brandCustomization.voice.use_catchphrase,
+            }
+          : undefined;
+        
         const result = await generateMutation.mutateAsync({
           assetType: selectedAssetType as any,
           brandKitId: selectedBrandKitId || undefined,
           customPrompt: finalPrompt || undefined,
           brandCustomization: selectedBrandKitId ? {
-            include_logo: includeLogo && hasLogo,
-            logo_type: 'primary',
-            logo_position: logoPosition,
-            logo_size: logoSize,
-            brand_intensity: 'balanced',
+            colors,
+            voice,
+            include_logo: brandCustomization.include_logo && hasLogo,
+            logo_type: brandCustomization.logo_type,
+            logo_position: brandCustomization.logo_position,
+            logo_size: brandCustomization.logo_size,
+            brand_intensity: brandCustomization.brand_intensity,
           } : undefined,
+          mediaAssetIds,
+          mediaAssetPlacements: serializedPlacements,
         });
         router.push(`/dashboard/generate/${result.id}`);
       }
@@ -319,17 +364,31 @@ export function CreatePageContent({
           />
         </div>
 
-        {/* Logo Options */}
-        {selectedBrandKitId && (
-          <LogoOptionsPanel
-            hasLogo={hasLogo}
-            includeLogo={includeLogo}
-            logoPosition={logoPosition}
-            logoSize={logoSize}
-            onIncludeLogoChange={setIncludeLogo}
-            onPositionChange={setLogoPosition}
-            onSizeChange={setLogoSize}
+        {/* Brand Customization */}
+        {selectedBrandKitId && selectedBrandKit && (
+          <BrandCustomizationSection
+            brandKitId={selectedBrandKitId}
+            brandKitName={selectedBrandKit.name}
+            value={brandCustomization}
+            onChange={setBrandCustomization}
           />
+        )}
+
+        {/* Media Library Assets (Pro/Studio only) */}
+        {isPremium && (
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-3">
+              Add Your Assets
+              <span className="ml-2 text-xs text-text-muted">(Optional)</span>
+            </label>
+            <MediaAssetPicker
+              selectedAssets={selectedMediaAssets}
+              onSelectionChange={setSelectedMediaAssets}
+              placements={mediaAssetPlacements}
+              onPlacementsChange={setMediaAssetPlacements}
+              assetType={selectedAssetType}
+            />
+          </div>
         )}
 
         {/* Generate Button */}

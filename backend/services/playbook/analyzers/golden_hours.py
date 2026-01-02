@@ -8,7 +8,7 @@ Analyzes Twitch stream data to find time windows where:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 from backend.api.schemas.playbook import GoldenHourWindow
@@ -61,7 +61,7 @@ class GoldenHoursAnalyzer:
         Returns:
             List of golden hour windows sorted by opportunity score
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         # Analyze current competition level
         total_viewers = sum(s.get("viewer_count", 0) for s in twitch_streams)

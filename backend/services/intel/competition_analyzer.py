@@ -325,9 +325,9 @@ class CompetitionAnalyzer:
         category_key: str,
         twitch_id: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Check Redis for cached Twitch stream data."""
+        """Check Redis for cached Twitch stream data from twitch_streams_worker."""
         try:
-            # Try game-specific cache key
+            # Try game-specific cache key (from twitch_streams_worker)
             if twitch_id:
                 cache_key = TWITCH_STREAMS_CACHE_KEY.format(game_id=twitch_id)
                 cached = await self.redis.get(cache_key)
@@ -335,13 +335,22 @@ class CompetitionAnalyzer:
                 if cached:
                     data = json.loads(cached)
                     streams = data.get("streams", [])
-                    viewer_counts = [s.get("viewer_count", 0) for s in streams]
+                    
+                    # Use pre-computed viewer_counts if available (from twitch_streams_worker)
+                    viewer_counts = data.get("viewer_counts")
+                    if not viewer_counts:
+                        viewer_counts = [s.get("viewer_count", 0) for s in streams]
 
-                    logger.debug(f"Found cached Twitch data for {category_key}")
+                    logger.debug(
+                        f"Found cached Twitch data for {category_key} "
+                        f"(streams: {len(streams)}, fetched: {data.get('fetched_at', 'unknown')})"
+                    )
                     return {
                         "streams": streams,
                         "viewer_counts": viewer_counts,
                         "source": "cached",
+                        "stream_count": data.get("stream_count", len(streams)),
+                        "total_viewers": data.get("total_viewers", sum(viewer_counts)),
                     }
         except Exception as e:
             logger.warning(f"Error reading Twitch cache: {e}")
