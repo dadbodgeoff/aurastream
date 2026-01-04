@@ -4,33 +4,43 @@
  * ============================================================================
  * 
  * 🚨 AGENT INSTRUCTIONS:
- * This flag SUPPRESSES dev logs when set to true (for production).
+ * This flag ENABLES dev logs when set to true.
  * 
- * To DISABLE logs (production): Set SUPPRESS_DEV_LOGS = true
- * To ENABLE logs (debugging):   Set SUPPRESS_DEV_LOGS = false
+ * To ENABLE logs (debugging):   Set DEV_LOGGING_ENABLED = true
+ * To DISABLE logs (production): Set DEV_LOGGING_ENABLED = false
+ * 
+ * You can also enable at runtime via browser console:
+ *   localStorage.setItem('AURASTREAM_DEV_LOGS', 'true')
+ *   // Then refresh the page
  * 
  * ============================================================================
  */
 
-// ⬇️ TOGGLE THIS FLAG - TRUE = SUPPRESS LOGS (PRODUCTION) ⬇️
-const SUPPRESS_DEV_LOGS = true;
-// ⬆️ TOGGLE THIS FLAG - TRUE = SUPPRESS LOGS (PRODUCTION) ⬆️
+// ⬇️ TOGGLE THIS FLAG - TRUE = ENABLE LOGS, FALSE = DISABLE ⬇️
+const DEV_LOGGING_ENABLED = false;
+// ⬆️ TOGGLE THIS FLAG - TRUE = ENABLE LOGS, FALSE = DISABLE ⬆️
 
 /**
  * Check if we're in development mode
  * Dev logging is enabled when:
- * 1. SUPPRESS_DEV_LOGS is false, AND
- * 2. Either NODE_ENV is 'development' OR NEXT_PUBLIC_DEV_LOGS is 'true'
+ * 1. DEV_LOGGING_ENABLED is true, OR
+ * 2. localStorage has AURASTREAM_DEV_LOGS = 'true', OR
+ * 3. NEXT_PUBLIC_DEV_LOGS env var is 'true'
  */
 const isDevLoggingEnabled = (): boolean => {
-  // If suppression is on, no logging
-  if (SUPPRESS_DEV_LOGS) return false;
+  // Check localStorage override first (allows runtime debugging)
+  if (typeof window !== 'undefined') {
+    const localOverride = localStorage.getItem('AURASTREAM_DEV_LOGS');
+    if (localOverride === 'true') return true;
+    if (localOverride === 'false') return false;
+  }
   
-  // Check environment
+  // Check compile-time flag
+  if (DEV_LOGGING_ENABLED) return true;
+  
+  // Check environment variable
   if (typeof process !== 'undefined') {
-    const isDev = process.env.NODE_ENV === 'development';
-    const envFlag = process.env.NEXT_PUBLIC_DEV_LOGS === 'true';
-    return isDev || envFlag;
+    if (process.env.NEXT_PUBLIC_DEV_LOGS === 'true') return true;
   }
   
   return false;

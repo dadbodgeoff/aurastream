@@ -572,6 +572,17 @@ Refinement request: """
         Returns:
             Tuple of (image_data, thought_signature)
         """
+        # Log grounding metadata if present (verifies Google Search was used)
+        grounding_metadata = data.get("groundingMetadata")
+        if grounding_metadata:
+            search_queries = grounding_metadata.get("webSearchQueries", [])
+            grounding_chunks = grounding_metadata.get("groundingChunks", [])
+            logger.info(
+                f"[GROUNDING] Google Search was used! "
+                f"Queries: {search_queries}, "
+                f"Sources: {len(grounding_chunks)} chunks"
+            )
+        
         candidates = data.get("candidates", [])
         if not candidates:
             raise GenerationError(
