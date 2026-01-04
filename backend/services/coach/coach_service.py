@@ -97,7 +97,9 @@ Brand colors: {color_list}
 Gather (only what's missing): subject, style/mood, any text to include.
 
 Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
-"✨ Ready! [summary] [INTENT_READY]"
+"✨ Ready! [DETAILED summary with ALL specific names, locations, characters, and exact text] [INTENT_READY]"
+
+CRITICAL: Your [summary] MUST include ALL specific details - game locations by name (e.g. "Sandy Strip" not "a POI"), character names, skin names, exact text. Generic summaries will fail.
 '''
     
     MAX_TURNS = 10
