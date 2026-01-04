@@ -70,6 +70,8 @@ class GenerationRequest:
     conversation_history: Optional[list] = None  # List of ConversationTurn or dicts
     # Media assets to include in generation (logos, faces, characters, etc.)
     media_assets: Optional[List["MediaAssetInput"]] = None
+    # Enable Google Search grounding for real-time information (game content, current events, etc.)
+    enable_grounding: bool = False
 
 
 @dataclass
@@ -235,6 +237,7 @@ class NanoBananaClient:
             input_mime_type=request.input_mime_type,
             conversation_history=request.conversation_history,
             media_assets=request.media_assets,
+            enable_grounding=request.enable_grounding,
         )
     
     def _build_multi_turn_contents(
@@ -333,6 +336,7 @@ Refinement request: """
         input_mime_type: str = "image/png",
         conversation_history: Optional[list] = None,
         media_assets: Optional[List["MediaAssetInput"]] = None,
+        enable_grounding: bool = False,
     ) -> GenerationResponse:
         """
         Execute generation request with exponential backoff retry.
@@ -351,6 +355,7 @@ Refinement request: """
                     input_mime_type=input_mime_type,
                     conversation_history=conversation_history,
                     media_assets=media_assets,
+                    enable_grounding=enable_grounding,
                 )
             
             except ContentPolicyError:
@@ -401,6 +406,7 @@ Refinement request: """
         input_mime_type: str = "image/png",
         conversation_history: Optional[list] = None,
         media_assets: Optional[List["MediaAssetInput"]] = None,
+        enable_grounding: bool = False,
     ) -> GenerationResponse:
         """
         Execute a single generation request using Gemini REST API.
@@ -493,6 +499,13 @@ Refinement request: """
                 {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
             ]
         }
+        
+        # Add Google Search grounding tool if enabled
+        # This allows the model to search for real-time information (game content, current events, etc.)
+        # to avoid hallucinating details about things like new game locations, skins, POIs
+        if enable_grounding:
+            request_body["tools"] = [{"google_search": {}}]
+            logger.info("[GROUNDING] Google Search grounding enabled for this generation request")
         
         url = f"{self.BASE_URL}/models/{model_name}:generateContent"
         headers = {

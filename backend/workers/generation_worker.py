@@ -816,6 +816,14 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
         if generation_context.get('input_image'):
             logger.info(f"[CANVAS DEBUG] Worker: input_image size: {len(generation_context['input_image'])} bytes")
         
+        # Determine if grounding should be enabled
+        # Grounding uses Google Search to get real-time information about games, events, etc.
+        # This helps avoid hallucinating details about new game content (POIs, skins, locations)
+        # Enable by default for gemini-3-pro-image-preview, can be disabled via job params
+        enable_grounding = job_params.get("enable_grounding", True)  # Default to True for better accuracy
+        if enable_grounding:
+            logger.info(f"[GROUNDING] Grounding enabled for job_id={job_id}")
+        
         generation_request = GenerationRequest(
             prompt=generation_context["final_prompt"], 
             width=width, 
@@ -824,6 +832,7 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
             input_mime_type=generation_context["input_mime_type"],
             conversation_history=generation_context["conversation_history"],
             media_assets=generation_context["media_assets"],
+            enable_grounding=enable_grounding,
         )
         
         # Build provenance context for tracking
