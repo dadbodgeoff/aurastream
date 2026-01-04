@@ -1051,6 +1051,13 @@ async def generate_from_session(
     if data.media_asset_placements:
         media_asset_placements = [p.model_dump() for p in data.media_asset_placements]
     
+    # Get reference assets from session (user-attached visual references)
+    # These are different from media_asset_placements - they're visual references
+    # the user attached during the coach conversation to show what they want
+    reference_assets = None
+    if hasattr(session, 'reference_assets') and session.reference_assets:
+        reference_assets = session.reference_assets
+    
     # Build parameters for generation
     parameters = {
         "coach_session_id": session_id,
@@ -1060,6 +1067,10 @@ async def generate_from_session(
     }
     if brand_kit_id:
         parameters["brand_kit_id"] = brand_kit_id
+    
+    # Add reference assets to parameters for the worker to download
+    if reference_assets:
+        parameters["reference_assets"] = reference_assets
     
     # Create generation job with media assets and canvas snapshot
     job = await generation_service.create_job(
@@ -1115,6 +1126,7 @@ async def generate_from_session(
             "asset_type": session.asset_type,
             "include_logo": data.include_logo,
             "media_asset_count": len(media_asset_ids) if media_asset_ids else 0,
+            "reference_asset_count": len(reference_assets) if reference_assets else 0,
             "has_canvas_snapshot": canvas_snapshot_url is not None,
             "quality_score": validation_result.quality_score,
         },

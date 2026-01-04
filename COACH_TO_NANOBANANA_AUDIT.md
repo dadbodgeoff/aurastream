@@ -28,7 +28,9 @@ After a deep audit of the Coach → NanoBanana flow, I found **several inconsist
 - Added `reference_assets` field to `CoachSession` model
 - Coach now stores reference assets when user attaches them
 - Reference assets are included in system prompt context
-- Ready to be passed to NanoBanana for generation (next step)
+- Reference assets are passed to generation job when user generates
+- Generation worker downloads reference assets and attaches to NanoBanana request
+- Reference images are used as visual inspiration for the generated asset
 
 ---
 

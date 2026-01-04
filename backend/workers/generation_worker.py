@@ -520,7 +520,61 @@ Style: {user_prompt}"""
                 context["warnings"].append(f"Failed to prepare media assets: {e}")
                 logger.warning(f"Failed to download media assets: {e}")
     
-    # 4. Final verification
+    # 5. Download reference assets from coach session (visual references user attached)
+    # These are different from media_asset_placements - they're visual references
+    # the user attached during the coach conversation to show what they want
+    reference_assets = job_params.get("reference_assets")
+    if reference_assets and not context["media_assets"]:
+        logger.info(f"Downloading reference assets for generation: job_id={job_id}, count={len(reference_assets)}")
+        
+        try:
+            # Convert reference assets to placement format for download
+            ref_placements = [
+                {
+                    "url": ref.get("url"),
+                    "displayName": ref.get("display_name", f"Reference {i+1}"),
+                    "assetType": ref.get("asset_type", "reference"),
+                    "assetId": ref.get("asset_id", ""),
+                }
+                for i, ref in enumerate(reference_assets)
+            ]
+            
+            ref_media_assets, successful_refs = await download_media_assets(ref_placements)
+            
+            if ref_media_assets:
+                # Initialize media_assets if not already set
+                if context["media_assets"] is None:
+                    context["media_assets"] = []
+                
+                context["media_assets"].extend(ref_media_assets)
+                
+                # Add reference context to prompt
+                ref_context = "\n\nREFERENCE IMAGES:\n"
+                for i, ref in enumerate(successful_refs, 1):
+                    ref_name = ref.get("displayName", f"Reference {i}")
+                    ref_desc = reference_assets[i-1].get("description", "") if i <= len(reference_assets) else ""
+                    ref_context += f"- Image {i}: \"{ref_name}\""
+                    if ref_desc:
+                        ref_context += f" - {ref_desc}"
+                    ref_context += "\n"
+                ref_context += "\nUse these reference images as visual inspiration for style, mood, and composition.\n"
+                
+                context["final_prompt"] = f"{context['final_prompt']}{ref_context}"
+                
+                logger.info(
+                    f"Reference assets prepared: job_id={job_id}, "
+                    f"count={len(ref_media_assets)}, "
+                    f"names={[a.display_name for a in ref_media_assets]}"
+                )
+            else:
+                context["warnings"].append("No reference assets could be downloaded")
+                logger.warning(f"No reference assets downloaded despite {len(reference_assets)} provided")
+                
+        except Exception as e:
+            context["warnings"].append(f"Failed to prepare reference assets: {e}")
+            logger.warning(f"Failed to download reference assets: {e}")
+    
+    # 6. Final verification
     # Log the prepared context for debugging
     logger.info(
         f"Generation context prepared: job_id={job_id}, "
@@ -528,6 +582,7 @@ Style: {user_prompt}"""
         f"has_input_image={context['input_image'] is not None}, "
         f"has_history={context['conversation_history'] is not None}, "
         f"media_asset_count={len(context['media_assets']) if context['media_assets'] else 0}, "
+        f"has_reference_assets={bool(reference_assets)}, "
         f"warnings={len(context['warnings'])}"
     )
     
