@@ -6,3 +6,4 @@ export * from './stores/commandStore';
 export * from './stores/onboardingStore';
 export * from './stores/undoStore';
 export * from './stores/lightboxStore';
+export * from './stores/createDraftStore';

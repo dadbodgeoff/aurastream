@@ -14,6 +14,11 @@ Schedule: Every 4 hours (aligned with playbook_worker)
 Data Flow:
     youtube_worker → Redis cache → creator_intel_worker → Redis + PostgreSQL
 
+Synchronization:
+- Uses distributed locking to prevent multiple instances from running simultaneously
+- Sets a "generation_in_progress" flag for coordination with aggregation workers
+- Aggregation workers should check is_generation_in_progress() before running
+
 Usage:
     # Continuous mode (recommended for Docker/systemd)
     python -m backend.workers.creator_intel_worker
@@ -34,9 +39,19 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
+
+from backend.services.distributed_lock import worker_lock, LockAcquisitionError
+from backend.workers.heartbeat import send_heartbeat, send_idle_heartbeat
+from backend.workers.execution_report import (
+    create_report,
+    submit_execution_report,
+    ExecutionOutcome,
+)
 
 logger = logging.getLogger(__name__)
+
+WORKER_NAME = "creator_intel_worker"
 
 # Generation interval (4 hours - synced with playbook_worker)
 GENERATION_INTERVAL = 4 * 60 * 60
@@ -53,7 +68,7 @@ INTEL_TITLE_KEY = "intel:title:precomputed:{game}"
 INTEL_VIDEO_IDEAS_KEY = "intel:video_ideas:precomputed:{game}"
 INTEL_VIRAL_KEY = "intel:viral:precomputed:{game}"
 INTEL_LAST_RUN_KEY = "intel:worker:last_run"
-INTEL_CACHE_TTL = 5 * 60 * 60  # 5 hours (slightly longer than run interval)
+INTEL_CACHE_TTL = 72 * 60 * 60  # 72 hours (3 days) - stale data better than no data
 
 # Intel V2 analyzer keys
 INTEL_V2_FORMAT_KEY = "intel:format:precomputed:{game}"
@@ -61,6 +76,12 @@ INTEL_V2_DESCRIPTION_KEY = "intel:description:precomputed:{game}"
 INTEL_V2_SEMANTIC_KEY = "intel:semantic:precomputed:{game}"
 INTEL_V2_REGIONAL_KEY = "intel:regional:precomputed:{game}"
 INTEL_V2_LIVESTREAM_KEY = "intel:livestream:precomputed:{game}"
+
+# Coordination key for aggregation workers
+INTEL_GENERATION_IN_PROGRESS_KEY = "intel:generation:in_progress"
+
+# Distributed lock timeout (30 minutes - intel generation can take several minutes)
+INTEL_LOCK_TIMEOUT = 1800
 
 # Games to analyze (same as youtube_worker)
 TRACKED_GAMES = [
@@ -90,6 +111,31 @@ async def get_redis_client():
     import redis.asyncio as redis
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
     return redis.from_url(redis_url, decode_responses=True)
+
+
+async def is_generation_in_progress() -> bool:
+    """
+    Check if intel generation is currently running.
+    
+    This function is intended for use by aggregation workers to coordinate
+    with the intel generation process. Aggregation workers should check this
+    before starting to avoid reading stale or partially updated data.
+    
+    Returns:
+        True if intel generation is currently in progress, False otherwise.
+    
+    Example:
+        if await is_generation_in_progress():
+            logger.info("Intel generation in progress, skipping aggregation")
+            return
+        # Safe to proceed with aggregation
+    """
+    redis_client = await get_redis_client()
+    try:
+        result = await redis_client.get(INTEL_GENERATION_IN_PROGRESS_KEY)
+        return result is not None
+    finally:
+        await redis_client.aclose()
 
 
 async def retry_with_backoff(func, *args, max_retries=MAX_RETRIES, **kwargs):
@@ -219,13 +265,18 @@ async def analyze_title_intel(game_key: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def analyze_video_ideas(game_key: str) -> Optional[Dict[str, Any]]:
-    """Generate video ideas for a game."""
+async def analyze_video_ideas(game_key: str, execution_id: str = "") -> Optional[Dict[str, Any]]:
+    """Generate video ideas for a game with provenance capture."""
     try:
-        from backend.services.intel.video_idea_generator import get_video_idea_generator
+        from backend.services.intel.video_idea_generator_provenance import get_provenance_video_idea_generator
         
-        generator = get_video_idea_generator()
-        response = await generator.generate_ideas(game_key, max_ideas=5)
+        generator = get_provenance_video_idea_generator()
+        # Use provenance-enabled generator that captures reasoning chains
+        response = await generator.generate_ideas_with_provenance(
+            game_key, 
+            execution_id=execution_id or game_key,
+            max_ideas=5
+        )
         
         if not response:
             return None
@@ -435,14 +486,28 @@ async def store_intel_results(
 
 
 async def run_intel_generation(force: bool = False) -> Dict[str, Any]:
-    """Execute a full intel generation cycle for all games."""
+    """
+    Execute a full intel generation cycle for all games with distributed locking.
+    
+    This function:
+    1. Acquires a distributed lock to prevent multiple instances from running
+    2. Sets a "generation_in_progress" flag for aggregation worker coordination
+    3. Processes all tracked games for title intel, video ideas, and viral analysis
+    4. Cleans up the flag and releases the lock when done
+    
+    Args:
+        force: If True, bypass the minimum time gap check since last run
+        
+    Returns:
+        Dictionary containing generation results, or skip information if skipped
+    """
     logger.info("=" * 60)
     logger.info("CREATOR INTEL WORKER - Starting")
     logger.info("=" * 60)
     
     start_time = time.time()
     
-    # Check if we should run
+    # Check if we should run (time-based check before acquiring lock)
     if not force:
         should_run, reason = await check_last_run_time()
         logger.info(f"Run check: {reason}")
@@ -450,6 +515,43 @@ async def run_intel_generation(force: bool = False) -> Dict[str, Any]:
         if not should_run:
             return {"skipped": True, "reason": reason}
     
+    # Acquire distributed lock to prevent multiple instances from running
+    try:
+        async with worker_lock(
+            "creator_intel", 
+            "generation", 
+            timeout=INTEL_LOCK_TIMEOUT, 
+            raise_on_failure=False
+        ) as acquired:
+            if not acquired:
+                logger.info("Intel generation skipped: another instance is already running")
+                return {"skipped": True, "reason": "lock_held"}
+            
+            # Execute the actual generation logic
+            return await _execute_intel_generation(force, start_time)
+            
+    except LockAcquisitionError:
+        logger.warning("Failed to acquire distributed lock for intel generation")
+        return {"skipped": True, "reason": "lock_acquisition_failed"}
+    except Exception as e:
+        logger.error(f"Unexpected error in intel generation: {e}")
+        return {"skipped": False, "errors": [str(e)]}
+
+
+async def _execute_intel_generation(force: bool, start_time: float) -> Dict[str, Any]:
+    """
+    Internal function that executes the actual intel generation logic.
+    
+    This function should only be called while holding the distributed lock.
+    It sets the generation-in-progress flag for aggregation worker coordination.
+    
+    Args:
+        force: Whether this is a forced run
+        start_time: Timestamp when generation started
+        
+    Returns:
+        Dictionary containing generation results
+    """
     redis_client = await get_redis_client()
     
     results = {
@@ -468,6 +570,15 @@ async def run_intel_generation(force: bool = False) -> Dict[str, Any]:
     }
     
     try:
+        # Set generation in progress flag for aggregation worker coordination
+        # TTL of 1 hour as a safety net in case of crashes
+        await redis_client.setex(INTEL_GENERATION_IN_PROGRESS_KEY, 3600, "1")
+        logger.debug("Set generation-in-progress flag for aggregation worker coordination")
+        
+        # Generate execution ID for this run (used for provenance tracking)
+        import uuid
+        execution_id = str(uuid.uuid4())[:8]
+        
         for game in TRACKED_GAMES:
             game_key = game["key"]
             game_name = game["name"]
@@ -476,8 +587,9 @@ async def run_intel_generation(force: bool = False) -> Dict[str, Any]:
             game_start = time.time()
             
             # Run V1 analyses (title, video ideas, viral)
+            # Video ideas uses provenance-enabled generator for AI reasoning capture
             title_intel = await analyze_title_intel(game_key)
-            video_ideas = await analyze_video_ideas(game_key)
+            video_ideas = await analyze_video_ideas(game_key, execution_id=f"{execution_id}:{game_key}")
             viral_analysis = await analyze_viral(game_key)
             
             # Store V1 results
@@ -542,6 +654,13 @@ async def run_intel_generation(force: bool = False) -> Dict[str, Any]:
         logger.error(f"Intel generation failed: {e}")
         results["errors"].append(str(e))
     finally:
+        # Always clear the generation-in-progress flag when done
+        try:
+            await redis_client.delete(INTEL_GENERATION_IN_PROGRESS_KEY)
+            logger.debug("Cleared generation-in-progress flag")
+        except Exception as e:
+            logger.warning(f"Failed to clear generation-in-progress flag: {e}")
+        
         await redis_client.aclose()
     
     elapsed = time.time() - start_time
@@ -571,6 +690,89 @@ def run_generation_sync(force: bool = False) -> Dict[str, Any]:
     return asyncio.run(run_intel_generation(force=force))
 
 
+def _submit_enhanced_report(result: Dict[str, Any], duration_ms: int) -> None:
+    """Submit an enhanced execution report with data verification metrics."""
+    report = create_report(WORKER_NAME)
+    
+    if result.get("skipped"):
+        report.outcome = ExecutionOutcome.SKIPPED
+        report.custom_metrics = {"reason": result.get("reason", "unknown")}
+        submit_execution_report(report)
+        return
+    
+    if result.get("errors"):
+        report.outcome = ExecutionOutcome.FAILED
+        report.error_message = str(result.get("errors"))
+        report.error_type = "GenerationError"
+    else:
+        report.outcome = ExecutionOutcome.SUCCESS
+    
+    report.duration_ms = duration_ms
+    
+    # Data verification metrics
+    games_processed = result.get("games_processed", 0)
+    title_success = result.get("title_intel_success", 0)
+    ideas_success = result.get("video_ideas_success", 0)
+    viral_success = result.get("viral_analysis_success", 0)
+    
+    # V2 analyzer success counts
+    v2_format = result.get("intel_v2_content_format_success", 0)
+    v2_desc = result.get("intel_v2_description_success", 0)
+    v2_semantic = result.get("intel_v2_semantic_success", 0)
+    v2_regional = result.get("intel_v2_regional_success", 0)
+    v2_livestream = result.get("intel_v2_live_stream_success", 0)
+    
+    # Total analyses attempted: 3 V1 + 5 V2 = 8 per game
+    total_analyses = games_processed * 8
+    total_success = title_success + ideas_success + viral_success + v2_format + v2_desc + v2_semantic + v2_regional + v2_livestream
+    
+    report.data_verification.records_fetched = games_processed
+    report.data_verification.records_processed = total_success
+    report.data_verification.records_failed = total_analyses - total_success
+    report.data_verification.cache_writes = total_success
+    report.data_verification.cache_ttl_seconds = INTEL_CACHE_TTL
+    
+    # Calculate data completeness
+    if total_analyses > 0:
+        report.data_verification.completeness_score = round(total_success / total_analyses, 2)
+    
+    # Custom metrics for intel worker
+    report.custom_metrics = {
+        "games_processed": games_processed,
+        "v1_title_intel": title_success,
+        "v1_video_ideas": ideas_success,
+        "v1_viral_analysis": viral_success,
+        "v2_content_format": v2_format,
+        "v2_description": v2_desc,
+        "v2_semantic": v2_semantic,
+        "v2_regional": v2_regional,
+        "v2_live_stream": v2_livestream,
+        "total_success_rate": f"{total_success}/{total_analyses}",
+        "duration_seconds": result.get("duration_seconds", 0),
+    }
+    
+    # Add per-game details if available
+    details = result.get("details", {})
+    if details:
+        game_summaries = {}
+        for game_key, game_data in details.items():
+            v1_ok = sum([
+                game_data.get("title_intel", False),
+                game_data.get("video_ideas", False),
+                game_data.get("viral_analysis", False),
+            ])
+            v2_data = game_data.get("intel_v2", {})
+            v2_ok = sum(1 for v in v2_data.values() if v)
+            game_summaries[game_key] = {
+                "v1": f"{v1_ok}/3",
+                "v2": f"{v2_ok}/5",
+                "duration_s": game_data.get("duration_seconds", 0),
+            }
+        report.custom_metrics["per_game"] = game_summaries
+    
+    submit_execution_report(report)
+
+
 def run_continuous():
     """Run the worker in continuous mode."""
     logger.info("=" * 60)
@@ -584,33 +786,60 @@ def run_continuous():
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
     
+    # Send initial idle heartbeat
+    send_idle_heartbeat(WORKER_NAME, schedule_interval_seconds=GENERATION_INTERVAL)
+    
     last_generation = 0
     
     # Generate immediately on startup
     logger.info("Running initial generation on startup...")
+    send_heartbeat(WORKER_NAME, is_running=True)
+    start_time = time.time()
     result = run_generation_sync(force=False)
+    duration_ms = int((time.time() - start_time) * 1000)
+    
     if result.get("skipped"):
         logger.info(f"Initial generation skipped: {result.get('reason')}")
         # Set last_generation to avoid immediate retry
         last_generation = time.time() - GENERATION_INTERVAL + MIN_GENERATION_GAP
+        # Submit skipped report
+        _submit_enhanced_report(result, duration_ms)
     else:
         last_generation = time.time()
+        # Submit enhanced execution report
+        _submit_enhanced_report(result, duration_ms)
     
     while not _shutdown_requested:
         now = time.time()
         
+        # Calculate next scheduled run
+        next_run = datetime.fromtimestamp(last_generation + GENERATION_INTERVAL, tz=timezone.utc)
+        
+        # Send idle heartbeat every loop (indicates we're alive and waiting)
+        send_idle_heartbeat(
+            WORKER_NAME,
+            next_scheduled_run=next_run,
+            schedule_interval_seconds=GENERATION_INTERVAL,
+        )
+        
         # Check if it's time to generate
         if now - last_generation >= GENERATION_INTERVAL:
             logger.info(f"Scheduled generation triggered (interval: {GENERATION_INTERVAL/3600:.1f}h)")
+            send_heartbeat(WORKER_NAME, is_running=True)
+            start_time = time.time()
             result = run_generation_sync(force=False)
+            duration_ms = int((time.time() - start_time) * 1000)
             
             if result.get("skipped"):
-                pass  # Don't update last_generation
+                # Submit skipped report
+                _submit_enhanced_report(result, duration_ms)
             elif result.get("errors"):
                 logger.warning("Generation had errors, will retry in 30 minutes")
                 last_generation = now - GENERATION_INTERVAL + (30 * 60)
+                _submit_enhanced_report(result, duration_ms)
             else:
                 last_generation = now
+                _submit_enhanced_report(result, duration_ms)
         
         # Sleep for a short interval before checking again
         time.sleep(60)

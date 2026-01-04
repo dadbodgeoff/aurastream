@@ -107,6 +107,10 @@ export interface PlacementCanvasProps {
   placements: AssetPlacement[];
   /** Callback when placements change */
   onPlacementsChange: (placements: AssetPlacement[]) => void;
+  /** Currently selected asset ID (controlled mode) */
+  selectedId?: string | null;
+  /** Callback when selection changes (controlled mode) */
+  onSelectionChange?: (id: string | null) => void;
   /** Optional className */
   className?: string;
 }

@@ -19,11 +19,8 @@ from pydantic import BaseModel, Field
 
 from backend.api.middleware.auth import get_current_user
 from backend.services.jwt_service import TokenPayload
-from backend.services.site_analytics_service import (
-    get_site_analytics_service,
-    SiteAnalyticsService,
-    ANALYTICS_ADMIN_EMAIL,
-)
+from backend.api.service_dependencies import SiteAnalyticsServiceDep
+from backend.services.site_analytics_service import ANALYTICS_ADMIN_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -87,15 +84,6 @@ class FunnelEventRequest(BaseModel):
     metadata: Optional[dict[str, Any]] = None
 
 
-# =============================================================================
-# Dependencies
-# =============================================================================
-
-def get_service() -> SiteAnalyticsService:
-    """Get analytics service."""
-    return get_site_analytics_service()
-
-
 async def require_analytics_admin(
     current_user: TokenPayload = Depends(get_current_user),
 ) -> TokenPayload:
@@ -115,7 +103,7 @@ async def require_analytics_admin(
 @router.post("/visitor", status_code=status.HTTP_202_ACCEPTED)
 async def track_visitor(
     data: VisitorTrackRequest,
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Track a visitor (creates or updates)."""
     result = service.track_visitor(
@@ -135,7 +123,7 @@ async def track_visitor(
 @router.post("/session/start", status_code=status.HTTP_202_ACCEPTED)
 async def start_session(
     data: SessionStartRequest,
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Start a new session."""
     result = service.start_session(
@@ -152,7 +140,7 @@ async def start_session(
 @router.post("/session/end", status_code=status.HTTP_202_ACCEPTED)
 async def end_session(
     request: Request,
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """
     End a session. Supports sendBeacon (text/plain content type).
@@ -182,7 +170,7 @@ async def end_session(
 @router.post("/pageview", status_code=status.HTTP_202_ACCEPTED)
 async def track_page_view(
     data: PageViewRequest,
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Track a page view."""
     result = service.track_page_view(
@@ -200,7 +188,7 @@ async def track_page_view(
 @router.post("/funnel", status_code=status.HTTP_202_ACCEPTED)
 async def track_funnel_event(
     data: FunnelEventRequest,
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Track a funnel conversion event."""
     result = service.track_funnel_event(
@@ -221,7 +209,7 @@ async def get_dashboard_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Get dashboard summary. Admin only."""
     try:
@@ -236,7 +224,7 @@ async def get_funnel_data(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Get funnel conversion data. Admin only."""
     try:
@@ -252,7 +240,7 @@ async def get_page_flow(
     end_date: Optional[str] = None,
     limit: int = 20,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Get page flow data for flow charts. Admin only."""
     try:
@@ -266,7 +254,7 @@ async def get_page_flow(
 async def get_recent_sessions(
     limit: int = 50,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Get recent sessions. Admin only."""
     try:
@@ -283,7 +271,7 @@ async def get_top_pages(
     end_date: Optional[str] = None,
     limit: int = 20,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Get top pages by views. Admin only."""
     try:
@@ -298,7 +286,7 @@ async def get_top_pages(
 async def trigger_aggregation(
     date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: SiteAnalyticsService = Depends(get_service),
+    service: SiteAnalyticsServiceDep = None,
 ) -> dict:
     """Manually trigger daily aggregation. Admin only."""
     return service.aggregate_daily(date)

@@ -131,6 +131,88 @@ services:
         reservations:
           memory: 128M
 
+  # Head Orchestrator - Enterprise-grade orchestration of all 14 workers
+  # Manages scheduling, health monitoring, anomaly detection, and score reporting
+  head-orchestrator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: python -m backend.workers.orchestrator.orchestrator
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+  # YouTube Worker - Fetches YouTube trending data every 30 minutes
+  youtube-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: python -m backend.workers.youtube_worker
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+  # Playbook Worker - Generates algorithmic playbook reports every 4 hours
+  playbook-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: python -m backend.workers.playbook_worker
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
   # Creator Intel V2 Orchestrator - Enterprise analytics with quota-aware collection
   # Runs 6 analyzers: ContentFormat, Description, Semantic, Regional, LiveStream, Channel
   # Manages YouTube API quota (10k units/day), tiered aggregation (Redis → PostgreSQL)
@@ -208,6 +290,34 @@ services:
       api:
         condition: service_healthy
     command: python -m backend.workers.clip_radar_worker
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+  # Thumbnail Intel Worker - Analyzes YouTube gaming thumbnails daily at 6 AM EST
+  # Uses Gemini Vision for layout/design analysis
+  thumbnail-intel-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: python -m backend.workers.thumbnail_intel_worker
     networks:
       - aurastream
     restart: unless-stopped

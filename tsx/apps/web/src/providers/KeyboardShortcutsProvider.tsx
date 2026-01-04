@@ -192,16 +192,16 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
           openCommandPalette();
           break;
         case 'newAsset':
-          router.push('/dashboard/create');
+          router.push('/intel/create');
           break;
         case 'brandKits':
-          router.push('/dashboard/brand-kits');
+          router.push('/intel/brand-kits');
           break;
         case 'assets':
-          router.push('/dashboard/assets');
+          router.push('/intel/assets');
           break;
         case 'intel':
-          router.push('/dashboard/intel');
+          router.push('/intel');
           break;
         case 'community':
           router.push('/community');

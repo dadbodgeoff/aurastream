@@ -24,7 +24,7 @@ from backend.api.schemas.avatar import (
     AvatarListResponse,
     AvatarOptionsResponse,
 )
-from backend.services.avatar_service import get_avatar_service
+from backend.api.service_dependencies import AvatarServiceDep
 from backend.services.jwt_service import TokenPayload
 from backend.services.exceptions import NotFoundError, AuthorizationError
 
@@ -68,9 +68,9 @@ def _avatar_to_response(avatar) -> AvatarResponse:
 )
 async def list_avatars(
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> AvatarListResponse:
     """List all avatars for the current user."""
-    service = get_avatar_service()
     avatars = await service.list(current_user.sub)
     
     return AvatarListResponse(
@@ -89,10 +89,9 @@ async def list_avatars(
 async def create_avatar(
     data: CreateAvatarRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> AvatarResponse:
     """Create a new avatar."""
-    service = get_avatar_service()
-    
     avatar = await service.create(
         user_id=current_user.sub,
         name=data.name,
@@ -140,9 +139,9 @@ async def get_avatar_options() -> AvatarOptionsResponse:
 )
 async def get_default_avatar(
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> AvatarResponse:
     """Get the user's default avatar."""
-    service = get_avatar_service()
     avatar = await service.get_default(current_user.sub)
     
     if not avatar:
@@ -167,10 +166,9 @@ async def get_default_avatar(
 async def get_avatar(
     avatar_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> AvatarResponse:
     """Get a specific avatar."""
-    service = get_avatar_service()
-    
     try:
         avatar = await service.get(current_user.sub, avatar_id)
         return _avatar_to_response(avatar)
@@ -200,10 +198,9 @@ async def update_avatar(
     avatar_id: str,
     data: UpdateAvatarRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> AvatarResponse:
     """Update an avatar."""
-    service = get_avatar_service()
-    
     # Build kwargs from non-None fields
     update_kwargs = {}
     for field, value in data.model_dump().items():
@@ -238,10 +235,9 @@ async def update_avatar(
 async def delete_avatar(
     avatar_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> None:
     """Delete an avatar."""
-    service = get_avatar_service()
-    
     try:
         await service.delete(current_user.sub, avatar_id)
     except NotFoundError:
@@ -269,10 +265,9 @@ async def delete_avatar(
 async def set_default_avatar(
     avatar_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: AvatarServiceDep = None,
 ) -> AvatarResponse:
     """Set an avatar as the default."""
-    service = get_avatar_service()
-    
     try:
         avatar = await service.set_default(current_user.sub, avatar_id)
         return _avatar_to_response(avatar)

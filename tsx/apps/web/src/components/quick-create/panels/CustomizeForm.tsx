@@ -8,6 +8,7 @@ import { ColorPickerField } from '../ColorPickerField';
 import type { QuickTemplate, VibeOption } from '../types';
 import type { MediaAsset } from '@aurastream/api-client';
 import type { AssetPlacement } from '../../media-library/placement';
+import type { AnySketchElement } from '../../media-library/canvas-export/types';
 
 interface CustomizeFormProps {
   template: QuickTemplate;
@@ -39,6 +40,9 @@ interface CustomizeFormProps {
   // Asset placements (optional)
   mediaAssetPlacements?: AssetPlacement[];
   onMediaAssetPlacementsChange?: (placements: AssetPlacement[]) => void;
+  // Sketch elements (optional)
+  sketchElements?: AnySketchElement[];
+  onSketchElementsChange?: (elements: AnySketchElement[]) => void;
 }
 
 const LOGO_POSITIONS = ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center'];
@@ -103,6 +107,7 @@ export function CustomizeForm(props: CustomizeFormProps) {
     isFormValid, onBack, onNext, isLoading,
     selectedMediaAssets = [], onMediaAssetsChange,
     mediaAssetPlacements = [], onMediaAssetPlacementsChange,
+    sketchElements = [], onSketchElementsChange,
   } = props;
 
   const hasLotsOfVibes = template.vibes.length > 6;
@@ -382,6 +387,8 @@ export function CustomizeForm(props: CustomizeFormProps) {
                 onSelectionChange={onMediaAssetsChange}
                 placements={mediaAssetPlacements}
                 onPlacementsChange={onMediaAssetPlacementsChange}
+                sketchElements={sketchElements}
+                onSketchElementsChange={onSketchElementsChange}
                 assetType={template.assetType}
               />
             </div>

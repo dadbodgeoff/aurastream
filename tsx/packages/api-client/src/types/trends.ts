@@ -38,6 +38,25 @@ export type DurationType = 'short' | 'medium' | 'long' | 'any';
 // Daily Brief Types
 // ============================================================================
 
+/**
+ * Market opportunity data for Intel header badge.
+ */
+export interface MarketOpportunityData {
+  level: 'high' | 'medium' | 'low';
+  reason: string;
+  activeStreams: number;
+  changePercent: number;
+  primaryCategory: string;
+}
+
+/**
+ * Daily assets data for Intel header badge.
+ */
+export interface DailyAssetsData {
+  createdToday: number;
+  pendingReview: number;
+}
+
 export interface DailyBrief {
   date: string;
   thumbnailOfDay: ThumbnailOfDay | null;
@@ -49,6 +68,11 @@ export interface DailyBrief {
   bestStreamTimes: TimingRecommendation | null;
   titlePatterns: TitlePatterns | null;
   thumbnailPatterns: ThumbnailPatterns | null;
+  generatedAt?: string;
+  
+  // NEW: Intel redesign header badge data
+  marketOpportunity?: MarketOpportunityData | null;
+  dailyAssets?: DailyAssetsData | null;
 }
 
 export interface ThumbnailOfDay {

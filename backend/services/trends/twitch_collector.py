@@ -17,6 +17,8 @@ Rate Limits:
 - Unlimited quota (no daily limits like YouTube)
 """
 
+import asyncio
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -24,7 +26,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Literal
 
 import httpx
+import redis.asyncio as redis
 
+from backend.services.distributed_lock import DistributedLock
 from backend.services.exceptions import StreamerStudioError
 
 
@@ -188,10 +192,13 @@ class TwitchCollector:
     Service for collecting data from Twitch Helix API.
     
     This service handles:
-    - OAuth app access token management with caching
+    - OAuth app access token management with Redis caching
     - Fetching top live streams
     - Fetching top games by viewers
     - Fetching top clips for games
+    
+    Token management uses Redis for distributed caching and a distributed
+    lock to prevent race conditions during token refresh.
     
     Usage:
         collector = TwitchCollector()
@@ -204,13 +211,21 @@ class TwitchCollector:
     TOKEN_URL = "https://id.twitch.tv/oauth2/token"
     HELIX_BASE_URL = "https://api.twitch.tv/helix"
     
+    # Redis keys for token caching
+    REDIS_TOKEN_KEY = "twitch:access_token"
+    REDIS_TOKEN_LOCK_KEY = "twitch:token_refresh_lock"
+    
+    # Lock timeout for token refresh (seconds)
+    TOKEN_REFRESH_LOCK_TIMEOUT = 30
+    
     # Clip period options
     ClipPeriod = Literal["day", "week", "month", "all"]
     
     def __init__(
         self,
         client_id: Optional[str] = None,
-        client_secret: Optional[str] = None
+        client_secret: Optional[str] = None,
+        redis_url: Optional[str] = None
     ):
         """
         Initialize the Twitch collector.
@@ -218,12 +233,14 @@ class TwitchCollector:
         Args:
             client_id: Twitch application client ID (defaults to env var)
             client_secret: Twitch application client secret (defaults to env var)
+            redis_url: Redis connection URL (defaults to REDIS_URL env var)
             
         Raises:
             TwitchConfigError: If required credentials are not provided
         """
         self.client_id = client_id or os.getenv("TWITCH_CLIENT_ID")
         self.client_secret = client_secret or os.getenv("TWITCH_CLIENT_SECRET")
+        self._redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
         
         # Validate configuration
         if not self.client_id:
@@ -231,31 +248,103 @@ class TwitchCollector:
         if not self.client_secret:
             raise TwitchConfigError("TWITCH_CLIENT_SECRET")
         
-        # Cached access token
-        self._access_token: Optional[TwitchAccessToken] = None
+        # Redis client for token caching (lazy initialization)
+        self._redis_client: Optional[redis.Redis] = None
         
-        logger.info("TwitchCollector initialized")
+        # Distributed lock for token refresh
+        self._lock = DistributedLock(redis_url=self._redis_url)
+        
+        logger.info("TwitchCollector initialized with Redis token caching")
     
     # =========================================================================
-    # Token Management
+    # Redis Client Management
     # =========================================================================
     
-    async def _get_access_token(self) -> str:
+    async def _get_redis_client(self) -> redis.Redis:
+        """Get or create Redis client for token caching."""
+        if self._redis_client is None:
+            self._redis_client = redis.from_url(self._redis_url, decode_responses=True)
+        return self._redis_client
+    
+    # =========================================================================
+    # Token Management (Redis-cached with distributed lock)
+    # =========================================================================
+    
+    async def _get_cached_token(self) -> Optional[str]:
         """
-        Get a valid OAuth app access token.
-        
-        Returns cached token if still valid, otherwise fetches a new one.
+        Get cached token from Redis if valid.
         
         Returns:
-            Valid access token string
+            Valid access token string or None if not cached/expired
+        """
+        try:
+            client = await self._get_redis_client()
+            token_data = await client.get(self.REDIS_TOKEN_KEY)
+            
+            if not token_data:
+                return None
+            
+            # Parse cached token data
+            data = json.loads(token_data)
+            expires_at = datetime.fromisoformat(data["expires_at"])
+            
+            # Check if token is expired (with 5 minute buffer)
+            buffer = timedelta(minutes=5)
+            if datetime.now(timezone.utc) >= (expires_at - buffer):
+                logger.debug("Cached Twitch token is expired or expiring soon")
+                return None
+            
+            return data["access_token"]
+            
+        except (redis.ConnectionError, json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Error reading cached Twitch token: {e}")
+            return None
+    
+    async def _cache_token(self, access_token: str, expires_in: int) -> None:
+        """
+        Cache token in Redis with expiration.
+        
+        Args:
+            access_token: The access token to cache
+            expires_in: Token lifetime in seconds
+        """
+        try:
+            client = await self._get_redis_client()
+            
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            token_data = json.dumps({
+                "access_token": access_token,
+                "expires_at": expires_at.isoformat(),
+            })
+            
+            # Set with expiration (slightly less than token lifetime for safety)
+            ttl = max(expires_in - 300, 60)  # At least 60 seconds, 5 min buffer
+            await client.set(self.REDIS_TOKEN_KEY, token_data, ex=ttl)
+            
+            logger.debug(f"Twitch token cached in Redis with TTL {ttl}s")
+            
+        except redis.ConnectionError as e:
+            logger.warning(f"Failed to cache Twitch token in Redis: {e}")
+    
+    async def _clear_cached_token(self) -> None:
+        """Clear the cached token from Redis."""
+        try:
+            client = await self._get_redis_client()
+            await client.delete(self.REDIS_TOKEN_KEY)
+            logger.debug("Cleared cached Twitch token from Redis")
+        except redis.ConnectionError as e:
+            logger.warning(f"Failed to clear cached Twitch token: {e}")
+    
+    async def _fetch_new_token(self) -> str:
+        """
+        Fetch a new OAuth app access token from Twitch.
+        
+        Returns:
+            New access token string
             
         Raises:
             TwitchAuthError: If token fetch fails
         """
-        # Return cached token if still valid
-        if self._access_token and not self._access_token.is_expired:
-            return self._access_token.access_token
-        
         logger.info("Fetching new Twitch app access token")
         
         async with httpx.AsyncClient() as client:
@@ -278,24 +367,67 @@ class TwitchCollector:
                     raise TwitchAuthError(error_msg)
                 
                 data = response.json()
-                
-                # Calculate expiration time
+                access_token = data["access_token"]
                 expires_in = data.get("expires_in", 3600)
-                expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
                 
-                # Cache the token
-                self._access_token = TwitchAccessToken(
-                    access_token=data["access_token"],
-                    expires_at=expires_at,
-                    token_type=data.get("token_type", "bearer"),
-                )
+                # Cache the token in Redis
+                await self._cache_token(access_token, expires_in)
                 
-                logger.info(f"Twitch access token cached, expires in {expires_in}s")
-                return self._access_token.access_token
+                logger.info(f"Twitch access token obtained, expires in {expires_in}s")
+                return access_token
                 
             except httpx.RequestError as e:
                 logger.error(f"Network error fetching Twitch token: {e}")
                 raise TwitchAuthError(f"Network error: {str(e)}")
+    
+    async def _get_access_token(self) -> str:
+        """
+        Get a valid OAuth app access token.
+        
+        Uses Redis for distributed caching and a distributed lock to prevent
+        race conditions when multiple concurrent requests need to refresh
+        the token.
+        
+        Returns:
+            Valid access token string
+            
+        Raises:
+            TwitchAuthError: If token fetch fails
+        """
+        # First, try to get cached token from Redis (fast path)
+        cached_token = await self._get_cached_token()
+        if cached_token:
+            return cached_token
+        
+        # Token needs refresh - acquire distributed lock to prevent race condition
+        # Use blocking mode with short timeout since token refresh is quick
+        async with self._lock.acquire_lock(
+            self.REDIS_TOKEN_LOCK_KEY,
+            timeout=self.TOKEN_REFRESH_LOCK_TIMEOUT,
+            blocking=True,
+            blocking_timeout=10,
+            raise_on_failure=False,
+        ) as acquired:
+            if not acquired:
+                # Another process is refreshing, wait and retry cache
+                logger.debug("Token refresh lock held by another process, waiting...")
+                # Brief wait then check cache again
+                await asyncio.sleep(0.5)
+                cached_token = await self._get_cached_token()
+                if cached_token:
+                    return cached_token
+                # If still no token, try to fetch anyway (lock may have expired)
+                logger.warning("No cached token after waiting, fetching new token")
+                return await self._fetch_new_token()
+            
+            # We have the lock - double-check cache (another process may have just refreshed)
+            cached_token = await self._get_cached_token()
+            if cached_token:
+                logger.debug("Token was refreshed by another process while waiting for lock")
+                return cached_token
+            
+            # Fetch new token while holding the lock
+            return await self._fetch_new_token()
     
     def _get_headers(self, access_token: str) -> dict:
         """Get headers for Twitch Helix API requests."""
@@ -348,7 +480,7 @@ class TwitchCollector:
                 if response.status_code == 401:
                     if retry_on_auth_error:
                         logger.warning("Twitch token expired, refreshing...")
-                        self._access_token = None  # Clear cached token
+                        await self._clear_cached_token()  # Clear cached token from Redis
                         return await self._make_request(
                             endpoint, params, retry_on_auth_error=False
                         )

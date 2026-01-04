@@ -27,14 +27,16 @@ from backend.api.schemas.subscription import (
     SubscriptionStatusResponse,
     CancelResponse,
 )
+from backend.api.service_dependencies import (
+    StripeServiceDep,
+    SubscriptionServiceDep,
+    AuditServiceDep,
+)
 from backend.services.stripe_service import (
-    get_stripe_service,
     StripeServiceError,
     StripeCustomerNotFoundError,
 )
-from backend.services.subscription_service import get_subscription_service
 from backend.services.jwt_service import TokenPayload
-from backend.services.audit_service import get_audit_service
 from backend.api.config import get_settings
 from backend.database.supabase_client import get_supabase_client
 
@@ -143,6 +145,8 @@ async def create_checkout_session(
     data: CheckoutRequest,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    stripe_service: StripeServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> CheckoutResponse:
     """
     Create a Stripe Checkout session for subscription purchase.
@@ -154,6 +158,8 @@ async def create_checkout_session(
         data: CheckoutRequest with plan and optional URLs
         request: FastAPI request object for audit logging
         current_user: Authenticated user's token payload
+        stripe_service: Injected StripeService
+        audit: Injected AuditService
         
     Returns:
         CheckoutResponse: Checkout URL and session ID
@@ -163,7 +169,6 @@ async def create_checkout_session(
         HTTPException: 502 if Stripe API fails
     """
     settings = get_settings()
-    stripe_service = get_stripe_service()
     
     # Map plan to price ID
     price_id_map = {
@@ -210,7 +215,6 @@ async def create_checkout_session(
         )
         
         # Audit log the checkout creation
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="subscription.checkout_created",
@@ -266,6 +270,7 @@ async def create_portal_session(
     data: PortalRequest,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    stripe_service: StripeServiceDep = None,
 ) -> PortalResponse:
     """
     Create a Stripe Customer Portal session.
@@ -277,6 +282,7 @@ async def create_portal_session(
         data: PortalRequest with optional return URL
         request: FastAPI request object
         current_user: Authenticated user's token payload
+        stripe_service: Injected StripeService
         
     Returns:
         PortalResponse: Portal URL for redirect
@@ -286,7 +292,6 @@ async def create_portal_session(
         HTTPException: 502 if Stripe API fails
     """
     settings = get_settings()
-    stripe_service = get_stripe_service()
     
     # Get user's Stripe customer ID
     stripe_customer_id = await _get_user_stripe_customer_id(current_user.sub)
@@ -359,6 +364,7 @@ async def create_portal_session(
 )
 async def get_subscription_status(
     current_user: TokenPayload = Depends(get_current_user),
+    subscription_service: SubscriptionServiceDep = None,
 ) -> SubscriptionStatusResponse:
     """
     Get the user's current subscription status.
@@ -368,12 +374,11 @@ async def get_subscription_status(
     
     Args:
         current_user: Authenticated user's token payload
+        subscription_service: Injected SubscriptionService
         
     Returns:
         SubscriptionStatusResponse: Full subscription status
     """
-    subscription_service = get_subscription_service()
-    
     # Get subscription status from service
     status = await subscription_service.get_subscription_status(current_user.sub)
     
@@ -418,6 +423,9 @@ async def get_subscription_status(
 async def cancel_subscription(
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    subscription_service: SubscriptionServiceDep = None,
+    stripe_service: StripeServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> CancelResponse:
     """
     Cancel the user's subscription at period end.
@@ -428,6 +436,9 @@ async def cancel_subscription(
     Args:
         request: FastAPI request object for audit logging
         current_user: Authenticated user's token payload
+        subscription_service: Injected SubscriptionService
+        stripe_service: Injected StripeService
+        audit: Injected AuditService
         
     Returns:
         CancelResponse: Confirmation message
@@ -436,9 +447,6 @@ async def cancel_subscription(
         HTTPException: 400 if user has no active subscription
         HTTPException: 502 if Stripe API fails
     """
-    subscription_service = get_subscription_service()
-    stripe_service = get_stripe_service()
-    
     # Get user's subscription
     subscription = await subscription_service.get_user_subscription(current_user.sub)
     
@@ -459,7 +467,6 @@ async def cancel_subscription(
         )
         
         # Audit log the cancellation
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="subscription.cancelled",

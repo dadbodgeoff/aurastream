@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@aurastream/shared';
+import { useAuth, useSimpleAnalytics } from '@aurastream/shared';
 import { FormErrorBoundary } from '@/components/ErrorBoundary';
 import { showErrorToast, getErrorFromApi } from '@/utils/errorMessages';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -49,6 +49,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isLoading, error, clearError } = useAuth();
+  const { trackLogin } = useSimpleAnalytics();
   const emailInputRef = useRef<HTMLInputElement>(null);
   
   const [showPassword, setShowPassword] = useState(false);
@@ -56,7 +57,7 @@ function LoginForm() {
   
   // Check for registration success message
   const registered = searchParams.get('registered') === 'true';
-  const returnUrl = searchParams.get('returnUrl') || '/dashboard';
+  const returnUrl = searchParams.get('returnUrl') || '/intel';
   
   // Enterprise form validation with inline feedback
   const { fieldStates, setFieldValue, touchField, isFormValid, getFieldProps } = useFormValidation({
@@ -95,6 +96,7 @@ function LoginForm() {
     clearError();
     try {
       await login(fieldStates.email.value, fieldStates.password.value, rememberMe);
+      trackLogin();
       router.push(decodeURIComponent(returnUrl));
     } catch (err) {
       // Show enterprise error toast with recovery actions

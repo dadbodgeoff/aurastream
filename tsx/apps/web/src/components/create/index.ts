@@ -17,3 +17,7 @@ export * from './CreateTabs';
 export * from './CreatePageContent';
 export * from './UnifiedCreateFlow';
 export * from './BrandCustomizationSection';
+export * from './MethodSelector';
+export * from './MethodSelectorCard';
+export * from './CreateStudioHeader';
+export * from './CanvasPreview';

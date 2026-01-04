@@ -27,5 +27,10 @@ export { CategoryPill } from './CategoryPill';
 export { FilterDropdown } from './FilterDropdown';
 export { ConfidenceRing } from './ConfidenceRing';
 
+// NEW: Intel redesign components
+export { TopicDropdown } from './TopicDropdown';
+export { AIInsightBanner } from './AIInsightBanner';
+export { MarketOpportunityBadge, DailyAssetsBadge } from './badges';
+
 // Panel components
 export * from './panels';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   useMediaLibrary,
@@ -19,6 +19,7 @@ import { MediaUploadModal } from './MediaUploadModal';
 import { MediaDetailModal } from './MediaDetailModal';
 import { MediaLibrarySummary } from './MediaLibrarySummary';
 import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
+import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
 import type { MediaFilters as MediaFiltersType } from './types';
 
 function PlusIcon() {
@@ -58,6 +59,17 @@ function LockIcon() {
 }
 
 export function MediaLibraryPage() {
+  return (
+    <AsyncErrorBoundary 
+      resourceName="Media Library"
+      onRefetch={() => window.location.reload()}
+    >
+      <MediaLibraryPageContent />
+    </AsyncErrorBoundary>
+  );
+}
+
+function MediaLibraryPageContent() {
   const [filters, setFilters] = useState<MediaFiltersType>({
     sortBy: 'created_at',
     sortOrder: 'desc',
@@ -67,9 +79,13 @@ export function MediaLibraryPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<MediaAsset | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  
+  // Track in-progress operations to prevent race conditions
+  const deletingIdsRef = useRef<Set<string>>(new Set());
+  const isBulkDeletingRef = useRef(false);
 
   const { data: access, isLoading: accessLoading } = useMediaAccess();
-  const { data, isLoading, refetch } = useMediaLibrary({
+  const { data, isLoading, error: _queryError, refetch } = useMediaLibrary({
     ...filters,
     limit: 50,
   });
@@ -106,6 +122,9 @@ export function MediaLibraryPage() {
   }, []);
 
   const handleFavorite = useCallback(async (id: string) => {
+    // Prevent favorite toggle during delete operations
+    if (deletingIdsRef.current.has(id) || isBulkDeletingRef.current) return;
+    
     try {
       await toggleFavoriteMutation.mutateAsync(id);
     } catch (err) {
@@ -114,6 +133,9 @@ export function MediaLibraryPage() {
   }, [toggleFavoriteMutation]);
 
   const handleSetPrimary = useCallback(async (id: string) => {
+    // Prevent set primary during delete operations
+    if (deletingIdsRef.current.has(id) || isBulkDeletingRef.current) return;
+    
     try {
       await setPrimaryMutation.mutateAsync(id);
       showSuccessToast('Set as primary');
@@ -123,17 +145,24 @@ export function MediaLibraryPage() {
   }, [setPrimaryMutation]);
 
   const handleDelete = useCallback(async (id: string) => {
+    // Prevent concurrent deletes on same asset or during bulk delete
+    if (deletingIdsRef.current.has(id) || isBulkDeletingRef.current) return;
+    
+    deletingIdsRef.current.add(id);
     try {
       await deleteMutation.mutateAsync(id);
       showSuccessToast('Asset deleted');
     } catch (err) {
       showErrorToast(err);
+    } finally {
+      deletingIdsRef.current.delete(id);
     }
   }, [deleteMutation]);
 
   const handleBulkDelete = useCallback(async () => {
-    if (selectedIds.size === 0) return;
+    if (selectedIds.size === 0 || isBulkDeletingRef.current) return;
     
+    isBulkDeletingRef.current = true;
     try {
       const result = await bulkDeleteMutation.mutateAsync(Array.from(selectedIds));
       showSuccessToast(`Deleted ${result.deletedCount} assets`);
@@ -141,6 +170,8 @@ export function MediaLibraryPage() {
       setSelectionMode(false);
     } catch (err) {
       showErrorToast(err);
+    } finally {
+      isBulkDeletingRef.current = false;
     }
   }, [selectedIds, bulkDeleteMutation]);
 

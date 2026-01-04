@@ -8,7 +8,7 @@
  */
 
 import { useRef } from 'react';
-import { ChevronLeft, ChevronRight, Play, Eye, TrendingUp, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Eye, TrendingUp } from 'lucide-react';
 
 interface ClipItem {
   id: string;
@@ -25,13 +25,13 @@ interface ClipItem {
 }
 
 interface ClipCarouselProps {
-  title: string;
-  icon: React.ReactNode;
+  title?: string;
+  icon?: React.ReactNode;
   clips: ClipItem[];
   isLoading?: boolean;
   emptyMessage?: string;
-  accentColor?: string;
   compact?: boolean;
+  hideHeader?: boolean;
 }
 
 function formatDuration(seconds: number): string {
@@ -52,8 +52,8 @@ export function ClipCarousel({
   clips, 
   isLoading, 
   emptyMessage = 'No clips available',
-  accentColor = 'interactive',
-  compact = false
+  compact = false,
+  hideHeader = false
 }: ClipCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -72,10 +72,12 @@ export function ClipCarousel({
   if (isLoading) {
     return (
       <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
-        </div>
+        {!hideHeader && title && (
+          <div className="flex items-center gap-2">
+            {icon}
+            <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
+          </div>
+        )}
         <div className="flex gap-2 overflow-hidden">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className={`flex-shrink-0 ${compact ? 'w-48 h-28' : 'w-64 h-36'} bg-white/5 rounded-lg animate-pulse`} />
@@ -88,10 +90,12 @@ export function ClipCarousel({
   if (clips.length === 0) {
     return (
       <div className={compact ? "space-y-2" : "space-y-3"}>
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
-        </div>
+        {!hideHeader && title && (
+          <div className="flex items-center gap-2">
+            {icon}
+            <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
+          </div>
+        )}
         <div className={`text-center ${compact ? 'py-4' : 'py-6'} text-text-tertiary text-xs bg-white/[0.02] rounded-lg border border-white/[0.06]`}>
           {emptyMessage}
         </div>
@@ -102,15 +106,35 @@ export function ClipCarousel({
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
-          <span className="text-micro text-text-tertiary">({clips.length})</span>
+      {!hideHeader && title && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {icon}
+            <span className={`font-medium text-text-primary ${compact ? 'text-xs' : 'text-sm'}`}>{title}</span>
+            <span className="text-micro text-text-tertiary">({clips.length})</span>
+          </div>
+          
+          {/* Scroll Controls */}
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => scroll('left')}
+              className="p-1 hover:bg-white/10 rounded transition-colors"
+            >
+              <ChevronLeft className={`${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-text-tertiary`} />
+            </button>
+            <button
+              onClick={() => scroll('right')}
+              className="p-1 hover:bg-white/10 rounded transition-colors"
+            >
+              <ChevronRight className={`${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-text-tertiary`} />
+            </button>
+          </div>
         </div>
-        
-        {/* Scroll Controls */}
-        <div className="flex items-center gap-0.5">
+      )}
+
+      {/* Scroll Controls when header is hidden */}
+      {hideHeader && clips.length > 2 && (
+        <div className="flex items-center justify-end gap-0.5 mb-1">
           <button
             onClick={() => scroll('left')}
             className="p-1 hover:bg-white/10 rounded transition-colors"
@@ -124,7 +148,7 @@ export function ClipCarousel({
             <ChevronRight className={`${compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-text-tertiary`} />
           </button>
         </div>
-      </div>
+      )}
 
       {/* Carousel */}
       <div 

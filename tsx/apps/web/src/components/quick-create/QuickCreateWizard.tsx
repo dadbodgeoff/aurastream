@@ -7,6 +7,8 @@ import type { LogoPosition, LogoSize, LogoType, BrandIntensity, ClassifiedError,
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 import type { AssetPlacement } from '../media-library/placement';
 import { serializePlacements } from '@aurastream/api-client';
+import { getCanvasDimensions } from '../media-library/placement/constants';
+import { useCanvasGeneration } from '../../hooks/useCanvasGeneration';
 
 import { StepIndicator } from './shared';
 import { BoltIcon } from './icons';
@@ -24,7 +26,7 @@ export function QuickCreateWizard() {
   const generateMutation = useGenerateAsset({
     onSuccess: (data) => {
       // Redirect to generation progress page with SSE streaming
-      router.push(`/dashboard/generate/${data.id}`);
+      router.push(`/intel/generate/${data.id}`);
     },
     onError: (classifiedError: ClassifiedError) => {
       // Show appropriate error toast based on error type
@@ -49,6 +51,17 @@ export function QuickCreateWizard() {
   const [selectedMediaAssets, setSelectedMediaAssets] = useState<MediaAsset[]>([]);
   // Asset placements with precise positioning
   const [mediaAssetPlacements, setMediaAssetPlacements] = useState<AssetPlacement[]>([]);
+  // Sketch elements for canvas annotations
+  const [sketchElements, setSketchElements] = useState<import('../media-library/canvas-export/types').AnySketchElement[]>([]);
+
+  // Canvas generation hook for preparing snapshot at generation time
+  // We need to get dimensions based on template, so we use a default until template is selected
+  const canvasDimensions = template ? getCanvasDimensions(template.assetType) : { width: 1280, height: 720 };
+  const { prepareCanvasForGeneration, isPreparing: isPreparingCanvas } = useCanvasGeneration({
+    width: canvasDimensions.width,
+    height: canvasDimensions.height,
+    assetType: template?.assetType || 'thumbnail',
+  });
 
   // Handle generation errors with appropriate toasts
   const handleGenerationError = useCallback((error: ClassifiedError) => {
@@ -230,15 +243,57 @@ export function QuickCreateWizard() {
       assetType = `${formValues.platform}_emote_${formValues.size}`;
     }
     
-    // Extract media asset IDs for injection (fallback if no placements)
-    const mediaAssetIds = selectedMediaAssets.length > 0 && mediaAssetPlacements.length === 0
+    // Check if we should use canvas snapshot mode
+    const hasCanvasContent = mediaAssetPlacements.length > 0 || sketchElements.length > 0;
+    
+    // Prepare canvas snapshot if there's canvas content
+    let canvasSnapshotUrl: string | undefined;
+    let canvasSnapshotDescription: string | undefined;
+    
+    if (hasCanvasContent) {
+      try {
+        console.log('[CANVAS DEBUG] QuickCreate: Preparing canvas snapshot...', {
+          placementsCount: mediaAssetPlacements.length,
+          sketchElementsCount: sketchElements.length,
+        });
+        
+        const canvasResult = await prepareCanvasForGeneration(
+          mediaAssetPlacements,
+          sketchElements,
+          [] // No labeled regions in Quick Create
+        );
+        canvasSnapshotUrl = canvasResult.snapshotUrl;
+        canvasSnapshotDescription = canvasResult.description;
+        
+        console.log('[CANVAS DEBUG] QuickCreate: Canvas snapshot prepared', {
+          snapshotUrl: canvasSnapshotUrl,
+          description: canvasSnapshotDescription,
+        });
+      } catch (canvasError) {
+        console.error('[CANVAS DEBUG] QuickCreate: Canvas snapshot preparation failed:', canvasError);
+        // Fall back to regular placements mode - don't fail the generation
+      }
+    }
+    
+    // Extract media asset IDs for injection (fallback if no placements and no canvas snapshot)
+    const mediaAssetIds = selectedMediaAssets.length > 0 && mediaAssetPlacements.length === 0 && !canvasSnapshotUrl
       ? selectedMediaAssets.map(a => a.id) 
       : undefined;
     
-    // Serialize placements for API if present
-    const serializedPlacements = mediaAssetPlacements.length > 0
+    // Serialize placements for API if present and NOT using canvas snapshot
+    const serializedPlacements = !canvasSnapshotUrl && mediaAssetPlacements.length > 0
       ? serializePlacements(mediaAssetPlacements)
       : undefined;
+    
+    // DEBUG: Log what we're sending to the API
+    console.log('[CANVAS DEBUG] QuickCreate: Calling generateMutation with:', {
+      assetType,
+      hasCanvasSnapshotUrl: !!canvasSnapshotUrl,
+      canvasSnapshotUrl,
+      canvasSnapshotDescription,
+      mediaAssetIds,
+      serializedPlacements: serializedPlacements?.length,
+    });
     
     generateMutation.mutate({
       assetType: assetType as any,
@@ -253,18 +308,21 @@ export function QuickCreateWizard() {
       } : undefined,
       mediaAssetIds,
       mediaAssetPlacements: serializedPlacements,
+      // Canvas snapshot mode - more cost-effective for complex compositions
+      canvasSnapshotUrl,
+      canvasSnapshotDescription,
     });
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-8">
-      {/* Header - More refined */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-600/25 ring-1 ring-white/10">
+    <div className="max-w-5xl mx-auto pb-6">
+      {/* Header - Compact */}
+      <div className="mb-4 flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center shadow-md shadow-emerald-600/20 ring-1 ring-white/10">
           <BoltIcon />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-text-primary tracking-tight">Quick Create</h1>
+          <h1 className="text-sm font-semibold text-text-primary tracking-tight">Quick Create</h1>
           <p className="text-xs text-text-secondary">Professional templates, instant results</p>
         </div>
       </div>
@@ -308,6 +366,8 @@ export function QuickCreateWizard() {
           onMediaAssetsChange={setSelectedMediaAssets}
           mediaAssetPlacements={mediaAssetPlacements}
           onMediaAssetPlacementsChange={setMediaAssetPlacements}
+          sketchElements={sketchElements}
+          onSketchElementsChange={setSketchElements}
         />
       )}
 
@@ -323,10 +383,12 @@ export function QuickCreateWizard() {
           onBack={() => setStep('customize')}
           onGenerate={handleGenerate}
           onRetry={() => generateMutation.retry()}
-          isGenerating={generateMutation.isPending}
+          isGenerating={generateMutation.isPending || isPreparingCanvas}
           error={generateMutation.error}
           classifiedError={generateMutation.classifiedError}
           selectedMediaAssets={selectedMediaAssets}
+          mediaAssetPlacements={mediaAssetPlacements}
+          sketchElements={sketchElements}
         />
       )}
     </div>

@@ -34,7 +34,17 @@ from datetime import datetime, timezone
 
 import redis.asyncio as redis
 
+from backend.workers.heartbeat import send_heartbeat
+from backend.workers.execution_report import (
+    create_report,
+    submit_execution_report,
+    ExecutionOutcome,
+)
+
 logger = logging.getLogger(__name__)
+
+WORKER_NAME_HOURLY = "intel_aggregation_hourly"
+WORKER_NAME_DAILY = "intel_aggregation_daily"
 
 # Configuration
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
@@ -112,16 +122,68 @@ async def should_run_daily(redis_client) -> bool:
     return True
 
 
+async def check_intel_freshness(redis_client) -> tuple[bool, float]:
+    """
+    Check if intel data is fresh enough for aggregation.
+    
+    Returns:
+        Tuple of (is_fresh, age_minutes)
+        - is_fresh: True if data is less than 60 minutes old
+        - age_minutes: Age of the intel data in minutes (or -1 if no data)
+    """
+    try:
+        last_intel_run = await redis_client.get("intel:worker:last_run")
+        if not last_intel_run:
+            logger.warning("No intel:worker:last_run timestamp found - intel worker may not have run yet")
+            return False, -1
+        
+        now = datetime.now(timezone.utc)
+        last_run_dt = datetime.fromisoformat(last_intel_run)
+        age_minutes = (now - last_run_dt).total_seconds() / 60
+        
+        if age_minutes > 60:  # Data older than 1 hour
+            logger.warning(f"Intel data is {age_minutes:.0f} min old, may be stale")
+            return False, age_minutes
+        
+        logger.info(f"Intel data is fresh ({age_minutes:.0f} min old)")
+        return True, age_minutes
+        
+    except Exception as e:
+        logger.warning(f"Error checking intel freshness: {e}")
+        return False, -1
+
+
 async def run_hourly_aggregation(redis_client, db) -> dict:
-    """Run hourly aggregation."""
+    """Run hourly aggregation with distributed lock."""
+    from backend.services.distributed_lock import worker_lock, LockAcquisitionError
+    
     logger.info("Starting hourly aggregation...")
     start = time.time()
     
     try:
-        from backend.services.intel.aggregation.hourly import HourlyAggregator
-        
-        aggregator = HourlyAggregator(redis_client, db)
-        count = await aggregator.run()
+        # Acquire distributed lock to prevent concurrent aggregation
+        async with worker_lock("intel_aggregation", "hourly", timeout=300, raise_on_failure=False) as acquired:
+            if not acquired:
+                logger.info("Hourly aggregation already running on another instance, skipping")
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "already_running",
+                    "duration_seconds": round(time.time() - start, 2),
+                }
+            
+            # Check if intel data is fresh before aggregating
+            is_fresh, age_minutes = await check_intel_freshness(redis_client)
+            if not is_fresh and age_minutes > 0:
+                logger.warning(
+                    f"Proceeding with aggregation despite stale intel data ({age_minutes:.0f} min old). "
+                    "Results may not reflect latest intel analysis."
+                )
+            
+            from backend.services.intel.aggregation.hourly import HourlyAggregator
+            
+            aggregator = HourlyAggregator(redis_client, db)
+            count = await aggregator.run()
         
         # Record last run
         await redis_client.set(
@@ -148,15 +210,28 @@ async def run_hourly_aggregation(redis_client, db) -> dict:
 
 
 async def run_daily_rollup(redis_client, db) -> dict:
-    """Run daily rollup."""
+    """Run daily rollup with distributed lock."""
+    from backend.services.distributed_lock import worker_lock, LockAcquisitionError
+    
     logger.info("Starting daily rollup...")
     start = time.time()
     
     try:
-        from backend.services.intel.aggregation.daily import DailyRollup
-        
-        rollup = DailyRollup(db)
-        count = await rollup.run()
+        # Acquire distributed lock to prevent concurrent rollup
+        async with worker_lock("intel_aggregation", "daily", timeout=600, raise_on_failure=False) as acquired:
+            if not acquired:
+                logger.info("Daily rollup already running on another instance, skipping")
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "already_running",
+                    "duration_seconds": round(time.time() - start, 2),
+                }
+            
+            from backend.services.intel.aggregation.daily import DailyRollup
+            
+            rollup = DailyRollup(db)
+            count = await rollup.run()
         
         # Record last run
         await redis_client.set(
@@ -196,6 +271,10 @@ async def run_continuous():
     
     redis_client = await get_redis_client()
     
+    # Send initial heartbeats
+    send_heartbeat(WORKER_NAME_HOURLY, is_running=False)
+    send_heartbeat(WORKER_NAME_DAILY, is_running=False)
+    
     try:
         db = get_supabase_db()
         logger.info("✓ Connected to Supabase")
@@ -207,15 +286,65 @@ async def run_continuous():
         while not _shutdown_requested:
             now = datetime.now(timezone.utc)
             
+            # Send heartbeats every loop
+            send_heartbeat(WORKER_NAME_HOURLY, is_running=False)
+            send_heartbeat(WORKER_NAME_DAILY, is_running=False)
+            
             # Check hourly aggregation
             if await should_run_hourly(redis_client):
+                send_heartbeat(WORKER_NAME_HOURLY, is_running=True)
+                start_time = time.time()
                 result = await run_hourly_aggregation(redis_client, db)
+                duration_ms = int((time.time() - start_time) * 1000)
+                
+                # Submit enhanced report for hourly
+                report = create_report(WORKER_NAME_HOURLY)
+                report.duration_ms = duration_ms
+                
+                if result.get("skipped"):
+                    report.outcome = ExecutionOutcome.SKIPPED
+                    report.custom_metrics = {"reason": result.get("reason", "unknown")}
+                elif not result.get("success"):
+                    report.outcome = ExecutionOutcome.FAILED
+                    report.error_message = result.get("error")
+                else:
+                    report.outcome = ExecutionOutcome.SUCCESS
+                    report.data_verification.records_processed = result.get("categories_aggregated", 0)
+                    report.custom_metrics = {
+                        "categories_aggregated": result.get("categories_aggregated", 0),
+                    }
+                
+                submit_execution_report(report)
+                
                 if not result["success"]:
                     logger.warning(f"Hourly aggregation had errors: {result.get('error')}")
             
             # Check daily rollup
             if await should_run_daily(redis_client):
+                send_heartbeat(WORKER_NAME_DAILY, is_running=True)
+                start_time = time.time()
                 result = await run_daily_rollup(redis_client, db)
+                duration_ms = int((time.time() - start_time) * 1000)
+                
+                # Submit enhanced report for daily
+                report = create_report(WORKER_NAME_DAILY)
+                report.duration_ms = duration_ms
+                
+                if result.get("skipped"):
+                    report.outcome = ExecutionOutcome.SKIPPED
+                    report.custom_metrics = {"reason": result.get("reason", "unknown")}
+                elif not result.get("success"):
+                    report.outcome = ExecutionOutcome.FAILED
+                    report.error_message = result.get("error")
+                else:
+                    report.outcome = ExecutionOutcome.SUCCESS
+                    report.data_verification.records_processed = result.get("categories_rolled_up", 0)
+                    report.custom_metrics = {
+                        "categories_rolled_up": result.get("categories_rolled_up", 0),
+                    }
+                
+                submit_execution_report(report)
+                
                 if not result["success"]:
                     logger.warning(f"Daily rollup had errors: {result.get('error')}")
             

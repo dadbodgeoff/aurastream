@@ -1,122 +1,51 @@
 'use client';
 
 /**
- * Daily Brief - Intel Dashboard
+ * Daily Brief - Intel Dashboard (Redesigned)
  * 
- * Layout (optimized for actionable content):
- * 1. Compact header with inline insight
- * 2. Clip carousels (YouTube trending + Twitch clips) - at TOP
- * 3. Category feeds (Thumbnails, Titles, Ideas, Keywords) - main value
+ * Target Layout:
+ * 1. Header: Greeting + date (left), Market Opportunity + Daily Assets badges (right)
+ * 2. Side-by-side carousels: YouTube Trending | Twitch Clips with "View All" links
+ * 3. Intelligence section: Topic dropdown inline with title, tabs, AI insight banner inside
+ * 4. Thumbnail rows: Row-based layout with aspect ratio, hashtags, stats, Analyze button
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { 
   useIntelPreferences, 
-  useDailyInsight,
+  useDailyBrief,
   useYouTubeTrending,
   useTwitchClips,
+  useCategoryInsight,
 } from '@aurastream/api-client';
 import { useIntelStore } from '@/stores/intelStore';
 import { useAuth } from '@aurastream/shared';
 import Link from 'next/link';
 import { 
-  Zap, Clock, Image, Type, Lightbulb, Hash,
-  ChevronDown, ChevronUp, Settings, Youtube, Tv2,
-  ArrowRight
+  Clock, Image, Type, Lightbulb, Hash,
+  Settings, Tv2, Play, ChevronRight,
 } from 'lucide-react';
 
 import { BriefSkeleton } from '@/components/intel/brief/BriefSkeleton';
 import { IntelOnboarding } from '@/components/intel/IntelOnboarding';
-import { ThumbnailFeed, TitleFeed, VideoIdeasFeed, KeywordsFeed } from '@/components/intel/feeds';
+import { TitleFeed, VideoIdeasFeed, KeywordsFeed, ThumbnailEntryRow } from '@/components/intel/feeds';
 import { ClipCarousel } from '@/components/intel/carousels';
+import { TopicDropdown } from '@/components/intel/TopicDropdown';
+import { AIInsightBanner } from '@/components/intel/AIInsightBanner';
+import { MarketOpportunityBadge, DailyAssetsBadge } from '@/components/intel/badges';
 
 // ============================================================================
-// Category Feed Section Component
+// Feed Tab Types
 // ============================================================================
 
 type FeedType = 'thumbnails' | 'titles' | 'ideas' | 'keywords';
 
-interface CategoryFeedSectionProps {
-  categoryKey: string;
-  categoryName: string;
-  defaultExpanded?: boolean;
-}
-
-function CategoryFeedSection({ categoryKey, categoryName, defaultExpanded = true }: CategoryFeedSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [activeFeed, setActiveFeed] = useState<FeedType>('thumbnails'); // Default to thumbnails
-
-  const feedTabs: { key: FeedType; label: string; icon: any; color: string }[] = [
-    { key: 'thumbnails', label: 'Thumbnails', icon: Image, color: 'text-purple-400' },
-    { key: 'titles', label: 'Titles', icon: Type, color: 'text-blue-400' },
-    { key: 'ideas', label: 'Ideas', icon: Lightbulb, color: 'text-yellow-400' },
-    { key: 'keywords', label: 'Keywords', icon: Hash, color: 'text-green-400' },
-  ];
-
-  return (
-    <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
-      {/* Category Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-interactive-500" />
-          <h2 className="text-base font-semibold text-text-primary">{categoryName}</h2>
-        </div>
-        {isExpanded ? (
-          <ChevronUp className="w-4 h-4 text-text-tertiary" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-text-tertiary" />
-        )}
-      </button>
-
-      {isExpanded && (
-        <>
-          {/* Feed Tabs */}
-          <div className="flex border-t border-white/[0.06]">
-            {feedTabs.map(tab => {
-              const Icon = tab.icon;
-              const isActive = activeFeed === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveFeed(tab.key)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs transition-colors ${
-                    isActive 
-                      ? 'bg-white/[0.04] border-b-2 border-interactive-500' 
-                      : 'hover:bg-white/[0.02] text-text-tertiary'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? tab.color : ''}`} />
-                  <span className={isActive ? 'text-text-primary font-medium' : ''}>
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Feed Content */}
-          <div className="p-4">
-            {activeFeed === 'thumbnails' && (
-              <ThumbnailFeed categoryKey={categoryKey} categoryName={categoryName} />
-            )}
-            {activeFeed === 'titles' && (
-              <TitleFeed categoryKey={categoryKey} categoryName={categoryName} />
-            )}
-            {activeFeed === 'ideas' && (
-              <VideoIdeasFeed categoryKey={categoryKey} categoryName={categoryName} />
-            )}
-            {activeFeed === 'keywords' && (
-              <KeywordsFeed categoryKey={categoryKey} categoryName={categoryName} />
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+const feedTabs: { key: FeedType; label: string; icon: any }[] = [
+  { key: 'thumbnails', label: 'Thumbnails', icon: Image },
+  { key: 'titles', label: 'Titles', icon: Type },
+  { key: 'ideas', label: 'Ideas', icon: Lightbulb },
+  { key: 'keywords', label: 'Keywords', icon: Hash },
+];
 
 // ============================================================================
 // Main Component
@@ -125,171 +54,231 @@ function CategoryFeedSection({ categoryKey, categoryName, defaultExpanded = true
 export default function DailyBriefPage() {
   const { user } = useAuth();
   const { data: preferences, isLoading: prefsLoading } = useIntelPreferences();
-  const { data: insight } = useDailyInsight();
+  const { data: dailyBrief, isLoading: briefLoading } = useDailyBrief();
   
-  // YouTube trending videos (gaming category)
   const { data: youtubeTrending, isLoading: youtubeLoading } = useYouTubeTrending('gaming', 10);
   
   const syncFromServer = useIntelStore(state => state.syncFromServer);
   const subscribedCategories = useIntelStore(state => state.subscribedCategories);
 
-  // Get first subscribed category's Twitch ID for clips
-  // If no twitchId, fetch general clips (not category-specific)
-  const firstTwitchId = subscribedCategories[0]?.twitchId;
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState<string>('');
+  const [activeFeed, setActiveFeed] = useState<FeedType>('thumbnails');
+  
+  // Track if initial sync has happened to prevent race conditions
+  const hasSyncedRef = useRef(false);
+
+  const selectedCategory = subscribedCategories.find(c => c.key === selectedCategoryKey) 
+    || subscribedCategories[0];
+
+  const selectedTwitchId = selectedCategory?.twitchId;
   const { data: twitchClips, isLoading: twitchLoading } = useTwitchClips(
-    firstTwitchId || undefined,  // undefined = fetch general top clips
-    'day',
-    10,
-    true  // Always enabled - fetch general clips if no category
+    selectedTwitchId || undefined, 'day', 10, true
   );
 
+  // Get category insight for thumbnails and AI insight
+  const { data: categoryInsight } = useCategoryInsight(selectedCategory?.key || '');
+
+  // Sync preferences to store only once when data arrives
   useEffect(() => {
-    if (preferences) {
+    if (preferences && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
       syncFromServer(preferences);
     }
   }, [preferences, syncFromServer]);
 
-  if (prefsLoading) {
-    return <BriefSkeleton />;
-  }
+  // Set initial category only after sync and when categories are available
+  useEffect(() => {
+    if (subscribedCategories.length > 0 && !selectedCategoryKey && hasSyncedRef.current) {
+      setSelectedCategoryKey(subscribedCategories[0].key);
+    }
+  }, [subscribedCategories, selectedCategoryKey]);
 
-  if (subscribedCategories.length === 0) {
-    return <IntelOnboarding />;
-  }
+  // Unified loading state - wait for critical data before rendering
+  const isInitialLoading = prefsLoading || (preferences && !hasSyncedRef.current);
+  
+  if (isInitialLoading) return <BriefSkeleton />;
+  if (subscribedCategories.length === 0) return <IntelOnboarding />;
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening';
+  const dateStr = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
-  // Transform YouTube trending for carousel
   const youtubeClips = (youtubeTrending || []).map(video => ({
-    id: video.videoId,
-    title: video.title,
-    thumbnailUrl: video.thumbnail,
+    id: video.videoId, title: video.title, thumbnailUrl: video.thumbnail,
     url: `https://youtube.com/watch?v=${video.videoId}`,
-    viewCount: video.views,
-    broadcasterName: video.channelTitle,
-    duration: video.durationSeconds,
+    viewCount: video.views, broadcasterName: video.channelTitle, duration: video.durationSeconds,
   }));
 
-  // Transform Twitch clips for carousel
   const twitchClipItems = (twitchClips || []).map(clip => ({
-    id: clip.id,
-    title: clip.title,
-    thumbnailUrl: clip.thumbnailUrl,
-    url: clip.url,
-    viewCount: clip.viewCount,
-    broadcasterName: clip.broadcasterName,
-    duration: clip.duration,
+    id: clip.id, title: clip.title, thumbnailUrl: clip.thumbnailUrl, url: clip.url,
+    viewCount: clip.viewCount, broadcasterName: clip.broadcasterName, duration: clip.duration,
   }));
+
+  const aiInsight = categoryInsight?.categoryStyleSummary || dailyBrief?.insights?.[0]?.insight || null;
+  const thumbnails = categoryInsight?.thumbnails || [];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
+    <div className="max-w-6xl mx-auto space-y-4 px-4">
       {/* ================================================================== */}
-      {/* COMPACT HEADER WITH INLINE INSIGHT */}
+      {/* HEADER: Greeting + Date (left) | Badges (right) */}
       {/* ================================================================== */}
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-xl font-bold text-text-primary">
-              {greeting}, {user?.displayName || 'Creator'}
-            </h1>
-            <span className="text-xs text-text-tertiary">
-              {now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-          
-          {/* Inline insight - compact */}
-          {insight && (
-            <div className="flex items-center gap-3 mt-2">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-interactive-500/10 border border-interactive-500/20 rounded-lg">
-                <Zap className="w-3.5 h-3.5 text-interactive-400" />
-                <span className="text-sm text-interactive-400 font-medium">{insight.metricValue}</span>
-                <span className="text-xs text-text-secondary">{insight.headline}</span>
-              </div>
-              <Link
-                href="/create"
-                className="text-xs text-interactive-400 hover:text-interactive-300 flex items-center gap-1"
-              >
-                Act now <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-          )}
-        </div>
-
+      <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
-          {subscribedCategories.slice(0, 2).map(cat => (
-            <span key={cat.key} className="px-2 py-1 bg-white/5 text-text-tertiary text-micro rounded-full">
-              {cat.name}
-            </span>
-          ))}
-          {subscribedCategories.length > 2 && (
-            <span className="text-micro text-text-tertiary">+{subscribedCategories.length - 2}</span>
-          )}
-          <Link 
-            href="/intel/settings"
-            className="p-1.5 hover:bg-white/5 rounded-lg transition-colors"
-          >
+          <h1 className="text-xl font-bold text-text-primary">
+            {greeting}, {user?.displayName || 'Creator'}
+          </h1>
+          <span className="text-xs text-text-tertiary">{dateStr}</span>
+          <Link href="/intel/settings" className="p-1 hover:bg-white/5 rounded ml-1">
             <Settings className="w-4 h-4 text-text-tertiary" />
           </Link>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <MarketOpportunityBadge data={dailyBrief?.marketOpportunity} isLoading={briefLoading} />
+          <DailyAssetsBadge data={dailyBrief?.dailyAssets} isLoading={briefLoading} />
         </div>
       </header>
 
       {/* ================================================================== */}
-      {/* CLIP CAROUSELS - COMPACT */}
+      {/* CAROUSELS: Side-by-side YouTube Trending | Twitch Clips */}
       {/* ================================================================== */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-2">
-          <ClipCarousel
-            title="YouTube Trending"
-            icon={<Youtube className="w-3 h-3 text-red-500" />}
-            clips={youtubeClips}
-            isLoading={youtubeLoading}
-            emptyMessage="No trending videos"
-            compact
-          />
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Play className="w-4 h-4 text-red-500" />
+              <span className="text-sm font-medium text-text-primary">YouTube Trending</span>
+            </div>
+            <Link href="/intel/youtube" className="text-xs text-text-tertiary hover:text-text-secondary flex items-center gap-0.5">
+              View All <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <ClipCarousel clips={youtubeClips} isLoading={youtubeLoading} emptyMessage="No trending videos" compact hideHeader />
         </div>
 
-        <div className="bg-white/[0.02] border border-white/[0.06] rounded-lg p-2">
-          <ClipCarousel
-            title={firstTwitchId ? "Twitch Clips" : "Recent Twitch Clips"}
-            icon={<Tv2 className="w-3 h-3 text-purple-500" />}
-            clips={twitchClipItems}
-            isLoading={twitchLoading}
-            emptyMessage="No Twitch clips available"
-            compact
-          />
+        <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Tv2 className="w-4 h-4 text-purple-500" />
+              <span className="text-sm font-medium text-text-primary">
+                {selectedCategory?.name || 'Twitch'} Clips ({twitchClipItems.length})
+              </span>
+            </div>
+            <Link href="/intel/clips" className="text-xs text-text-tertiary hover:text-text-secondary flex items-center gap-0.5">
+              View All <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+          <ClipCarousel clips={twitchClipItems} isLoading={twitchLoading} emptyMessage="No clips available" compact hideHeader />
         </div>
       </section>
 
       {/* ================================================================== */}
-      {/* CATEGORY FEEDS - MAIN VALUE */}
+      {/* INTELLIGENCE SECTION: Topic dropdown + Tabs + AI Insight + Content */}
       {/* ================================================================== */}
-      <section className="space-y-3">
-        {subscribedCategories.map((category, index) => (
-          <CategoryFeedSection
-            key={category.key}
-            categoryKey={category.key}
-            categoryName={category.name}
-            defaultExpanded={index === 0}
-          />
-        ))}
-      </section>
+      {selectedCategory && (
+        <section className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden">
+          {/* Section Header: Title + Topic Dropdown + Tabs */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 border-b border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-interactive-500" />
+                <h2 className="text-base font-semibold text-text-primary">
+                  {selectedCategory.name} Intelligence
+                </h2>
+              </div>
+              <TopicDropdown
+                categories={subscribedCategories}
+                selectedKey={selectedCategoryKey || subscribedCategories[0]?.key || ''}
+                onSelect={setSelectedCategoryKey}
+              />
+            </div>
+            
+            {/* Feed Tabs - pill style */}
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+              {feedTabs.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeFeed === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveFeed(tab.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs transition-colors ${
+                      isActive 
+                        ? 'bg-white/10 text-text-primary font-medium' 
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* ================================================================== */}
-      {/* MINIMAL FOOTER */}
-      {/* ================================================================== */}
+          {/* AI Insight Banner - inside the section */}
+          {aiInsight && activeFeed === 'thumbnails' && (
+            <div className="px-4 pt-3">
+              <AIInsightBanner insight={aiInsight} categoryName={selectedCategory.name} onDismiss={() => {}} />
+            </div>
+          )}
+
+          {/* Feed Content */}
+          <div className="p-4">
+            {activeFeed === 'thumbnails' && (
+              <div className="space-y-1">
+                {thumbnails.length === 0 ? (
+                  <p className="text-sm text-text-tertiary text-center py-8">
+                    No thumbnail data yet for {selectedCategory.name}
+                  </p>
+                ) : (
+                  thumbnails.map((thumb, i) => (
+                    <ThumbnailEntryRow
+                      key={thumb.videoId || i}
+                      thumbnail={{
+                        videoId: thumb.videoId,
+                        title: thumb.title,
+                        thumbnailUrl: thumb.thumbnailUrl || thumb.url,
+                        viewCount: thumb.viewCount || thumb.views || 0,
+                        layoutType: thumb.layoutType || 'standard',
+                        colorMood: thumb.colorMood || '',
+                        whyItWorks: thumb.whyItWorks || '',
+                        aspectRatio: thumb.aspectRatio,
+                        hashtags: thumb.hashtags || [],
+                        formatType: thumb.formatType || thumb.layoutType,
+                        channelName: thumb.channelName,
+                        hasFace: thumb.hasFace,
+                        hasText: thumb.hasText,
+                        dominantColors: thumb.dominantColors,
+                        textContent: thumb.textContent,
+                      }}
+                      onAnalyze={(videoId) => console.log('Analyze:', videoId)}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+            {activeFeed === 'titles' && (
+              <TitleFeed categoryKey={selectedCategory.key} categoryName={selectedCategory.name} />
+            )}
+            {activeFeed === 'ideas' && (
+              <VideoIdeasFeed categoryKey={selectedCategory.key} categoryName={selectedCategory.name} />
+            )}
+            {activeFeed === 'keywords' && (
+              <KeywordsFeed categoryKey={selectedCategory.key} categoryName={selectedCategory.name} />
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Footer */}
       <footer className="flex items-center justify-between py-3 text-micro text-text-tertiary">
         <div className="flex items-center gap-1.5">
           <Clock className="w-3 h-3" />
           <span>Refreshes every 30 min</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/intel/thumbnails" className="hover:text-text-secondary transition-colors">
-            Thumbnails
-          </Link>
-          <Link href="/intel/observatory" className="hover:text-text-secondary transition-colors">
-            Observatory
-          </Link>
+          <Link href="/intel/thumbnails" className="hover:text-text-secondary">Thumbnails</Link>
+          <Link href="/intel/observatory" className="hover:text-text-secondary">Observatory</Link>
         </div>
       </footer>
     </div>

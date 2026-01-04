@@ -36,6 +36,8 @@ export type {
   UseRedirectToastOptions, 
   UseRedirectToastReturn,
 } from './useRedirectToast';
+export { useCreateDraft } from './useCreateDraft';
+export type { UseCreateDraftOptions, UseCreateDraftReturn } from './useCreateDraft';
 
 // Aura Lab hooks - re-exported from api-client for convenience
 export {

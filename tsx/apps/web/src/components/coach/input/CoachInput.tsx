@@ -13,6 +13,7 @@ import React, { memo, useCallback, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useReducedMotion, createDevLogger } from '@aurastream/shared';
 import { SuggestionChips } from './SuggestionChips';
+import { AssetLibraryPicker, type SelectedReferenceAsset } from './AssetLibraryPicker';
 import type { Suggestion } from './useSuggestionContext';
 
 // Dev logger for this component
@@ -57,6 +58,10 @@ export interface CoachInputProps {
   referenceImage?: { file: File; preview: string } | null;
   /** Callback to remove reference image */
   onRemoveImage?: () => void;
+  /** Selected reference assets from media library */
+  selectedReferenceAssets?: SelectedReferenceAsset[];
+  /** Callback when reference assets selection changes */
+  onReferenceAssetsChange?: (assets: SelectedReferenceAsset[]) => void;
   /** Test ID for testing */
   testId?: string;
 }
@@ -392,6 +397,8 @@ export const CoachInput = memo(function CoachInput({
   onImageUpload,
   referenceImage,
   onRemoveImage,
+  selectedReferenceAssets = [],
+  onReferenceAssetsChange,
   testId = 'coach-input',
 }: CoachInputProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -513,7 +520,16 @@ export const CoachInput = memo(function CoachInput({
         className
       )}
     >
-      {/* Reference Image Preview */}
+      {/* Reference Assets from Library */}
+      {onReferenceAssetsChange && (
+        <AssetLibraryPicker
+          selectedAssets={selectedReferenceAssets}
+          onSelectionChange={onReferenceAssetsChange}
+          testId={`${testId}-asset-picker`}
+        />
+      )}
+
+      {/* Reference Image Preview (file upload) */}
       {referenceImage && onRemoveImage && (
         <div className="flex items-start gap-2">
           <ReferenceImagePreview

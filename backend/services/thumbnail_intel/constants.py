@@ -81,7 +81,7 @@ MIN_VIEW_COUNT = 10_000
 MAX_VIDEO_AGE_DAYS = 7
 
 # Gemini model for vision analysis
-GEMINI_VISION_MODEL = "gemini-2.0-flash-001"
+GEMINI_VISION_MODEL = "gemini-3-flash-preview"
 
 # Analysis cache duration (hours)
 CACHE_DURATION_HOURS = 24

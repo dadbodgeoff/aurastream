@@ -22,6 +22,7 @@ Usage:
 
 import argparse
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -29,9 +30,21 @@ import signal
 import sys
 import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import AsyncIterator, Dict, List, Optional, Any
+
+import redis.asyncio as redis
+
+from backend.services.distributed_lock import worker_lock
+from backend.workers.heartbeat import send_heartbeat, send_idle_heartbeat, report_execution
+from backend.workers.execution_report import (
+    create_report,
+    submit_execution_report,
+    ExecutionOutcome,
+)
 
 logger = logging.getLogger(__name__)
+
+WORKER_NAME = "twitch_streams_worker"
 
 # Fetch interval (15 minutes)
 FETCH_INTERVAL = 15 * 60
@@ -66,11 +79,15 @@ def signal_handler(signum, frame):
     _shutdown_requested = True
 
 
-async def get_redis_client():
-    """Get async Redis client."""
-    import redis.asyncio as redis
+@asynccontextmanager
+async def get_redis_client() -> AsyncIterator[redis.Redis]:
+    """Get async Redis client as context manager for proper cleanup."""
     redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379")
-    return redis.from_url(redis_url, decode_responses=True)
+    client = redis.from_url(redis_url, decode_responses=True)
+    try:
+        yield client
+    finally:
+        await client.aclose()
 
 
 async def fetch_streams_for_game(
@@ -169,79 +186,90 @@ async def run_fetch_cycle() -> Dict[str, Any]:
         logger.error(f"Failed to initialize Twitch collector: {e}")
         return {"success": False, "error": str(e)}
     
-    redis_client = await get_redis_client()
-    
     results = {
         "games_fetched": 0,
         "total_streams": 0,
         "total_viewers": 0,
         "errors": [],
+        "skipped": [],
         "details": {},
     }
     
-    try:
-        # Fetch streams for each tracked game
-        for game in TRACKED_GAMES:
-            game_key = game["key"]
-            game_name = game["name"]
+    async with get_redis_client() as redis_client:
+        try:
+            # Fetch streams for each tracked game
+            for game in TRACKED_GAMES:
+                game_key = game["key"]
+                game_name = game["name"]
+                game_id = game["twitch_id"]
+                
+                # Use distributed lock to prevent duplicate fetches across worker instances
+                async with worker_lock(
+                    "twitch_streams",
+                    f"fetch_{game_id}",
+                    timeout=120,
+                    raise_on_failure=False
+                ) as acquired:
+                    if not acquired:
+                        logger.info(f"Fetch already in progress for {game_name}, skipping")
+                        results["skipped"].append(game_name)
+                        continue
+                    
+                    logger.info(f"Fetching streams for {game_name}...")
+                    
+                    stream_data = await fetch_streams_for_game(twitch_collector, game)
+                    
+                    if stream_data:
+                        # Store in Redis
+                        cache_key = TWITCH_STREAMS_KEY.format(game_id=game_id)
+                        await redis_client.setex(
+                            cache_key,
+                            CACHE_TTL,
+                            json.dumps(stream_data)
+                        )
+                        
+                        results["games_fetched"] += 1
+                        results["total_streams"] += stream_data["stream_count"]
+                        results["total_viewers"] += stream_data["total_viewers"]
+                        
+                        results["details"][game_key] = {
+                            "stream_count": stream_data["stream_count"],
+                            "total_viewers": stream_data["total_viewers"],
+                            "avg_viewers": stream_data["avg_viewers_per_stream"],
+                        }
+                        
+                        logger.info(
+                            f"  {game_name}: {stream_data['stream_count']} streams, "
+                            f"{stream_data['total_viewers']:,} viewers"
+                        )
+                    else:
+                        results["errors"].append(f"No data for {game_name}")
+                
+                # Small delay between API calls
+                await asyncio.sleep(0.3)
             
-            logger.info(f"Fetching streams for {game_name}...")
-            
-            stream_data = await fetch_streams_for_game(twitch_collector, game)
-            
-            if stream_data:
-                # Store in Redis
-                cache_key = TWITCH_STREAMS_KEY.format(game_id=game["twitch_id"])
+            # Fetch top games (for discovery)
+            top_games = await fetch_top_games(twitch_collector)
+            if top_games:
                 await redis_client.setex(
-                    cache_key,
+                    TWITCH_GAMES_KEY,
                     CACHE_TTL,
-                    json.dumps(stream_data)
+                    json.dumps({
+                        "games": top_games,
+                        "fetched_at": datetime.now(timezone.utc).isoformat(),
+                    })
                 )
-                
-                results["games_fetched"] += 1
-                results["total_streams"] += stream_data["stream_count"]
-                results["total_viewers"] += stream_data["total_viewers"]
-                
-                results["details"][game_key] = {
-                    "stream_count": stream_data["stream_count"],
-                    "total_viewers": stream_data["total_viewers"],
-                    "avg_viewers": stream_data["avg_viewers_per_stream"],
-                }
-                
-                logger.info(
-                    f"  {game_name}: {stream_data['stream_count']} streams, "
-                    f"{stream_data['total_viewers']:,} viewers"
-                )
-            else:
-                results["errors"].append(f"No data for {game_name}")
+                logger.info(f"Cached top {len(top_games)} games")
             
-            # Small delay between API calls
-            await asyncio.sleep(0.3)
-        
-        # Fetch top games (for discovery)
-        top_games = await fetch_top_games(twitch_collector)
-        if top_games:
-            await redis_client.setex(
-                TWITCH_GAMES_KEY,
-                CACHE_TTL,
-                json.dumps({
-                    "games": top_games,
-                    "fetched_at": datetime.now(timezone.utc).isoformat(),
-                })
+            # Update last fetch timestamp
+            await redis_client.set(
+                TWITCH_LAST_FETCH_KEY,
+                datetime.now(timezone.utc).isoformat()
             )
-            logger.info(f"Cached top {len(top_games)} games")
-        
-        # Update last fetch timestamp
-        await redis_client.set(
-            TWITCH_LAST_FETCH_KEY,
-            datetime.now(timezone.utc).isoformat()
-        )
-        
-    except Exception as e:
-        logger.error(f"Fetch cycle failed: {e}")
-        results["errors"].append(str(e))
-    finally:
-        await redis_client.aclose()
+            
+        except Exception as e:
+            logger.error(f"Fetch cycle failed: {e}")
+            results["errors"].append(str(e))
         # TwitchCollector doesn't need explicit cleanup - uses per-request httpx clients
     
     elapsed = time.time() - start_time
@@ -252,6 +280,7 @@ async def run_fetch_cycle() -> Dict[str, Any]:
     logger.info("TWITCH STREAMS WORKER - Fetch cycle complete")
     logger.info("=" * 60)
     logger.info(f"  Games fetched: {results['games_fetched']}/{len(TRACKED_GAMES)}")
+    logger.info(f"  Games skipped (locked): {len(results['skipped'])}")
     logger.info(f"  Total streams: {results['total_streams']:,}")
     logger.info(f"  Total viewers: {results['total_viewers']:,}")
     logger.info(f"  Duration: {elapsed:.1f}s")
@@ -277,22 +306,44 @@ def run_continuous():
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
     
+    # Send initial idle heartbeat
+    send_idle_heartbeat(WORKER_NAME, schedule_interval_seconds=FETCH_INTERVAL)
+    
     # Fetch immediately on startup
     logger.info("Running initial fetch on startup...")
-    run_fetch_sync()
+    send_heartbeat(WORKER_NAME, is_running=True)
+    start_time = time.time()
+    result = run_fetch_sync()
+    duration_ms = int((time.time() - start_time) * 1000)
+    
+    # Submit enhanced report for initial fetch
+    _submit_enhanced_report(result, duration_ms)
     
     last_fetch = time.time()
     
     while not _shutdown_requested:
         now = time.time()
         
+        # Calculate next scheduled run
+        next_run = datetime.fromtimestamp(last_fetch + FETCH_INTERVAL, tz=timezone.utc)
+        
+        # Send idle heartbeat every loop (indicates we're alive and waiting)
+        send_idle_heartbeat(
+            WORKER_NAME,
+            next_scheduled_run=next_run,
+            schedule_interval_seconds=FETCH_INTERVAL,
+        )
+        
         # Check if it's time to fetch
         if now - last_fetch >= FETCH_INTERVAL:
             logger.info(f"Scheduled fetch triggered (interval: {FETCH_INTERVAL/60:.0f}m)")
+            send_heartbeat(WORKER_NAME, is_running=True)
+            start_time = time.time()
             result = run_fetch_sync()
+            duration_ms = int((time.time() - start_time) * 1000)
             
-            if result.get("errors"):
-                logger.warning(f"Fetch had errors: {result.get('errors')}")
+            # Submit enhanced report
+            _submit_enhanced_report(result, duration_ms)
             
             last_fetch = now
         
@@ -300,6 +351,43 @@ def run_continuous():
         time.sleep(30)
     
     logger.info("Twitch Streams Worker shutting down...")
+
+
+def _submit_enhanced_report(result: Dict[str, Any], duration_ms: int) -> None:
+    """Submit enhanced execution report with data verification."""
+    report = create_report(WORKER_NAME)
+    report.duration_ms = duration_ms
+    
+    has_errors = bool(result.get("errors"))
+    
+    if has_errors:
+        report.outcome = ExecutionOutcome.PARTIAL_SUCCESS if result.get("games_fetched", 0) > 0 else ExecutionOutcome.FAILED
+        report.error_message = str(result.get("errors"))
+        report_execution(WORKER_NAME, success=False, duration_ms=duration_ms, error=str(result.get("errors")))
+    else:
+        report.outcome = ExecutionOutcome.SUCCESS
+        report_execution(WORKER_NAME, success=True, duration_ms=duration_ms)
+    
+    # Data verification metrics
+    report.data_verification.records_fetched = len(TRACKED_GAMES)
+    report.data_verification.records_processed = result.get("games_fetched", 0)
+    report.data_verification.records_skipped = len(result.get("skipped", []))
+    report.data_verification.records_failed = len(result.get("errors", []))
+    report.data_verification.api_calls_made = len(TRACKED_GAMES)
+    report.data_verification.api_calls_succeeded = result.get("games_fetched", 0)
+    report.data_verification.cache_writes = result.get("games_fetched", 0)
+    report.data_verification.cache_ttl_seconds = CACHE_TTL
+    
+    # Custom metrics for Twitch streams
+    report.custom_metrics = {
+        "games_fetched": result.get("games_fetched", 0),
+        "total_streams": result.get("total_streams", 0),
+        "total_viewers": result.get("total_viewers", 0),
+        "games_skipped": result.get("skipped", []),
+        "details": result.get("details", {}),
+    }
+    
+    submit_execution_report(report)
 
 
 def run_once():

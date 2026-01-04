@@ -35,10 +35,16 @@ import {
   useFaceAssets,
   useUploadFace,
   useBrandKits,
+  useMediaAccess,
   type ThumbnailAnalysis,
   type FaceAsset,
+  type MediaAsset,
+  serializePlacements,
 } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
+import { MediaAssetPicker } from '@/components/media-library/MediaAssetPicker';
+import type { AssetPlacement } from '@/components/media-library/placement/types';
+import { useCanvasGeneration } from '@/hooks/useCanvasGeneration';
 
 // ============================================================================
 // Types
@@ -69,6 +75,12 @@ interface RecreationState {
   recreationId: string | null;
   generatedUrl: string | null;
   skinTone: SkinTone;
+  // Media Library integration
+  selectedMediaAssets: MediaAsset[];
+  mediaAssetPlacements: AssetPlacement[];
+  // Canvas Studio integration
+  sketchElements: import('@/components/media-library/canvas-export/types').AnySketchElement[];
+  labeledRegions: import('@/components/media-library/sketch/RegionLabel').LabeledRegion[];
 }
 
 // ============================================================================
@@ -197,6 +209,219 @@ function FaceUploader({
   );
 }
 
+/**
+ * Canvas Preview Component
+ * Shows a live preview of what will be sent to Nano Banana
+ */
+function CanvasPreview({
+  placements,
+  sketchElements,
+}: {
+  placements: AssetPlacement[];
+  sketchElements: import('@/components/media-library/canvas-export/types').AnySketchElement[];
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+  
+  // Thumbnail dimensions
+  const width = 1280;
+  const height = 720;
+  
+  // Load images
+  useEffect(() => {
+    const loadAllImages = async () => {
+      const imageMap = new Map<string, HTMLImageElement>();
+      
+      for (const placement of placements) {
+        const url = placement.asset.processedUrl || placement.asset.thumbnailUrl || placement.asset.url;
+        if (!url || imageMap.has(url)) continue;
+        
+        try {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject();
+            img.src = url;
+          });
+          imageMap.set(url, img);
+        } catch {
+          console.warn(`Failed to load image for preview`);
+        }
+      }
+      
+      setLoadedImages(imageMap);
+    };
+    
+    if (placements.length > 0) {
+      loadAllImages();
+    }
+  }, [placements]);
+  
+  // Render canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Set canvas size (scaled down for preview)
+    const scale = 0.25;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    
+    // Clear with dark background to show transparency
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid pattern to indicate canvas area
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    const gridSize = 20;
+    for (let x = 0; x < canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    
+    // Sort and draw placements
+    const sortedPlacements = [...placements].sort((a, b) => a.zIndex - b.zIndex);
+    
+    for (const placement of sortedPlacements) {
+      const { asset, position, size, rotation, opacity } = placement;
+      const url = asset.processedUrl || asset.thumbnailUrl || asset.url;
+      const img = url ? loadedImages.get(url) : null;
+      
+      if (!img) continue;
+      
+      const x = (position.x / 100) * canvas.width;
+      const y = (position.y / 100) * canvas.height;
+      
+      let drawWidth = (size.width / 100) * canvas.width;
+      let drawHeight = (size.height / 100) * canvas.height;
+      
+      ctx.save();
+      ctx.globalAlpha = opacity / 100;
+      ctx.translate(x, y);
+      
+      if (rotation !== 0) {
+        ctx.rotate((rotation * Math.PI) / 180);
+      }
+      
+      ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      ctx.restore();
+    }
+    
+    // Draw sketch elements
+    const sortedSketch = [...sketchElements].sort((a, b) => a.zIndex - b.zIndex);
+    
+    for (const element of sortedSketch) {
+      ctx.save();
+      ctx.globalAlpha = element.opacity / 100;
+      ctx.strokeStyle = element.color;
+      ctx.fillStyle = element.color;
+      ctx.lineWidth = element.strokeWidth * scale;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      switch (element.type) {
+        case 'freehand': {
+          if (element.points.length < 2) break;
+          ctx.beginPath();
+          ctx.moveTo(
+            (element.points[0].x / 100) * canvas.width,
+            (element.points[0].y / 100) * canvas.height
+          );
+          for (let i = 1; i < element.points.length; i++) {
+            ctx.lineTo(
+              (element.points[i].x / 100) * canvas.width,
+              (element.points[i].y / 100) * canvas.height
+            );
+          }
+          ctx.stroke();
+          break;
+        }
+        case 'rectangle': {
+          const rx = (element.x / 100) * canvas.width;
+          const ry = (element.y / 100) * canvas.height;
+          const rw = (element.width / 100) * canvas.width;
+          const rh = (element.height / 100) * canvas.height;
+          element.filled ? ctx.fillRect(rx, ry, rw, rh) : ctx.strokeRect(rx, ry, rw, rh);
+          break;
+        }
+        case 'circle': {
+          const cx = (element.cx / 100) * canvas.width;
+          const cy = (element.cy / 100) * canvas.height;
+          const radiusX = (element.rx / 100) * canvas.width;
+          const radiusY = (element.ry / 100) * canvas.height;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, radiusX, radiusY, 0, 0, Math.PI * 2);
+          if (element.filled) ctx.fill();
+          ctx.stroke();
+          break;
+        }
+        case 'arrow': {
+          const sx = (element.startX / 100) * canvas.width;
+          const sy = (element.startY / 100) * canvas.height;
+          const ex = (element.endX / 100) * canvas.width;
+          const ey = (element.endY / 100) * canvas.height;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(ex, ey);
+          ctx.stroke();
+          const angle = Math.atan2(ey - sy, ex - sx);
+          const headLen = 8;
+          ctx.beginPath();
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(ex - headLen * Math.cos(angle - Math.PI / 6), ey - headLen * Math.sin(angle - Math.PI / 6));
+          ctx.moveTo(ex, ey);
+          ctx.lineTo(ex - headLen * Math.cos(angle + Math.PI / 6), ey - headLen * Math.sin(angle + Math.PI / 6));
+          ctx.stroke();
+          break;
+        }
+        case 'text': {
+          ctx.font = `${element.fontSize * scale}px ${element.fontFamily}`;
+          ctx.fillText(
+            element.text,
+            (element.x / 100) * canvas.width,
+            (element.y / 100) * canvas.height
+          );
+          break;
+        }
+      }
+      ctx.restore();
+    }
+  }, [placements, sketchElements, loadedImages]);
+  
+  return (
+    <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+      <div className="flex items-center gap-2 mb-2">
+        <Eye className="w-4 h-4 text-emerald-400" />
+        <span className="text-sm font-medium text-emerald-400">Canvas Preview</span>
+        <span className="text-xs text-text-tertiary ml-auto">This will be sent to AI</span>
+      </div>
+      <div className="flex justify-center">
+        <canvas
+          ref={canvasRef}
+          className="rounded-lg border border-emerald-500/30"
+          style={{ maxWidth: '100%', height: 'auto' }}
+        />
+      </div>
+      <p className="text-xs text-text-tertiary mt-2 text-center">
+        {placements.length} asset{placements.length !== 1 ? 's' : ''} • {sketchElements.length} sketch element{sketchElements.length !== 1 ? 's' : ''}
+      </p>
+    </div>
+  );
+}
+
 // ============================================================================
 // Main Page Component
 // ============================================================================
@@ -217,6 +442,12 @@ export default function RecreationPage() {
     recreationId: null,
     generatedUrl: null,
     skinTone: 'original',
+    // Media Library integration
+    selectedMediaAssets: [],
+    mediaAssetPlacements: [],
+    // Canvas Studio integration
+    sketchElements: [],
+    labeledRegions: [],
   });
 
   // Hooks
@@ -225,6 +456,15 @@ export default function RecreationPage() {
   const brandKits = brandKitsData?.brandKits || [];
   const { mutate: uploadFace, isPending: isUploadingFace } = useUploadFace();
   const { mutate: recreate, isPending: isRecreating } = useRecreateThumbnail();
+  const { data: mediaAccess } = useMediaAccess();
+  
+  // Canvas generation hook for preparing snapshot at recreation time
+  // Thumbnail dimensions are fixed at 1280x720
+  const { prepareCanvasForGeneration, isPreparing: isPreparingCanvas } = useCanvasGeneration({
+    width: 1280,
+    height: 720,
+    assetType: 'thumbnail',
+  });
   
   // Poll recreation status
   const { data: recreationStatus } = useRecreationStatus(
@@ -284,12 +524,39 @@ export default function RecreationPage() {
     setState(prev => ({ ...prev, selectedFace: face, uploadedFaceBase64: null }));
   }, []);
 
-  const handleStartRecreation = useCallback(() => {
+  const handleStartRecreation = useCallback(async () => {
     if (!state.analysis) return;
     
     // Build skin tone instruction if not original
     const skinToneInstruction = state.skinTone !== 'original' 
       ? `Render the face with a ${state.skinTone} skin tone.`
+      : undefined;
+    
+    // Check if we should use canvas snapshot mode
+    const hasCanvasContent = state.mediaAssetPlacements.length > 0 || state.sketchElements.length > 0;
+    
+    // Prepare canvas snapshot if there's canvas content
+    let canvasSnapshotUrl: string | undefined;
+    let canvasSnapshotDescription: string | undefined;
+    
+    if (hasCanvasContent) {
+      try {
+        const canvasResult = await prepareCanvasForGeneration(
+          state.mediaAssetPlacements,
+          state.sketchElements,
+          state.labeledRegions
+        );
+        canvasSnapshotUrl = canvasResult.snapshotUrl;
+        canvasSnapshotDescription = canvasResult.description;
+      } catch (canvasError) {
+        console.error('Canvas snapshot preparation failed, falling back to placements:', canvasError);
+        // Fall back to regular placements mode - don't fail the recreation
+      }
+    }
+    
+    // Serialize media asset placements if any and NOT using canvas snapshot
+    const serializedPlacements = !canvasSnapshotUrl && state.mediaAssetPlacements.length > 0
+      ? serializePlacements(state.mediaAssetPlacements)
       : undefined;
     
     recreate({
@@ -302,6 +569,14 @@ export default function RecreationPage() {
       useBrandColors: state.useBrandColors,
       brandKitId: state.selectedBrandKitId || undefined,
       additionalInstructions: skinToneInstruction,
+      // Media Library integration (only when not using canvas snapshot)
+      mediaAssetIds: !canvasSnapshotUrl && state.selectedMediaAssets.length > 0 
+        ? state.selectedMediaAssets.map(a => a.id) 
+        : undefined,
+      mediaAssetPlacements: serializedPlacements,
+      // Canvas snapshot mode - more cost-effective for complex compositions
+      canvasSnapshotUrl,
+      canvasSnapshotDescription,
     }, {
       onSuccess: (response) => {
         setState(prev => ({
@@ -311,7 +586,7 @@ export default function RecreationPage() {
         }));
       },
     });
-  }, [state, recreate]);
+  }, [state, recreate, prepareCanvasForGeneration]);
 
   const handleNextStep = useCallback(() => {
     setState(prev => {
@@ -736,6 +1011,42 @@ export default function RecreationPage() {
                 </div>
               )}
               
+              {/* Media Asset Picker - Pro/Studio only */}
+              {mediaAccess?.hasAccess && (
+                <div className="border-t border-border-primary pt-4">
+                  <label className="block text-sm text-text-secondary mb-3">
+                    Add Your Assets (Logo, Character, etc.)
+                  </label>
+                  <MediaAssetPicker
+                    selectedAssets={state.selectedMediaAssets}
+                    onSelectionChange={(assets) => setState(prev => ({ ...prev, selectedMediaAssets: assets }))}
+                    placements={state.mediaAssetPlacements}
+                    onPlacementsChange={(placements) => setState(prev => ({ ...prev, mediaAssetPlacements: placements }))}
+                    sketchElements={state.sketchElements}
+                    onSketchElementsChange={(elements) => setState(prev => ({ ...prev, sketchElements: elements }))}
+                    assetType="thumbnail"
+                    maxAssets={2}
+                    allowedTypes={['logo', 'character', 'object', 'game_skin', 'overlay']}
+                  />
+                  <p className="text-xs text-text-tertiary mt-2">
+                    Add up to 2 assets from your Media Library. Click the layout icon to position them precisely.
+                  </p>
+                  
+                  {/* Canvas Preview - Shows what will be sent to AI */}
+                  {(state.mediaAssetPlacements.length > 0 || state.sketchElements.length > 0) && (
+                    <div className="mt-3">
+                      <CanvasPreview
+                        placements={state.mediaAssetPlacements}
+                        sketchElements={state.sketchElements}
+                      />
+                      <p className="text-xs text-emerald-400/80 mt-2 text-center italic">
+                        AI will adapt your layout while preserving the viral thumbnail style
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                 <p className="text-sm text-yellow-400">
                   ⚠️ Changing colors or text may reduce effectiveness. 
@@ -752,10 +1063,15 @@ export default function RecreationPage() {
                 </button>
                 <button
                   onClick={handleStartRecreation}
-                  disabled={isRecreating}
+                  disabled={isRecreating || isPreparingCanvas}
                   className="flex-1 py-3 bg-interactive-600 hover:bg-interactive-500 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
-                  {isRecreating ? (
+                  {isPreparingCanvas ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Preparing canvas...
+                    </>
+                  ) : isRecreating ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Starting...

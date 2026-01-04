@@ -33,10 +33,12 @@ const INITIAL_STATE: CreateStudioState = {
 };
 
 // Map URL tab params to creation modes
+// Note: 'coach' is mapped to 'custom' since the coach tab is hidden from the UI
+// The coach functionality is still available via the "Need help? Try the Coach" link in CustomPanel
 const TAB_TO_MODE: Record<string, CreationMode> = {
   templates: 'templates',
   custom: 'custom',
-  coach: 'coach',
+  coach: 'custom', // Redirect coach tab to custom since coach tab is hidden
 };
 
 // =============================================================================

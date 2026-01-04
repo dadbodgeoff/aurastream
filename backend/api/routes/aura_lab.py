@@ -30,8 +30,8 @@ from backend.api.schemas.aura_lab import (
     FusionItem,
     SuccessResponse,
 )
+from backend.api.service_dependencies import StorageServiceDep, UsageLimitServiceDep
 from backend.services.aura_lab_service import AuraLabService, ELEMENTS
-from backend.services.storage_service import get_storage_service
 from backend.services.nano_banana_client import get_nano_banana_client, GenerationRequest
 from backend.services.exceptions import ContentPolicyError, RateLimitError, GenerationError
 from backend.services.jwt_service import TokenPayload
@@ -91,7 +91,8 @@ CRITICAL RULES:
 @router.post("/set-subject", response_model=SetSubjectResponse)
 async def set_subject(
     file: UploadFile = File(...),
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    storage: StorageServiceDep = None,
 ):
     """
     Upload and lock in a test subject for fusion experiments.
@@ -122,7 +123,6 @@ async def set_subject(
     subject_id = str(uuid.uuid4())
     
     # Upload to Supabase Storage
-    storage = get_storage_service()
     try:
         # Use a dedicated bucket path for aura-lab subjects
         # Path: subjects/{user_id}/{subject_id}.{ext}
@@ -158,7 +158,9 @@ async def set_subject(
 @router.post("/fuse", response_model=FuseResponse)
 async def fuse(
     request: FuseRequest,
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    usage_service: UsageLimitServiceDep = None,
+    storage: StorageServiceDep = None,
 ):
     """
     Perform a fusion between test subject and element.
@@ -175,10 +177,7 @@ async def fuse(
     
     **Returns:** Fusion result with image URL, rarity, and scores.
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
     service = AuraLabService()
-    usage_service = get_usage_limit_service()
     tier = current_user.tier or "free"
     
     try:
@@ -260,7 +259,6 @@ async def fuse(
         
         # Upload the generated image to storage
         fusion_id = str(uuid.uuid4())
-        storage = get_storage_service()
         
         try:
             upload_result = await storage.upload_asset(
@@ -418,7 +416,8 @@ async def get_inventory(
 
 @router.get("/usage", response_model=UsageResponse)
 async def get_usage(
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    usage_service: UsageLimitServiceDep = None,
 ):
     """
     Get user's fusion usage.
@@ -433,9 +432,6 @@ async def get_usage(
     
     **Returns:** Usage statistics and reset time.
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    usage_service = get_usage_limit_service()
     usage = await usage_service.check_limit(current_user.sub, "aura_lab")
     
     return UsageResponse(

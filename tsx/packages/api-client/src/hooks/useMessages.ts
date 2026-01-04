@@ -79,6 +79,7 @@ function transformMessageHistoryResponse(data: any): MessageHistoryResponse {
 
 // Query Hooks
 export function useConversations() {
+  const token = getToken();
   return useQuery({
     queryKey: messagesKeys.conversations(),
     queryFn: async (): Promise<ConversationListResponse> => {
@@ -86,10 +87,12 @@ export function useConversations() {
       if (!res.ok) throw new Error('Failed to fetch conversations');
       return transformConversationListResponse(await res.json());
     },
+    enabled: !!token,
   });
 }
 
 export function useMessageHistory(userId: string | null, enabled = true) {
+  const token = getToken();
   return useQuery({
     queryKey: messagesKeys.history(userId ?? ''),
     queryFn: async (): Promise<MessageHistoryResponse> => {
@@ -97,11 +100,12 @@ export function useMessageHistory(userId: string | null, enabled = true) {
       if (!res.ok) throw new Error('Failed to fetch messages');
       return transformMessageHistoryResponse(await res.json());
     },
-    enabled: enabled && !!userId,
+    enabled: enabled && !!userId && !!token,
   });
 }
 
 export function useUnreadCount() {
+  const token = getToken();
   return useQuery({
     queryKey: messagesKeys.unreadCount(),
     queryFn: async (): Promise<number> => {
@@ -110,6 +114,7 @@ export function useUnreadCount() {
       const data = await res.json();
       return data.unread_count ?? 0;
     },
+    enabled: !!token,
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 }

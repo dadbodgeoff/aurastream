@@ -26,8 +26,8 @@ from backend.api.schemas.creator_media import (
     BulkDeleteMediaResponse,
     MediaForPrompt,
 )
+from backend.api.service_dependencies import CreatorMediaServiceDep
 from backend.services.creator_media import (
-    get_creator_media_service,
     MEDIA_ASSET_TYPES,
     ASSET_TYPE_DESCRIPTIONS,
     TOTAL_ASSET_LIMIT,
@@ -39,6 +39,12 @@ from backend.services.exceptions import StorageError
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/media-library", tags=["Creator Media Library"])
+
+
+# Helper to get service for non-endpoint functions
+def _get_service():
+    from backend.services.creator_media.service import get_creator_media_service
+    return get_creator_media_service()
 
 
 # ============================================================================
@@ -85,6 +91,7 @@ async def check_access(
 async def upload_media(
     request: UploadMediaRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Upload a new media asset to the library.
@@ -111,7 +118,6 @@ async def upload_media(
     - facecam_frame: Facecam borders
     - stinger: Transition animations
     """
-    service = get_creator_media_service()
     
     # Get user tier
     user_tier = getattr(current_user, "tier", "free")
@@ -157,6 +163,7 @@ async def list_media(
     sort_by: str = Query(default="created_at", pattern="^(created_at|updated_at|usage_count|display_name)$"),
     sort_order: str = Query(default="desc", pattern="^(asc|desc)$"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     List media assets with filtering and pagination.
@@ -173,7 +180,6 @@ async def list_media(
     - usage_count
     - display_name
     """
-    service = get_creator_media_service()
     
     # Parse tags
     tag_list = None
@@ -205,13 +211,13 @@ async def list_media(
 @router.get("/summary", response_model=MediaLibrarySummaryResponse)
 async def get_library_summary(
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Get summary of the user's media library.
     
     Returns counts by asset type, total assets, and storage used.
     """
-    service = get_creator_media_service()
     
     summaries, total, storage = await service.get_summary(current_user.sub)
     
@@ -240,13 +246,13 @@ async def get_asset_types():
 async def get_primary_asset(
     asset_type: MediaAssetType,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Get the primary asset of a given type.
     
     Returns null if no primary is set.
     """
-    service = get_creator_media_service()
     
     asset = await service.get_primary(current_user.sub, asset_type)
     
@@ -262,11 +268,11 @@ async def get_primary_asset(
 async def get_media(
     asset_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Get a single media asset by ID.
     """
-    service = get_creator_media_service()
     
     try:
         asset = await service.get(current_user.sub, asset_id)
@@ -280,6 +286,7 @@ async def update_media(
     asset_id: str,
     request: UpdateMediaRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Update a media asset.
@@ -292,7 +299,6 @@ async def update_media(
     - is_primary
     - metadata (merged with existing)
     """
-    service = get_creator_media_service()
     
     try:
         asset = await service.update(
@@ -314,13 +320,13 @@ async def update_media(
 async def delete_media(
     asset_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Delete a media asset.
     
     Removes from both storage and database.
     """
-    service = get_creator_media_service()
     
     try:
         await service.delete(current_user.sub, asset_id)
@@ -337,6 +343,7 @@ async def delete_media(
 async def bulk_delete_media(
     asset_ids: List[str],
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Delete multiple media assets at once.
@@ -348,8 +355,6 @@ async def bulk_delete_media(
     
     if len(asset_ids) > 50:
         raise HTTPException(status_code=400, detail="Maximum 50 assets per request")
-    
-    service = get_creator_media_service()
     
     deleted, failed = await service.bulk_delete(current_user.sub, asset_ids)
     
@@ -368,6 +373,7 @@ async def bulk_delete_media(
 async def get_media_for_prompt(
     asset_ids: List[str],
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Get media assets formatted for prompt injection.
@@ -393,8 +399,6 @@ async def get_media_for_prompt(
             status_code=400, 
             detail=f"Maximum {MAX_PROMPT_INJECTION_ASSETS} assets per prompt"
         )
-    
-    service = get_creator_media_service()
     user_tier = getattr(current_user, "tier", "free")
     
     try:
@@ -419,11 +423,11 @@ async def get_media_for_prompt(
 async def toggle_favorite(
     asset_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Toggle favorite status of an asset.
     """
-    service = get_creator_media_service()
     
     try:
         existing = await service.get(current_user.sub, asset_id)
@@ -441,13 +445,13 @@ async def toggle_favorite(
 async def set_as_primary(
     asset_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
 ):
     """
     Set an asset as the primary of its type.
     
     Automatically unsets any existing primary of the same type.
     """
-    service = get_creator_media_service()
     
     try:
         asset = await service.update(

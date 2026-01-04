@@ -5,6 +5,7 @@
  */
 
 import type { ThumbnailAnalysis } from './thumbnailIntel';
+import type { SerializedPlacement } from './creatorMedia';
 
 // ============================================================================
 // Recreation Request/Response
@@ -29,6 +30,14 @@ export interface RecreateRequest {
   brandKitId?: string;
   /** Additional generation instructions */
   additionalInstructions?: string;
+  /** Media asset IDs to include (logo, character, object, etc.). Max 2 assets. */
+  mediaAssetIds?: string[];
+  /** Precise placement data for media assets. Overrides mediaAssetIds if provided. */
+  mediaAssetPlacements?: SerializedPlacement[];
+  /** Canvas snapshot URL for single-image mode (more cost-effective for complex compositions) */
+  canvasSnapshotUrl?: string;
+  /** Description of canvas contents for AI context */
+  canvasSnapshotDescription?: string;
 }
 
 export interface RecreateResponse {

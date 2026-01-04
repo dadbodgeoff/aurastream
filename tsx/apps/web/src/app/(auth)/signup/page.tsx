@@ -216,7 +216,7 @@ export default function SignupPage() {
   const handleOAuthSignup = (provider: 'google' | 'twitch' | 'discord') => {
     // Redirect to OAuth endpoint
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || '';
-    window.location.href = `${baseUrl}/api/v1/oauth/${provider}/authorize?returnUrl=/dashboard`;
+    window.location.href = `${baseUrl}/api/v1/oauth/${provider}/authorize?returnUrl=/intel`;
   };
   
   return (

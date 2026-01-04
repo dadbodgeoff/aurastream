@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Palette, Sparkles, Send, Loader2, Check, ArrowRight, RefreshCw, ChevronLeft, Download, ExternalLink } from 'lucide-react';
+import { User, Palette, Sparkles, Send, Loader2, Check, ArrowRight, RefreshCw, ChevronLeft, Download, ExternalLink, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { 
@@ -13,7 +13,10 @@ import {
   getContinueSessionUrl,
   transformStartRequest,
   useGenerateFromSession,
+  ResilientEventSource,
+  type SSEEvent,
 } from '@aurastream/api-client';
+import { useSimpleAnalytics } from '@aurastream/shared';
 import type { 
   CreationType, 
   StylePreset, 
@@ -45,17 +48,27 @@ interface GeneratedAsset {
   height: number;
 }
 
+/** Stream controller interface for managing resilient streams */
+interface StreamController {
+  abort: () => void;
+  getStreamId: () => string | null;
+}
+
 export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCoreProps) {
   const router = useRouter();
+  const { trackGenerationStarted, trackGenerationCompleted, trackGenerationFailed } = useSimpleAnalytics();
   const [step, setStep] = useState<Step>('type');
   const [creationType, setCreationType] = useState<CreationType | null>(null);
   const [stylePreset, setStylePreset] = useState<StylePreset | null>(null);
   const [initialDescription, setInitialDescription] = useState('');
 
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [streamId, setStreamId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [refinedDescription, setRefinedDescription] = useState<string | null>(null);
   const [confidence, setConfidence] = useState(0);
@@ -71,6 +84,15 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamControllerRef = useRef<StreamController | null>(null);
+  
+  // Race condition guards
+  const isMountedRef = useRef(true);
+  const isPollingRef = useRef(false);
+  const currentJobIdRef = useRef<string | null>(null);
+  
+  // Token batching refs
+  const accumulatedContentRef = useRef<string>('');
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -80,17 +102,31 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     if (step === 'chat') inputRef.current?.focus();
   }, [step]);
 
-  // Cleanup polling on unmount
+  // Cleanup polling and streams on unmount
   useEffect(() => {
+    isMountedRef.current = true;
+    
     return () => {
+      isMountedRef.current = false;
+      isPollingRef.current = false;
       if (pollIntervalRef.current) {
         clearTimeout(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+      if (streamControllerRef.current) {
+        streamControllerRef.current.abort();
+        streamControllerRef.current = null;
       }
     };
   }, []);
 
-  // Poll job status
+  // Poll job status with race condition guards
   const pollJobStatus = useCallback(async (currentJobId: string) => {
+    // Guard: Don't poll if unmounted, not polling, or job ID changed
+    if (!isMountedRef.current || !isPollingRef.current || currentJobIdRef.current !== currentJobId) {
+      return;
+    }
+    
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const accessToken = apiClient.getAccessToken();
     
@@ -101,6 +137,11 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
       
+      // Check again after async operation
+      if (!isMountedRef.current || !isPollingRef.current || currentJobIdRef.current !== currentJobId) {
+        return;
+      }
+      
       if (!response.ok) {
         console.error('[ProfileCreator] Job status fetch failed:', response.status);
         throw new Error('Failed to fetch job status');
@@ -109,22 +150,30 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       const job = await response.json();
       console.log('[ProfileCreator] Job status:', job.status, 'Progress:', job.progress);
       
+      // Check mount status before state updates
+      if (!isMountedRef.current) return;
+      
       setGenerationProgress(job.progress || 0);
       setGenerationStatus(job.status);
       
       if (job.status === 'completed') {
         console.log('[ProfileCreator] Job completed, fetching assets...');
+        isPollingRef.current = false;
         
         // Fetch the generated asset
         const assetsResponse = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}/assets`, {
           headers: { 'Authorization': `Bearer ${accessToken}` },
         });
         
+        if (!isMountedRef.current) return;
+        
         console.log('[ProfileCreator] Assets response status:', assetsResponse.status);
         
         if (assetsResponse.ok) {
           const assets = await assetsResponse.json();
           console.log('[ProfileCreator] Assets received:', assets);
+          
+          if (!isMountedRef.current) return;
           
           if (assets && assets.length > 0) {
             const asset = assets[0];
@@ -137,6 +186,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
               width: asset.width,
               height: asset.height,
             });
+            // Track generation completed
+            trackGenerationCompleted(asset.asset_type || asset.assetType, currentJobId);
             setStep('complete');
             onComplete();
           } else {
@@ -154,18 +205,25 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       
       if (job.status === 'failed') {
         console.error('[ProfileCreator] Job failed:', job.error_message);
+        isPollingRef.current = false;
+        // Track generation failed
+        trackGenerationFailed(creationType || 'unknown', job.error_message || 'Unknown error', currentJobId);
         setError(job.error_message || 'Generation failed');
         setStep('generate'); // Go back to options
         return; // Stop polling
       }
       
       // Continue polling for queued/processing status
-      console.log('[ProfileCreator] Continuing to poll...');
-      pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 1500);
+      if (isMountedRef.current && isPollingRef.current && currentJobIdRef.current === currentJobId) {
+        console.log('[ProfileCreator] Continuing to poll...');
+        pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 1500);
+      }
     } catch (err) {
       console.error('[ProfileCreator] Polling error:', err);
-      // Continue polling on error (with longer delay)
-      pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 3000);
+      // Continue polling on error (with longer delay) if still valid
+      if (isMountedRef.current && isPollingRef.current && currentJobIdRef.current === currentJobId) {
+        pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 3000);
+      }
     }
   }, [onComplete]);
 
@@ -180,9 +238,18 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
   const startSession = useCallback(async () => {
     if (!creationType || !canCreate) return;
+    
+    // Abort any existing stream
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort();
+    }
+    
     setStep('chat');
     setIsStreaming(true);
+    setIsReconnecting(false);
+    setReconnectAttempt(0);
     setError(null);
+    setStreamId(null);
 
     const request: StartProfileCreatorRequest = {
       creationType,
@@ -190,133 +257,169 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       initialDescription: initialDescription || undefined,
     };
 
-    try {
-      const accessToken = apiClient.getAccessToken();
-      const response = await fetch(getStartSessionUrl(), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(transformStartRequest(request)),
-      });
+    const accessToken = apiClient.getAccessToken();
+    const messageId = `assistant-${Date.now()}`;
+    accumulatedContentRef.current = '';
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail?.message || errorData.detail || 'Failed to start session');
-      }
+    setMessages([{ id: messageId, role: 'assistant', content: '', isStreaming: true }]);
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
-
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-      const messageId = `assistant-${Date.now()}`;
-
-      setMessages([{ id: messageId, role: 'assistant', content: '', isStreaming: true }]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data: StreamChunk = JSON.parse(line.slice(6));
-              if (data.type === 'token') {
-                assistantMessage += data.content;
-                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
-              } else if (data.type === 'intent_ready') {
-                setIsReady(true);
-                const meta = data.metadata as Record<string, unknown> | undefined;
-                setRefinedDescription((meta?.refinedDescription || meta?.refined_description || null) as string | null);
-                setConfidence((meta?.confidence || 0) as number);
-              } else if (data.type === 'done') {
-                const meta = data.metadata as Record<string, unknown> | undefined;
-                setSessionId((meta?.sessionId || meta?.session_id || null) as string | null);
-              } else if (data.type === 'error') {
-                setError(data.content || 'An error occurred');
-              }
-            } catch (e) {}
-          }
+    // Create ResilientEventSource
+    const source = new ResilientEventSource({
+      url: getStartSessionUrl(),
+      method: 'POST',
+      body: transformStartRequest(request),
+      authToken: accessToken || undefined,
+      maxRetries: 3,
+      heartbeatTimeout: 35000,
+      onMessage: (event: SSEEvent) => {
+        if (!isMountedRef.current) return;
+        
+        const data = event.data as StreamChunk;
+        if (data.type === 'token') {
+          accumulatedContentRef.current += data.content;
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: accumulatedContentRef.current } : m));
+        } else if (data.type === 'intent_ready') {
+          setIsReady(true);
+          const meta = data.metadata as Record<string, unknown> | undefined;
+          setRefinedDescription((meta?.refinedDescription || meta?.refined_description || null) as string | null);
+          setConfidence((meta?.confidence || 0) as number);
+        } else if (data.type === 'done') {
+          const meta = data.metadata as Record<string, unknown> | undefined;
+          setSessionId((meta?.sessionId || meta?.session_id || null) as string | null);
+          setIsStreaming(false);
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+        } else if (data.type === 'error') {
+          setError(data.content || 'An error occurred');
+          setIsStreaming(false);
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
         }
-      }
+      },
+      onError: (err) => {
+        if (!isMountedRef.current) return;
+        console.error('Failed to start session:', err);
+        setError(err.message || 'Failed to start session');
+        setIsStreaming(false);
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+      },
+      onReconnect: (attempt) => {
+        if (!isMountedRef.current) return;
+        setIsReconnecting(true);
+        setReconnectAttempt(attempt);
+      },
+      onComplete: () => {
+        if (!isMountedRef.current) return;
+        setIsStreaming(false);
+        setIsReconnecting(false);
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+      },
+      onStreamId: (id) => {
+        setStreamId(id);
+      },
+    });
 
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
-    } catch (error) {
-      console.error('Failed to start session:', error);
-      setError(error instanceof Error ? error.message : 'Failed to start session');
-    } finally {
+    streamControllerRef.current = {
+      abort: () => source.abort(),
+      getStreamId: () => source.getStreamId(),
+    };
+
+    source.connect().catch((err) => {
+      if (!isMountedRef.current) return;
+      console.error('Failed to start session:', err);
+      setError(err.message || 'Failed to start session');
       setIsStreaming(false);
-    }
+    });
   }, [creationType, stylePreset, initialDescription, canCreate]);
 
   const sendMessage = useCallback(async () => {
     if (!sessionId || !inputValue.trim() || isStreaming) return;
 
+    // Abort any existing stream
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort();
+    }
+
     const userMessage = inputValue.trim();
     setInputValue('');
     setIsStreaming(true);
+    setIsReconnecting(false);
+    setReconnectAttempt(0);
+    setStreamId(null);
 
     const userMessageId = `user-${Date.now()}`;
-    setMessages(prev => [...prev, { id: userMessageId, role: 'user', content: userMessage }]);
+    const messageId = `assistant-${Date.now()}`;
+    accumulatedContentRef.current = '';
+    
+    setMessages(prev => [
+      ...prev, 
+      { id: userMessageId, role: 'user', content: userMessage },
+      { id: messageId, role: 'assistant', content: '', isStreaming: true }
+    ]);
 
-    try {
-      const accessToken = apiClient.getAccessToken();
-      const response = await fetch(getContinueSessionUrl(sessionId), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: userMessage }),
-      });
+    const accessToken = apiClient.getAccessToken();
 
-      if (!response.ok) throw new Error('Failed to send message');
-
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body');
-
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-      const messageId = `assistant-${Date.now()}`;
-
-      setMessages(prev => [...prev, { id: messageId, role: 'assistant', content: '', isStreaming: true }]);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data: StreamChunk = JSON.parse(line.slice(6));
-              if (data.type === 'token') {
-                assistantMessage += data.content;
-                setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: assistantMessage } : m));
-              } else if (data.type === 'intent_ready') {
-                setIsReady(true);
-                const meta = data.metadata as Record<string, unknown> | undefined;
-                setRefinedDescription((meta?.refinedDescription || meta?.refined_description || null) as string | null);
-                setConfidence((meta?.confidence || 0) as number);
-              }
-            } catch (e) {}
-          }
+    // Create ResilientEventSource
+    const source = new ResilientEventSource({
+      url: getContinueSessionUrl(sessionId),
+      method: 'POST',
+      body: { message: userMessage },
+      authToken: accessToken || undefined,
+      maxRetries: 3,
+      heartbeatTimeout: 35000,
+      onMessage: (event: SSEEvent) => {
+        if (!isMountedRef.current) return;
+        
+        const data = event.data as StreamChunk;
+        if (data.type === 'token') {
+          accumulatedContentRef.current += data.content;
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: accumulatedContentRef.current } : m));
+        } else if (data.type === 'intent_ready') {
+          setIsReady(true);
+          const meta = data.metadata as Record<string, unknown> | undefined;
+          setRefinedDescription((meta?.refinedDescription || meta?.refined_description || null) as string | null);
+          setConfidence((meta?.confidence || 0) as number);
+        } else if (data.type === 'done') {
+          setIsStreaming(false);
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+        } else if (data.type === 'error') {
+          setError(data.content || 'An error occurred');
+          setIsStreaming(false);
+          setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
         }
-      }
+      },
+      onError: (err) => {
+        if (!isMountedRef.current) return;
+        console.error('Failed to send message:', err);
+        setError(err.message || 'Failed to send message');
+        setIsStreaming(false);
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+      },
+      onReconnect: (attempt) => {
+        if (!isMountedRef.current) return;
+        setIsReconnecting(true);
+        setReconnectAttempt(attempt);
+      },
+      onComplete: () => {
+        if (!isMountedRef.current) return;
+        setIsStreaming(false);
+        setIsReconnecting(false);
+        setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
+      },
+      onStreamId: (id) => {
+        setStreamId(id);
+      },
+    });
 
-      setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    } finally {
+    streamControllerRef.current = {
+      abort: () => source.abort(),
+      getStreamId: () => source.getStreamId(),
+    };
+
+    source.connect().catch((err) => {
+      if (!isMountedRef.current) return;
+      console.error('Failed to send message:', err);
+      setError(err.message || 'Failed to send message');
       setIsStreaming(false);
-    }
+    });
   }, [sessionId, inputValue, isStreaming]);
 
   const handleGenerate = () => { if (isReady) setStep('generate'); };
@@ -334,6 +437,13 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     
     console.log('[ProfileCreator] Starting generation with options:', options);
     
+    // Stop any existing polling before starting new generation
+    isPollingRef.current = false;
+    if (pollIntervalRef.current) {
+      clearTimeout(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    
     setError(null);
     setGenerationProgress(0);
     setGenerationStatus('queued');
@@ -343,7 +453,15 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     try {
       const result = await generateMutation.mutateAsync({ sessionId, options });
       console.log('[ProfileCreator] Generation started, job ID:', result.jobId);
+      
+      if (!isMountedRef.current) return;
+      
+      // Track generation started
+      trackGenerationStarted(creationType || 'unknown', result.jobId);
+      
       setJobId(result.jobId);
+      currentJobIdRef.current = result.jobId;
+      isPollingRef.current = true;
       
       // Start polling for job status after a short delay
       pollIntervalRef.current = setTimeout(() => {
@@ -352,6 +470,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       }, 1500);
     } catch (error) {
       console.error('[ProfileCreator] Generation failed:', error);
+      if (!isMountedRef.current) return;
+      
       setError(error instanceof Error ? error.message : 'Generation failed');
       setGenerationStatus('failed');
       setStep('generate');
@@ -367,14 +487,26 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   };
 
   const handleReset = () => {
+    // Stop polling first
+    isPollingRef.current = false;
+    currentJobIdRef.current = null;
     if (pollIntervalRef.current) {
       clearTimeout(pollIntervalRef.current);
+      pollIntervalRef.current = null;
     }
+    
+    // Abort any active stream
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort();
+      streamControllerRef.current = null;
+    }
+    
     setStep('type');
     setCreationType(null);
     setStylePreset(null);
     setInitialDescription('');
     setSessionId(null);
+    setStreamId(null);
     setMessages([]);
     setIsReady(false);
     setRefinedDescription(null);
@@ -384,6 +516,9 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setGenerationProgress(0);
     setGenerationStatus('idle');
     setGeneratedAsset(null);
+    setIsReconnecting(false);
+    setReconnectAttempt(0);
+    accumulatedContentRef.current = '';
   };
 
   return (
@@ -489,6 +624,15 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 <div className="flex items-center gap-2 text-text-tertiary">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-xs">Starting conversation...</span>
+                </div>
+              )}
+              {/* Reconnecting indicator */}
+              {isReconnecting && (
+                <div className="flex items-center gap-2 p-2 bg-warning-muted/10 border border-warning-muted/20 rounded-lg">
+                  <WifiOff className="w-4 h-4 text-warning-muted animate-pulse" />
+                  <span className="text-xs text-warning-muted">
+                    Reconnecting... (attempt {reconnectAttempt})
+                  </span>
                 </div>
               )}
               {/* Error state */}

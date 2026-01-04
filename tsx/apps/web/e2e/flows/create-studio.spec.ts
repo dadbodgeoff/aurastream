@@ -101,17 +101,18 @@ test.describe("Create Studio", () => {
       }
     });
 
-    test("should switch to coach mode on tab click", async ({ page }) => {
+    test("should switch to custom mode on tab click (Coach now integrated)", async ({ page }) => {
       await page.goto("/dashboard/studio");
       await page.waitForTimeout(1000);
 
-      const coachTab = page.getByRole("tab", { name: /coach/i });
-      if (await coachTab.isVisible()) {
-        await coachTab.click();
+      // Coach is now integrated into Build Your Own, so clicking custom should work
+      const customTab = page.getByRole("radio", { name: /build your own/i });
+      if (await customTab.isVisible()) {
+        await customTab.click();
         await page.waitForTimeout(500);
         
-        // URL should update
-        await expect(page).toHaveURL(/tab=coach/);
+        // URL should update to custom
+        await expect(page).toHaveURL(/tab=custom|method=custom/);
       }
     });
   });
@@ -138,13 +139,16 @@ test.describe("Create Studio", () => {
       }
     });
 
-    test("should load coach mode from URL param", async ({ page }) => {
+    test("should load coach mode from URL param (redirects to custom)", async ({ page }) => {
+      // Coach tab is now integrated into custom/Build Your Own
+      // Legacy ?tab=coach URLs should redirect to custom
       await page.goto("/dashboard/studio?tab=coach");
       await page.waitForTimeout(1000);
 
-      const coachTab = page.getByRole("tab", { name: /coach/i });
-      if (await coachTab.isVisible()) {
-        await expect(coachTab).toHaveAttribute("aria-selected", "true");
+      // Should show Build Your Own content (which includes Coach)
+      const customCard = page.getByRole("radio", { name: /build your own/i });
+      if (await customCard.isVisible()) {
+        await expect(customCard).toHaveAttribute("aria-checked", "true");
       }
     });
 
@@ -189,15 +193,15 @@ test.describe("Create Studio", () => {
       expect(hasContent).toBe(true);
     });
 
-    test("should show coach panel content when coach mode active", async ({ page }) => {
-      await page.goto("/dashboard/studio?tab=coach");
+    test("should show coach content when using Coach in Build Your Own", async ({ page }) => {
+      // Coach is now integrated into Build Your Own
+      await page.goto("/dashboard/studio?tab=custom");
       await page.waitForTimeout(1500);
 
-      // Look for coach-related content
-      const coachContent = page.locator("[data-testid='coach-panel']");
-      const coachText = page.getByText(/coach|ai|assistant/i);
+      // Look for the Coach option in the prompt method selector
+      const coachOption = page.getByText(/coach|ai.*help/i);
       
-      const hasContent = await coachContent.isVisible() || await coachText.first().isVisible();
+      const hasContent = await coachOption.first().isVisible();
       expect(hasContent).toBe(true);
     });
   });

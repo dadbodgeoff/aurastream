@@ -161,3 +161,50 @@ export interface UnsubscribeCategoryResponse {
   success: boolean;
   remainingSubscriptions: number;
 }
+
+// ============================================================================
+// Intel Redesign Header Badge Types (NEW)
+// ============================================================================
+
+/**
+ * Market opportunity data for header badge.
+ * Shows competition level and active streams.
+ */
+export interface MarketOpportunityData {
+  level: 'high' | 'medium' | 'low';
+  reason: string;
+  activeStreams: number;
+  changePercent: number;
+  primaryCategory: string;
+}
+
+/**
+ * Daily assets data for header badge.
+ * Shows assets created today and pending jobs.
+ */
+export interface DailyAssetsData {
+  createdToday: number;
+  pendingReview: number;
+}
+
+/**
+ * Enhanced daily brief with header badge data.
+ * Extends the base DailyBrief with Intel redesign fields.
+ */
+export interface EnhancedDailyBrief {
+  date: string;
+  thumbnailOfDay: unknown | null;
+  youtubeHighlights: unknown[];
+  twitchHighlights: unknown[];
+  hotGames: unknown[];
+  insights: unknown[];
+  bestUploadTimes: unknown | null;
+  bestStreamTimes: unknown | null;
+  titlePatterns: unknown | null;
+  thumbnailPatterns: unknown | null;
+  generatedAt?: string;
+  
+  // NEW: Intel redesign header badge data
+  marketOpportunity?: MarketOpportunityData | null;
+  dailyAssets?: DailyAssetsData | null;
+}

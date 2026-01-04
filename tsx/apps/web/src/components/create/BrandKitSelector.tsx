@@ -52,8 +52,8 @@ export function BrandKitSelector({
 
   if (isLoading) {
     return (
-      <div className="h-12 bg-background-surface/50 border border-border-subtle rounded-xl flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
+      <div className="h-10 bg-background-surface/50 border border-border-subtle rounded-lg flex items-center justify-center">
+        <div className="w-4 h-4 border-2 border-interactive-600/30 border-t-interactive-600 rounded-full animate-spin" />
       </div>
     );
   }
@@ -69,8 +69,8 @@ export function BrandKitSelector({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "w-full h-12 px-4 rounded-xl border-2 text-left transition-all duration-200",
-          "flex items-center gap-3",
+          "w-full h-10 px-3 rounded-lg border text-left transition-all duration-150",
+          "flex items-center gap-2.5",
           "bg-background-surface/50 hover:bg-background-surface",
           isOpen 
             ? "border-interactive-600 ring-2 ring-interactive-600/20" 
@@ -80,7 +80,7 @@ export function BrandKitSelector({
         {/* Color indicator */}
         {selected && selectedKit ? (
           <div 
-            className="w-6 h-6 rounded-md flex-shrink-0"
+            className="w-5 h-5 rounded flex-shrink-0"
             style={{ 
               background: selectedColors.length > 0 
                 ? `linear-gradient(135deg, ${selectedColors[0]} 0%, ${selectedColors[1] || selectedColors[0]} 100%)`
@@ -88,8 +88,8 @@ export function BrandKitSelector({
             }}
           />
         ) : (
-          <div className="w-6 h-6 rounded-md bg-background-elevated flex items-center justify-center flex-shrink-0">
-            <svg className="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-5 h-5 rounded bg-background-elevated flex items-center justify-center flex-shrink-0">
+            <svg className="w-3 h-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
           </div>
@@ -98,7 +98,7 @@ export function BrandKitSelector({
         {/* Label */}
         <div className="flex-1 min-w-0">
           <span className={cn(
-            "font-medium truncate block",
+            "text-sm font-medium truncate block",
             selected ? "text-text-primary" : "text-text-secondary"
           )}>
             {selectedKit?.name || 'No brand kit'}
@@ -107,7 +107,7 @@ export function BrandKitSelector({
 
         {/* Active badge */}
         {selectedKit?.is_active && (
-          <span className="px-1.5 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
+          <span className="px-1 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
             Active
           </span>
         )}
@@ -115,7 +115,7 @@ export function BrandKitSelector({
         {/* Chevron */}
         <svg 
           className={cn(
-            "w-4 h-4 text-text-muted transition-transform duration-200 flex-shrink-0",
+            "w-3.5 h-3.5 text-text-muted transition-transform duration-150 flex-shrink-0",
             isOpen && "rotate-180"
           )} 
           fill="none" 
@@ -129,21 +129,21 @@ export function BrandKitSelector({
       {/* Dropdown Menu */}
       {isOpen && (
         <div className={cn(
-          "absolute z-50 w-full mt-2 py-1 rounded-xl border border-border-subtle",
+          "absolute z-50 w-full mt-1 py-1 rounded-lg border border-border-subtle",
           "bg-background-surface shadow-xl shadow-black/20",
-          "animate-fade-in max-h-64 overflow-y-auto"
+          "animate-fade-in max-h-56 overflow-y-auto"
         )}>
           {/* None option */}
           <button
             onClick={() => { onChange(''); setIsOpen(false); }}
             className={cn(
-              "w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors",
+              "w-full px-3 py-2 flex items-center gap-2.5 text-left transition-colors",
               "hover:bg-background-elevated",
               !selected && "bg-interactive-600/5"
             )}
           >
-            <div className="w-6 h-6 rounded-md bg-background-elevated flex items-center justify-center flex-shrink-0">
-              <svg className="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-5 h-5 rounded bg-background-elevated flex items-center justify-center flex-shrink-0">
+              <svg className="w-3 h-3 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
               </svg>
             </div>
@@ -160,7 +160,7 @@ export function BrandKitSelector({
 
           {/* Divider */}
           {brandKits.length > 0 && (
-            <div className="h-px bg-border-subtle mx-3 my-1" />
+            <div className="h-px bg-border-subtle mx-2 my-1" />
           )}
 
           {/* Brand kit options */}
@@ -174,13 +174,13 @@ export function BrandKitSelector({
                 key={kit.id}
                 onClick={() => { onChange(kit.id); setIsOpen(false); }}
                 className={cn(
-                  "w-full px-4 py-2.5 flex items-center gap-3 text-left transition-colors",
+                  "w-full px-3 py-2 flex items-center gap-2.5 text-left transition-colors",
                   "hover:bg-background-elevated",
                   isSelected && "bg-interactive-600/5"
                 )}
               >
                 <div 
-                  className="w-6 h-6 rounded-md flex-shrink-0"
+                  className="w-5 h-5 rounded flex-shrink-0"
                   style={{ 
                     background: hasColors 
                       ? `linear-gradient(135deg, ${colors[0]} 0%, ${colors[1] || colors[0]} 100%)`
@@ -196,7 +196,7 @@ export function BrandKitSelector({
                   </span>
                 </div>
                 {kit.is_active && (
-                  <span className="px-1.5 py-0.5 text-micro font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
+                  <span className="px-1 py-0.5 text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 rounded uppercase flex-shrink-0">
                     Active
                   </span>
                 )}
@@ -209,10 +209,10 @@ export function BrandKitSelector({
 
           {/* Create new link */}
           {brandKits.length === 0 && (
-            <div className="px-4 py-3 border-t border-border-subtle">
+            <div className="px-3 py-2 border-t border-border-subtle">
               <Link
                 href="/dashboard/brand-kits"
-                className="inline-flex items-center gap-2 text-sm text-interactive-600 hover:text-interactive-500 font-medium"
+                className="inline-flex items-center gap-1.5 text-sm text-interactive-600 hover:text-interactive-500 font-medium"
                 onClick={() => setIsOpen(false)}
               >
                 Create a brand kit

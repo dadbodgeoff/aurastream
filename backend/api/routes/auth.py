@@ -27,7 +27,7 @@ from backend.api.middleware.auth import (
     set_csrf_cookie,
     clear_csrf_cookie,
 )
-from backend.api.middleware.rate_limit import (
+from backend.services.rate_limit import (
     check_login_rate_limit,
     check_signup_rate_limit,
     reset_login_rate_limit,

@@ -23,7 +23,8 @@
 
 import React, { memo, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { useReducedMotion, createDevLogger } from '@aurastream/shared';
+import { useReducedMotion, createDevLogger, useUser } from '@aurastream/shared';
+import { apiClient } from '@aurastream/api-client';
 
 // Dev logger for this component
 const log = createDevLogger({ prefix: '[CoachChat]' });
@@ -65,6 +66,10 @@ import { useLightbox } from '../lightbox';
 // Download utility
 import { downloadAsset, getAssetFilename } from '@/utils/download';
 
+// Canvas generation hook for preparing canvas snapshot at generation time
+import { useCanvasGeneration } from '../../hooks/useCanvasGeneration';
+import { getCanvasDimensions } from '../media-library/placement/constants';
+
 // ============================================================================
 // Feature Flag
 // ============================================================================
@@ -98,6 +103,14 @@ export interface CoachChatIntegratedProps {
   selectedMediaAssets?: MediaAsset[];
   /** Media asset placements with precise positioning */
   mediaAssetPlacements?: AssetPlacement[];
+  /** Sketch elements from canvas studio */
+  sketchElements?: AnySketchElement[];
+  /** Pre-prepared canvas snapshot URL (if already uploaded) */
+  canvasSnapshotUrl?: string;
+  /** Canvas snapshot description for AI context */
+  canvasSnapshotDescription?: string;
+  /** Whether to use canvas mode (prepares snapshot at generation time) */
+  useCanvasMode?: boolean;
   /** Additional CSS classes */
   className?: string;
   /** Test ID for testing */
@@ -107,6 +120,7 @@ export interface CoachChatIntegratedProps {
 // Import media types
 import type { MediaAsset } from '@aurastream/api-client';
 import type { AssetPlacement } from '../media-library/placement';
+import type { AnySketchElement } from '../media-library/canvas-export/types';
 
 // ============================================================================
 // Helper Functions
@@ -207,17 +221,90 @@ const LoadingSpinner = ({ className }: { className?: string }) => (
 
 interface EmptyStateProps {
   isLoading: boolean;
+  onStartChat?: () => void;
+  initialRequest?: StartCoachRequest | null;
+  /** Number of media assets selected */
+  mediaAssetCount?: number;
+  /** Number of sketch elements */
+  sketchElementCount?: number;
 }
 
 /**
  * Empty state when no messages exist
  */
-const EmptyState = memo(function EmptyState({ isLoading }: EmptyStateProps) {
+const EmptyState = memo(function EmptyState({ 
+  isLoading, 
+  onStartChat, 
+  initialRequest,
+  mediaAssetCount = 0,
+  sketchElementCount = 0,
+}: EmptyStateProps) {
+  const hasCanvasContent = mediaAssetCount > 0 || sketchElementCount > 0;
+  
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8">
         <LoadingSpinner className="w-8 h-8 text-accent-600 mb-4" />
         <p className="text-text-secondary">Starting your coaching session...</p>
+      </div>
+    );
+  }
+
+  // Show start button if session hasn't started
+  if (onStartChat && initialRequest) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center p-8">
+        <div className="w-16 h-16 rounded-full bg-interactive-600/10 flex items-center justify-center mb-6">
+          <SparklesIcon className="w-8 h-8 text-interactive-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-text-primary mb-3">
+          Ready to start?
+        </h3>
+        <p className="text-sm text-text-secondary text-center max-w-md mb-6">
+          The AI Coach will help you refine your vision into the perfect prompt based on your inputs.
+        </p>
+        
+        {/* Summary of user input */}
+        <div className="w-full max-w-md bg-background-surface rounded-xl p-4 mb-6 space-y-2 text-left">
+          {initialRequest.mood && initialRequest.mood !== 'custom' && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-text-tertiary">Mood:</span>
+              <span className="text-text-primary capitalize">{initialRequest.mood}</span>
+            </div>
+          )}
+          {initialRequest.custom_mood && (
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-text-tertiary">Custom Mood:</span>
+              <span className="text-text-primary">{initialRequest.custom_mood}</span>
+            </div>
+          )}
+          {initialRequest.description && (
+            <div className="text-sm">
+              <span className="text-text-tertiary">Description:</span>
+              <p className="text-text-primary mt-1">{initialRequest.description}</p>
+            </div>
+          )}
+          {hasCanvasContent && (
+            <div className="flex items-center gap-2 text-sm pt-2 border-t border-border-subtle mt-2">
+              <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M3 9h18M9 21V9" />
+              </svg>
+              <span className="text-emerald-400">
+                Canvas: {mediaAssetCount} asset{mediaAssetCount !== 1 ? 's' : ''}
+                {sketchElementCount > 0 && ` • ${sketchElementCount} sketch${sketchElementCount !== 1 ? 'es' : ''}`}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <button
+          onClick={onStartChat}
+          className="flex items-center gap-2 px-6 py-3 rounded-lg bg-interactive-600 text-white font-medium hover:bg-interactive-500 transition-colors"
+        >
+          <SparklesIcon className="w-5 h-5" />
+          Start Chat
+        </button>
       </div>
     );
   }
@@ -399,7 +486,7 @@ const EnhancedCoachMessage = memo(function EnhancedCoachMessage({
   streamingStage,
   isLastMessage,
 }: EnhancedCoachMessageProps) {
-  const { role, content, isStreaming, intentStatus, groundingUsed } = message;
+  const { role, content, isStreaming, intentStatus, groundingUsed, referenceAssets } = message;
   const isUser = role === 'user';
   const [isReasoningExpanded, setIsReasoningExpanded] = useState(false);
 
@@ -427,6 +514,24 @@ const EnhancedCoachMessage = memo(function EnhancedCoachMessage({
         <div className="flex-1 min-w-0 text-right">
           <div className="inline-block max-w-full sm:max-w-[85%] rounded-2xl rounded-tr-sm px-4 py-3 bg-accent-600 text-white text-sm leading-relaxed">
             <p className="whitespace-pre-wrap break-words">{displayContent}</p>
+            {/* Reference assets attached to this message */}
+            {referenceAssets && referenceAssets.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-white/20">
+                {referenceAssets.map((asset) => (
+                  <div 
+                    key={asset.assetId} 
+                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/10 text-xs"
+                  >
+                    <img
+                      src={asset.thumbnailUrl || asset.url}
+                      alt={asset.displayName}
+                      className="w-5 h-5 rounded object-cover"
+                    />
+                    <span className="truncate max-w-[80px]">{asset.displayName}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="text-xs text-text-tertiary mt-1 text-right">
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -551,6 +656,10 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
   initialRequest,
   selectedMediaAssets,
   mediaAssetPlacements,
+  sketchElements,
+  canvasSnapshotUrl,
+  canvasSnapshotDescription,
+  useCanvasMode,
   className,
   testId = 'coach-chat-integrated',
 }: CoachChatIntegratedProps) {
@@ -588,6 +697,26 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
   const [generatedAsset, setGeneratedAsset] = useState<Asset | null>(null);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
   const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null);
+  const [isTweaking, setIsTweaking] = useState(false);
+  const [selectedReferenceAssets, setSelectedReferenceAssets] = useState<Array<{
+    assetId: string;
+    displayName: string;
+    assetType: string;
+    url: string;
+    thumbnailUrl?: string;
+    description?: string;
+  }>>([]);
+
+  // Get user for tier check
+  const user = useUser();
+
+  // Canvas generation hook for preparing snapshot at generation time
+  const canvasDimensions = getCanvasDimensions(assetType);
+  const { prepareCanvasForGeneration, isPreparing: isPreparingCanvas } = useCanvasGeneration({
+    width: canvasDimensions.width,
+    height: canvasDimensions.height,
+    assetType,
+  });
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -644,8 +773,9 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     }
   }, [messages, prefersReducedMotion]);
 
-  // Start session when initialRequest is provided
-  useEffect(() => {
+  // Start session when user clicks "Start Chat" button
+  // Removed auto-start - user must explicitly click to start
+  const handleStartSession = useCallback(() => {
     if (initialRequest && !hasStarted && !sessionId) {
       setHasStarted(true);
       startSession(initialRequest);
@@ -657,16 +787,30 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     const trimmedValue = inputValue.trim();
     if (!trimmedValue || isStreaming || !sessionId) return;
 
+    // Convert selected reference assets to the format expected by sendMessage
+    const referenceAssetsForMessage = selectedReferenceAssets.length > 0
+      ? selectedReferenceAssets.map(asset => ({
+          assetId: asset.assetId,
+          displayName: asset.displayName,
+          assetType: asset.assetType,
+          url: asset.url,
+          thumbnailUrl: asset.thumbnailUrl,
+          description: asset.description,
+        }))
+      : undefined;
+
     setInputValue('');
+    setSelectedReferenceAssets([]); // Clear reference assets after sending
     setLocalError(null);
-    await sendMessage(trimmedValue);
-  }, [inputValue, isStreaming, sessionId, sendMessage]);
+    await sendMessage(trimmedValue, referenceAssetsForMessage);
+  }, [inputValue, isStreaming, sessionId, sendMessage, selectedReferenceAssets]);
 
   // Handle suggestion selection
   const handleSuggestionSelect = useCallback(
     async (action: string) => {
       if (isStreaming || !sessionId) return;
       setLocalError(null);
+      // Suggestions don't include reference assets
       await sendMessage(action);
     },
     [isStreaming, sessionId, sendMessage]
@@ -688,21 +832,48 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
       // Map the coach asset type to the backend generation asset type
       const backendAssetType = mapAssetTypeForGeneration(assetType);
       
-      // Serialize media asset placements if provided
-      const serializedPlacements = mediaAssetPlacements?.map(p => ({
-        assetId: p.assetId,
-        displayName: p.asset.displayName,
-        assetType: p.asset.assetType,
-        url: p.asset.processedUrl || p.asset.url,
-        x: p.position.x,
-        y: p.position.y,
-        width: p.size.width,
-        height: p.size.height,
-        sizeUnit: p.size.unit,
-        zIndex: p.zIndex,
-        rotation: p.rotation,
-        opacity: p.opacity,
-      }));
+      // Check if we should use canvas snapshot mode
+      const hasCanvasContent = (mediaAssetPlacements?.length || 0) > 0 || (sketchElements?.length || 0) > 0;
+      const shouldUseCanvasMode = useCanvasMode && hasCanvasContent;
+      
+      // Prepare canvas snapshot if using canvas mode and no pre-prepared URL
+      let finalCanvasSnapshotUrl = canvasSnapshotUrl;
+      let finalCanvasSnapshotDescription = canvasSnapshotDescription;
+      
+      if (shouldUseCanvasMode && !canvasSnapshotUrl && mediaAssetPlacements) {
+        log.info('Preparing canvas snapshot for generation...');
+        try {
+          const canvasResult = await prepareCanvasForGeneration(
+            mediaAssetPlacements,
+            sketchElements || [],
+            [] // No labeled regions in simplified mode
+          );
+          finalCanvasSnapshotUrl = canvasResult.snapshotUrl;
+          finalCanvasSnapshotDescription = canvasResult.description;
+          log.info('Canvas snapshot prepared:', { url: finalCanvasSnapshotUrl, description: finalCanvasSnapshotDescription });
+        } catch (canvasError) {
+          log.error('Canvas snapshot preparation failed, falling back to placements:', canvasError);
+          // Fall back to regular placements mode - don't fail the generation
+        }
+      }
+      
+      // Serialize media asset placements if provided and NOT using canvas snapshot
+      const serializedPlacements = !finalCanvasSnapshotUrl && mediaAssetPlacements?.length
+        ? mediaAssetPlacements.map(p => ({
+            assetId: p.assetId,
+            displayName: p.asset.displayName,
+            assetType: p.asset.assetType,
+            url: p.asset.processedUrl || p.asset.url,
+            x: p.position.x,
+            y: p.position.y,
+            width: p.size.width,
+            height: p.size.height,
+            sizeUnit: p.size.unit,
+            zIndex: p.zIndex,
+            rotation: p.rotation,
+            opacity: p.opacity,
+          }))
+        : undefined;
       
       log.info('Triggering generation with:', {
         assetType: backendAssetType,
@@ -710,15 +881,20 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         brandKitId,
         mediaAssetCount: selectedMediaAssets?.length || 0,
         hasPlacement: !!serializedPlacements?.length,
+        hasCanvasSnapshot: !!finalCanvasSnapshotUrl,
+        useCanvasMode: shouldUseCanvasMode,
       });
       
       await triggerGeneration({
         assetType: backendAssetType as any,
         customPrompt: refinedDescription,
         brandKitId,
-        // Pass media assets if selected
-        mediaAssetIds: selectedMediaAssets?.map(a => a.id),
+        // Pass media assets if selected (only when not using canvas snapshot)
+        mediaAssetIds: !finalCanvasSnapshotUrl ? selectedMediaAssets?.map(a => a.id) : undefined,
         mediaAssetPlacements: serializedPlacements,
+        // Pass canvas snapshot if available (more cost-effective for complex compositions)
+        canvasSnapshotUrl: finalCanvasSnapshotUrl,
+        canvasSnapshotDescription: finalCanvasSnapshotDescription,
       });
       
       log.info('Generation triggered successfully');
@@ -726,7 +902,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
       log.error('Generation failed:', err);
       setLocalError(err instanceof Error ? err.message : 'Generation failed');
     }
-  }, [refinedDescription, isGenerationReady, isStreaming, triggerGeneration, assetType, brandKitId, selectedMediaAssets, mediaAssetPlacements]);
+  }, [refinedDescription, isGenerationReady, isStreaming, triggerGeneration, assetType, brandKitId, selectedMediaAssets, mediaAssetPlacements, sketchElements, canvasSnapshotUrl, canvasSnapshotDescription, useCanvasMode, prepareCanvasForGeneration]);
 
   // Handle end session
   const handleEndSession = useCallback(async () => {
@@ -778,14 +954,44 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
       URL.revokeObjectURL(referenceImage.preview);
     }
     setReferenceImage(null);
+    setSelectedReferenceAssets([]); // Clear reference assets
     setIsSessionLocked(false);
     setGeneratedAsset(null);
     setInputValue('');
     setLocalError(null);
+    setIsTweaking(false);
     resetGeneration();
     startNewSession();
     onEndSession?.();
   }, [referenceImage, resetGeneration, startNewSession, onEndSession]);
+
+  // Handle tweak - refine the generated asset with feedback
+  const handleTweak = useCallback(async (feedback: string) => {
+    if (!activeJobId || !feedback.trim()) return;
+    
+    setIsTweaking(true);
+    try {
+      const response = await apiClient.generation.refineJob(activeJobId, { refinement: feedback });
+      // Reset generation state and trigger new generation tracking
+      resetGeneration();
+      setIsSessionLocked(false);
+      setGeneratedAsset(null);
+      // The new job will be tracked - navigate or update state
+      // For inline experience, we'll trigger generation tracking for the new job
+      log.info('Tweak submitted, new job:', response.newJob.id);
+      // Trigger generation for the new job
+      await triggerGeneration({
+        assetType: mapAssetTypeForGeneration(assetType) as any,
+        customPrompt: `${refinedDescription} [TWEAK: ${feedback}]`,
+        brandKitId,
+      });
+    } catch (err) {
+      log.error('Tweak failed:', err);
+      setLocalError(err instanceof Error ? err.message : 'Failed to tweak asset');
+    } finally {
+      setIsTweaking(false);
+    }
+  }, [activeJobId, resetGeneration, triggerGeneration, assetType, refinedDescription, brandKitId]);
 
   // Cleanup reference image on unmount
   useEffect(() => {
@@ -813,7 +1019,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
   const showEmptyState = messages.length === 0;
 
   // Check if generation is in progress
-  const isGenerating = generationStatus === 'queued' || generationStatus === 'processing';
+  const isGenerating = generationStatus === 'queued' || generationStatus === 'processing' || isPreparingCanvas;
 
   // Get streaming progress message for enhanced UX feedback
   const getStreamingProgressMessage = useCallback((): string | null => {
@@ -869,7 +1075,13 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         aria-live="polite"
       >
         {showEmptyState ? (
-          <EmptyState isLoading={hasStarted && messages.length === 0} />
+          <EmptyState 
+            isLoading={hasStarted && messages.length === 0} 
+            onStartChat={!hasStarted ? handleStartSession : undefined}
+            initialRequest={initialRequest}
+            mediaAssetCount={selectedMediaAssets?.length || 0}
+            sketchElementCount={sketchElements?.length || 0}
+          />
         ) : (
           <>
             {messages.map((message, index) => (
@@ -947,6 +1159,9 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
                             assetType: generationAsset.assetType,
                           });
                         }}
+                        onTweak={handleTweak}
+                        isTweaking={isTweaking}
+                        tier={user?.subscriptionTier}
                       />
                     )}
                     {generationStatus === 'failed' && (
@@ -1046,6 +1261,8 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         onImageUpload={handleImageUpload}
         referenceImage={referenceImage}
         onRemoveImage={handleRemoveImage}
+        selectedReferenceAssets={selectedReferenceAssets}
+        onReferenceAssetsChange={setSelectedReferenceAssets}
         placeholder={
           isStreaming
             ? 'Waiting for response...'

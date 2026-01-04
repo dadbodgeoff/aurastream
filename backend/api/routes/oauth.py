@@ -25,9 +25,9 @@ from fastapi.responses import RedirectResponse
 
 from backend.api.config import get_settings
 from backend.api.schemas.auth import OAuthInitiateResponse, LoginResponse, UserResponse
-from backend.services.auth_service import get_auth_service, User, TokenPair
+from backend.api.service_dependencies import AuthServiceDep, OAuthServiceDep
+from backend.services.auth_service import User, TokenPair
 from backend.services.oauth_service import (
-    get_oauth_service,
     OAuthError,
     OAuthProviderNotFoundError,
     OAuthStateError,
@@ -144,6 +144,7 @@ def _build_frontend_redirect(success: bool, error: Optional[str] = None) -> str:
 async def initiate_oauth(
     request: Request,
     provider: str,
+    oauth_service: OAuthServiceDep = None,
 ) -> OAuthInitiateResponse:
     """
     Initiate OAuth authentication flow.
@@ -154,6 +155,7 @@ async def initiate_oauth(
     Args:
         request: FastAPI request object
         provider: OAuth provider name (google, twitch, discord)
+        oauth_service: Injected OAuthService
         
     Returns:
         OAuthInitiateResponse: Authorization URL and state token
@@ -161,8 +163,6 @@ async def initiate_oauth(
     Raises:
         HTTPException: 404 if provider is not supported
     """
-    oauth_service = get_oauth_service()
-    
     try:
         # Get the provider (validates it exists)
         oauth_provider = oauth_service.get_provider(provider)
@@ -233,6 +233,8 @@ async def oauth_callback(
     state: str = Query(..., description="State parameter for CSRF validation"),
     error: Optional[str] = Query(None, description="Error from OAuth provider"),
     error_description: Optional[str] = Query(None, description="Error description from provider"),
+    oauth_service: OAuthServiceDep = None,
+    auth_service: AuthServiceDep = None,
 ) -> RedirectResponse:
     """
     Handle OAuth callback from provider.
@@ -248,13 +250,13 @@ async def oauth_callback(
         state: State token for CSRF validation
         error: Error code from provider (if authorization failed)
         error_description: Human-readable error description
+        oauth_service: Injected OAuthService
+        auth_service: Injected AuthService
         
     Returns:
         RedirectResponse: Redirect to frontend with success or error
     """
     settings = get_settings()
-    oauth_service = get_oauth_service()
-    auth_service = get_auth_service()
     
     # Handle provider-side errors
     if error:
@@ -285,7 +287,7 @@ async def oauth_callback(
         user_info = await oauth_provider.get_user_info(tokens.access_token)
         
         # Create or link user account
-        user, token_pair = await _create_or_link_user(user_info)
+        user, token_pair = await _create_or_link_user(user_info, auth_service)
         
         # Calculate cookie max_age
         max_age = settings.JWT_EXPIRATION_HOURS * 3600
@@ -377,7 +379,7 @@ async def oauth_callback(
         )
 
 
-async def _create_or_link_user(user_info: OAuthUserInfo) -> tuple[User, TokenPair]:
+async def _create_or_link_user(user_info: OAuthUserInfo, auth_service) -> tuple[User, TokenPair]:
     """
     Create a new user or link OAuth to existing account.
     
@@ -386,11 +388,11 @@ async def _create_or_link_user(user_info: OAuthUserInfo) -> tuple[User, TokenPai
     
     Args:
         user_info: User information from OAuth provider
+        auth_service: Injected AuthService (required)
         
     Returns:
         Tuple of (User, TokenPair)
     """
-    auth_service = get_auth_service()
     settings = get_settings()
     
     # Check if user with this email already exists

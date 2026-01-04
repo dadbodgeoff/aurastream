@@ -26,6 +26,8 @@ httpx>=0.26.0
 stripe>=7.0.0
 
 # AI/ML Services
+# NOTE: Use google-genai (new SDK), NOT google-generativeai (old SDK)
+# The import is: from google import genai
 google-genai>=1.0.0
 
 # Image Processing

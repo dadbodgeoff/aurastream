@@ -384,6 +384,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         session_id: str,
         user_id: str,
         message: str,
+        reference_assets: list[dict] | None = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Continue the creative direction conversation.
@@ -392,6 +393,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             session_id: Session UUID
             user_id: User ID for ownership check
             message: User's response/refinement
+            reference_assets: Optional list of reference assets from user's library
             
         Yields:
             StreamChunk objects with tokens, intent status, etc.
@@ -415,11 +417,18 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         # Rebuild system prompt from stored context
         system_prompt = self._build_system_prompt_from_session(session)
         
+        # Build the user message with reference assets context
+        user_message_content = message
+        if reference_assets:
+            # Append reference asset context to the message
+            ref_context = self._build_reference_assets_context(reference_assets)
+            user_message_content = f"{message}\n\n{ref_context}"
+        
         # Build messages including history
         messages = [{"role": "system", "content": system_prompt}]
         for msg in session.messages:
             messages.append({"role": msg.role, "content": msg.content})
-        messages.append({"role": "user", "content": message})
+        messages.append({"role": "user", "content": user_message_content})
         
         # Stream response
         full_response = ""
@@ -672,6 +681,44 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         
         return " ".join(instructions) if instructions else ""
     
+    def _build_reference_assets_context(self, reference_assets: list[dict]) -> str:
+        """
+        Build context string for reference assets attached to a message.
+        
+        This provides the coach with information about visual references
+        the user has attached to help understand their vision.
+        
+        Args:
+            reference_assets: List of reference asset dictionaries with
+                asset_id, display_name, asset_type, url, and optional description
+                
+        Returns:
+            Formatted context string for the LLM
+        """
+        if not reference_assets:
+            return ""
+        
+        lines = ["📎 Reference images attached:"]
+        for i, asset in enumerate(reference_assets, 1):
+            asset_type = asset.get("asset_type", "image")
+            display_name = asset.get("display_name", f"Reference {i}")
+            description = asset.get("description", "")
+            url = asset.get("url", "")
+            
+            # Build the reference line
+            ref_line = f"  {i}. [{asset_type}] \"{display_name}\""
+            if description:
+                ref_line += f" - {description}"
+            if url:
+                ref_line += f" (URL: {url})"
+            
+            lines.append(ref_line)
+        
+        lines.append("")
+        lines.append("Please consider these visual references when refining the creative direction.")
+        
+        return "\n".join(lines)
+    
     def _build_system_prompt_from_session(self, session: CoachSession) -> str:
         """Rebuild system prompt from session data."""
         brand_context = session.brand_context or {}
@@ -715,9 +762,41 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         return " ".join(parts)
     
     def _check_intent_ready(self, response: str) -> bool:
-        """Check if the coach indicated the intent is clear enough."""
-        markers = ["[INTENT_READY]", "Ready to create", "ready to create", "✨ Perfect"]
-        return any(marker in response for marker in markers)
+        """Check if the coach indicated the intent is clear enough.
+        
+        Only returns True when the coach is definitively stating readiness,
+        not when asking questions like "Ready to create?"
+        """
+        import re
+        
+        # Explicit marker is always ready
+        if "[INTENT_READY]" in response:
+            return True
+        
+        # Check if the response ends with a question mark (asking for confirmation)
+        # If so, it's NOT ready
+        if response.rstrip().endswith("?"):
+            return False
+        
+        # Check for ready statements
+        # These patterns indicate the coach is stating readiness (not asking)
+        ready_patterns = [
+            r"(?:✨\s*)?(?:Ready to create|ready to create)",  # "Ready to create..."
+            r"(?:✨\s*)?Ready!",  # "Ready!"
+            r"(?:✨\s*)?Let's create",  # "Let's create..."
+            r"(?:✨\s*)?Perfect!",  # "Perfect!"
+            r"(?:✨\s*)?Ready\s+to\s+go",  # "Ready to go"
+        ]
+        
+        for pattern in ready_patterns:
+            if re.search(pattern, response, re.IGNORECASE):
+                return True
+        
+        # "✨ Perfect" or "✨ Ready" followed by content (not a question)
+        if "✨ Perfect" in response or "✨ Ready" in response:
+            return True
+        
+        return False
     
     def _extract_intent(
         self,

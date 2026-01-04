@@ -70,6 +70,12 @@ function transformThumbnailAnalysis(data: any): ThumbnailAnalysis {
     colorRecipe: data.color_recipe,
     whyItWorks: data.why_it_works,
     difficulty: data.difficulty,
+    // NEW: Enhanced metadata for Intel redesign
+    aspectRatio: data.aspect_ratio ?? null,
+    hashtags: data.hashtags || [],
+    formatType: data.format_type ?? null,
+    channelName: data.channel_name ?? null,
+    publishedAt: data.published_at ?? null,
   };
 }
 

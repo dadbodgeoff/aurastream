@@ -49,6 +49,18 @@ export interface ThumbnailAnalysis {
   colorRecipe: string;
   whyItWorks: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  
+  // NEW: Enhanced metadata for Intel redesign
+  /** Aspect ratio: '16:9', '4:3', '1:1', '9:16' */
+  aspectRatio?: string | null;
+  /** Extracted hashtags from title/description */
+  hashtags: string[];
+  /** Format type: 'split-screen', 'reaction', 'gameplay', 'tutorial', 'vlog' */
+  formatType?: string | null;
+  /** YouTube channel name */
+  channelName?: string | null;
+  /** Video publish date ISO string */
+  publishedAt?: string | null;
 }
 
 // ============================================================================

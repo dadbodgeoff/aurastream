@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 YOUTUBE_GAMES_KEY = "youtube:games:{game}"
 TITLE_INTEL_CACHE_KEY = "intel:title:{game}"
-TITLE_INTEL_CACHE_TTL = 1800  # 30 minutes
+TITLE_INTEL_CACHE_TTL = 72 * 60 * 60  # 72 hours (3 days) - stale data better than no data
 
 # Stop words for keyword extraction
 STOP_WORDS = {

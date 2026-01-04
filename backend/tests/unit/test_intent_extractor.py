@@ -229,9 +229,16 @@ class TestIntentExtractor:
         assert extractor.check_intent_ready(response) is True
     
     def test_check_intent_ready_with_ready_to_create(self, extractor):
-        """Test ready detection with 'Ready to create' text."""
-        response = "Ready to create this awesome thumbnail?"
+        """Test ready detection with 'Ready to create!' statement (not question)."""
+        # Statement with exclamation IS ready
+        response = "Ready to create this awesome thumbnail!"
         assert extractor.check_intent_ready(response) is True
+    
+    def test_check_intent_ready_question_not_ready(self, extractor):
+        """Test that 'Ready to create?' question is NOT ready."""
+        # Question mark means the coach is asking, not stating readiness
+        response = "Ready to create this awesome thumbnail?"
+        assert extractor.check_intent_ready(response) is False
     
     def test_check_intent_ready_with_sparkle_ready(self, extractor):
         """Test ready detection with '✨ Ready' text."""

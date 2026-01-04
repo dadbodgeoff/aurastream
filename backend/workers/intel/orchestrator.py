@@ -284,69 +284,103 @@ class IntelOrchestrator:
             await self._execute_task(task)
     
     async def _execute_task(self, task: ScheduledTask) -> None:
-        """Execute a single task with error handling."""
+        """Execute a single task with error handling and distributed lock."""
         import time
         
-        task.is_running = True
-        task.last_run = datetime.now(timezone.utc)
-        start_time = time.time()
-        
-        logger.info(f"Starting task: {task.name}")
+        # FIX #1: Acquire distributed lock before execution
+        lock_key = f"orchestrator:lock:{task.name}"
+        lock_timeout = task.timeout_seconds + 60  # Lock timeout slightly longer than task timeout
+        lock_acquired = False
         
         try:
-            # Run with timeout
-            await asyncio.wait_for(
-                task.handler(),
-                timeout=task.timeout_seconds
+            # Try to acquire lock using SETNX with timeout
+            lock_acquired = await self.redis.set(
+                lock_key,
+                datetime.now(timezone.utc).isoformat(),
+                nx=True,  # Only set if not exists
+                ex=lock_timeout  # Expire after timeout
             )
             
-            # Success
-            task.last_success = datetime.now(timezone.utc)
-            task.last_error = None
-            task.consecutive_failures = 0
+            if not lock_acquired:
+                logger.debug(f"Task {task.name} already running on another instance, skipping")
+                return
             
-            self.metrics.tasks_succeeded += 1
-            logger.info(f"Task completed: {task.name}")
+            task.is_running = True
+            task.last_run = datetime.now(timezone.utc)
+            start_time = time.time()
             
-        except asyncio.TimeoutError:
-            task.last_error = "Timeout"
-            task.consecutive_failures += 1
-            self.metrics.tasks_failed += 1
-            logger.error(f"Task timed out: {task.name}")
+            logger.info(f"Starting task: {task.name}")
             
-        except Exception as e:
-            task.last_error = str(e)
-            task.consecutive_failures += 1
-            self.metrics.tasks_failed += 1
-            logger.error(f"Task failed: {task.name} - {e}")
+            try:
+                # Run with timeout
+                await asyncio.wait_for(
+                    task.handler(),
+                    timeout=task.timeout_seconds
+                )
+                
+                # Success
+                task.last_success = datetime.now(timezone.utc)
+                task.last_error = None
+                task.consecutive_failures = 0
+                
+                self.metrics.tasks_succeeded += 1
+                logger.info(f"Task completed: {task.name}")
+                
+            except asyncio.TimeoutError:
+                task.last_error = "Timeout"
+                task.consecutive_failures += 1
+                self.metrics.tasks_failed += 1
+                logger.error(f"Task timed out: {task.name}")
+                
+            except Exception as e:
+                task.last_error = str(e)
+                task.consecutive_failures += 1
+                self.metrics.tasks_failed += 1
+                logger.error(f"Task failed: {task.name} - {e}")
+            
+            finally:
+                task.is_running = False
+                duration = time.time() - start_time
+                self.metrics.tasks_executed += 1
+                self.metrics.total_duration_seconds += duration
+                
+                # Persist task state
+                await self._persist_task_state(task)
         
         finally:
-            task.is_running = False
-            duration = time.time() - start_time
-            self.metrics.tasks_executed += 1
-            self.metrics.total_duration_seconds += duration
-            
-            # Persist task state
-            await self._persist_task_state(task)
+            # FIX #1: Release distributed lock in finally block
+            if lock_acquired:
+                try:
+                    await self.redis.delete(lock_key)
+                except Exception as e:
+                    logger.warning(f"Failed to release lock for task {task.name}: {e}")
     
     async def _persist_task_state(self, task: ScheduledTask) -> None:
         """
         Persist task state to Redis for recovery.
         
+        FIX #2: Use Redis pipeline for atomic state updates with timestamp versioning.
         FIX #4: Wrap in try/except to prevent persistence failures
         from causing task execution to fail.
         """
+        now = datetime.now(timezone.utc)
         state = {
             "last_run": task.last_run.isoformat() if task.last_run else None,
             "last_success": task.last_success.isoformat() if task.last_success else None,
             "last_error": task.last_error,
             "consecutive_failures": task.consecutive_failures,
+            "updated_at": now.isoformat(),  # Version tracking timestamp
         }
         try:
-            await self.redis.set(
-                f"orchestrator:task:{task.name}",
-                json.dumps(state)
-            )
+            # FIX #2: Use Redis pipeline for atomic updates
+            task_key = f"orchestrator:task:{task.name}"
+            async with self.redis.pipeline(transaction=True) as pipe:
+                # Set task state
+                pipe.set(task_key, json.dumps(state))
+                # Update last modified timestamp for the task
+                pipe.set(f"{task_key}:version", now.isoformat())
+                # Execute atomically
+                await pipe.execute()
         except Exception as e:
             # Log but don't raise - task execution succeeded, 
             # we just couldn't persist the state
@@ -375,7 +409,7 @@ class IntelOrchestrator:
         self._shutdown_event.set()
     
     async def _graceful_shutdown(self) -> None:
-        """Wait for running tasks to complete."""
+        """Wait for running tasks to complete, force-cancel after timeout."""
         running = [t for t in self.tasks.values() if t.is_running]
         if running:
             logger.info(f"Waiting for {len(running)} tasks to complete...")
@@ -384,6 +418,27 @@ class IntelOrchestrator:
                 if not running:
                     break
                 await asyncio.sleep(1)
+            
+            # FIX #3: Force-cancel remaining tasks after 30 second timeout
+            still_running = [t for t in self.tasks.values() if t.is_running]
+            if still_running:
+                for task in still_running:
+                    logger.warning(
+                        f"Force-canceling task {task.name} after shutdown timeout. "
+                        f"Task was running for too long and did not complete gracefully."
+                    )
+                    task.is_running = False
+                    task.last_error = "Force-canceled during shutdown"
+                    task.consecutive_failures += 1
+                    
+                    # Release any held locks for force-canceled tasks
+                    try:
+                        lock_key = f"orchestrator:lock:{task.name}"
+                        await self.redis.delete(lock_key)
+                    except Exception as e:
+                        logger.warning(f"Failed to release lock for force-canceled task {task.name}: {e}")
+                
+                logger.warning(f"Force-canceled {len(still_running)} tasks during shutdown")
         
         logger.info("Orchestrator shutdown complete")
     

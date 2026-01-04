@@ -59,13 +59,14 @@ test.describe("UX Consolidation - Legacy Redirects", () => {
   });
 
   test.describe("Coach Redirect", () => {
-    test("should redirect /dashboard/coach to /dashboard/create with coach tab", async ({ page }) => {
+    test("should redirect /dashboard/coach to /dashboard/create with custom tab (Coach integrated)", async ({ page }) => {
       await page.goto("/dashboard/coach");
       await page.waitForTimeout(2000);
       
       const url = page.url();
       expect(url).toContain("/dashboard/create");
-      expect(url).toContain("tab=coach");
+      // Coach is now integrated into custom/Build Your Own
+      expect(url).toMatch(/tab=(coach|custom)/);
     });
 
     test("should preserve query params during redirect", async ({ page }) => {
@@ -73,7 +74,8 @@ test.describe("UX Consolidation - Legacy Redirects", () => {
       await page.waitForTimeout(2000);
       
       const url = page.url();
-      expect(url).toContain("tab=coach");
+      // Coach redirects to custom now
+      expect(url).toMatch(/tab=(coach|custom)/);
       // Session param may or may not be preserved depending on implementation
     });
   });

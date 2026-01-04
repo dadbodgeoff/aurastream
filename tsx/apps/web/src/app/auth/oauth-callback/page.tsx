@@ -50,9 +50,9 @@ function OAuthCallbackContent() {
 
         if (response.ok) {
           setStatus('success');
-          // Redirect to dashboard after brief success message
+          // Redirect to intel (main app) after brief success message
           setTimeout(() => {
-            router.push('/dashboard');
+            router.push('/intel');
           }, 1500);
         } else {
           // Session not established, might need to complete OAuth flow
@@ -87,7 +87,7 @@ function OAuthCallbackContent() {
               </svg>
             </div>
             <h1 className="text-xl font-semibold text-text-primary">Sign in successful!</h1>
-            <p className="text-text-secondary">Redirecting to your dashboard...</p>
+            <p className="text-text-secondary">Redirecting to your workspace...</p>
           </div>
         )}
 

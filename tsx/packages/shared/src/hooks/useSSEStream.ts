@@ -2,10 +2,12 @@
  * SSE Stream Hook with State Machine Pattern
  * 
  * Provides a robust SSE streaming implementation with:
- * - Explicit state machine (idle → connecting → streaming → complete → error)
+ * - Explicit state machine (idle → connecting → streaming → reconnecting → complete → error)
  * - Token batching for smooth DOM updates
  * - Partial data preservation on errors
- * - Retry mechanism
+ * - Retry mechanism with exponential backoff
+ * - Automatic reconnection via ResilientEventSource
+ * - Completion recovery for interrupted streams
  * 
  * @example
  * ```tsx
@@ -26,6 +28,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { ResilientEventSource, type SSEEvent } from '@aurastream/api-client';
 
 // ============================================================================
 // Types
@@ -33,8 +36,9 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 
 /**
  * SSE stream state machine states
+ * Added 'reconnecting' state for ResilientEventSource integration
  */
-export type SSEState = 'idle' | 'connecting' | 'streaming' | 'complete' | 'error';
+export type SSEState = 'idle' | 'connecting' | 'streaming' | 'reconnecting' | 'complete' | 'error';
 
 /**
  * SSE chunk types matching backend coach.py StreamChunkTypeEnum
@@ -74,10 +78,16 @@ export interface SSEStreamOptions<T> {
   onError?: (error: Error) => void;
   /** Called when state changes */
   onStateChange?: (state: SSEState) => void;
+  /** Called when reconnecting (with attempt number) */
+  onReconnect?: (attempt: number) => void;
   /** Milliseconds between DOM updates (default: 50ms) */
   batchInterval?: number;
   /** Authorization token */
   authToken?: string;
+  /** Maximum retry attempts (default: 3) */
+  maxRetries?: number;
+  /** Heartbeat timeout in ms (default: 35000) */
+  heartbeatTimeout?: number;
 }
 
 /**
@@ -92,6 +102,8 @@ export interface SSEStreamResult<T> {
   partialData: string;
   /** Error if state is 'error' */
   error: Error | null;
+  /** Current stream ID from server */
+  streamId: string | null;
   /** Start a new stream */
   start: (url: string, options?: { body?: unknown }) => void;
   /** Retry the last stream */
@@ -110,7 +122,7 @@ export interface SSEStreamResult<T> {
  * SSE Stream Hook with State Machine Pattern
  * 
  * Provides robust SSE streaming with state management, token batching,
- * error recovery, and retry capabilities.
+ * error recovery, retry capabilities, and automatic reconnection via ResilientEventSource.
  * 
  * @param options - Configuration options for the stream
  * @returns SSEStreamResult with state, data, and control functions
@@ -124,8 +136,11 @@ export function useSSEStream<T = unknown>(
     onComplete,
     onError,
     onStateChange,
+    onReconnect,
     batchInterval = 50,
     authToken,
+    maxRetries = 3,
+    heartbeatTimeout = 35000,
   } = options;
 
   // State
@@ -133,11 +148,12 @@ export function useSSEStream<T = unknown>(
   const [data, setData] = useState<T | null>(null);
   const [partialData, setPartialData] = useState<string>('');
   const [error, setError] = useState<Error | null>(null);
+  const [streamId, setStreamId] = useState<string | null>(null);
 
   // Refs for batching and cleanup
   const tokenBuffer = useRef<string[]>([]);
   const batchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const resilientSourceRef = useRef<ResilientEventSource | null>(null);
   const lastRequestRef = useRef<{ url: string; body?: unknown } | null>(null);
 
   // Store callbacks in refs to avoid stale closures
@@ -146,6 +162,7 @@ export function useSSEStream<T = unknown>(
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
   const onStateChangeRef = useRef(onStateChange);
+  const onReconnectRef = useRef(onReconnect);
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -154,7 +171,8 @@ export function useSSEStream<T = unknown>(
     onCompleteRef.current = onComplete;
     onErrorRef.current = onError;
     onStateChangeRef.current = onStateChange;
-  }, [onToken, onChunk, onComplete, onError, onStateChange]);
+    onReconnectRef.current = onReconnect;
+  }, [onToken, onChunk, onComplete, onError, onStateChange, onReconnect]);
 
   // Update state and notify
   const updateState = useCallback((newState: SSEState) => {
@@ -178,14 +196,14 @@ export function useSSEStream<T = unknown>(
       if (batchTimeoutRef.current) {
         clearTimeout(batchTimeoutRef.current);
       }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (resilientSourceRef.current) {
+        resilientSourceRef.current.abort();
       }
     };
   }, []);
 
-  // Start streaming
-  const start = useCallback(async (url: string, requestOptions?: { body?: unknown }) => {
+  // Start streaming with ResilientEventSource
+  const start = useCallback((url: string, requestOptions?: { body?: unknown }) => {
     // Save for retry
     lastRequestRef.current = { url, body: requestOptions?.body };
 
@@ -193,124 +211,89 @@ export function useSSEStream<T = unknown>(
     setData(null);
     setPartialData('');
     setError(null);
+    setStreamId(null);
     tokenBuffer.current = [];
 
     // Abort any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (resilientSourceRef.current) {
+      resilientSourceRef.current.abort();
     }
-    abortControllerRef.current = new AbortController();
 
     updateState('connecting');
 
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-      };
+    // Create ResilientEventSource
+    const source = new ResilientEventSource({
+      url,
+      method: 'POST',
+      body: requestOptions?.body,
+      authToken,
+      maxRetries,
+      heartbeatTimeout,
+      onMessage: (event: SSEEvent) => {
+        const chunk = event.data as SSEChunk;
+        onChunkRef.current?.(chunk);
 
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
+        if (chunk.type === 'token') {
+          // Buffer tokens for batched updates
+          tokenBuffer.current.push(chunk.content);
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: requestOptions?.body ? JSON.stringify(requestOptions.body) : undefined,
-        signal: abortControllerRef.current.signal,
-      });
+          // Update state to streaming on first token
+          setState(prev => prev === 'connecting' || prev === 'reconnecting' ? 'streaming' : prev);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      if (!response.body) {
-        throw new Error('Response body is null');
-      }
-
-      updateState('streaming');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          // Flush any remaining tokens
-          flushTokenBuffer();
-          updateState('complete');
-          break;
-        }
-
-        // Decode chunk and add to buffer
-        buffer += decoder.decode(value, { stream: true });
-
-        // Process complete SSE messages
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const chunk: SSEChunk = JSON.parse(line.slice(6));
-              onChunkRef.current?.(chunk);
-
-              if (chunk.type === 'token') {
-                // Buffer tokens for batched updates
-                tokenBuffer.current.push(chunk.content);
-
-                // Schedule batch flush
-                if (!batchTimeoutRef.current) {
-                  batchTimeoutRef.current = setTimeout(() => {
-                    flushTokenBuffer();
-                    batchTimeoutRef.current = null;
-                  }, batchInterval);
-                }
-              } else if (chunk.type === 'done') {
-                // Flush remaining tokens
-                flushTokenBuffer();
-                
-                // Set final data
-                if (chunk.metadata) {
-                  setData(chunk.metadata as T);
-                  onCompleteRef.current?.(chunk.metadata as T);
-                }
-                
-                updateState('complete');
-              } else if (chunk.type === 'error') {
-                throw new Error(chunk.content);
-              }
-            } catch (parseError) {
-              // Log but don't fail on parse errors for non-JSON lines
-              if (parseError instanceof SyntaxError) {
-                console.warn('Failed to parse SSE chunk:', line, parseError);
-              } else {
-                // Re-throw actual errors (like the error chunk type)
-                throw parseError;
-              }
-            }
+          // Schedule batch flush
+          if (!batchTimeoutRef.current) {
+            batchTimeoutRef.current = setTimeout(() => {
+              flushTokenBuffer();
+              batchTimeoutRef.current = null;
+            }, batchInterval);
           }
+        } else if (chunk.type === 'done') {
+          // Flush remaining tokens
+          flushTokenBuffer();
+          
+          // Set final data
+          if (chunk.metadata) {
+            setData(chunk.metadata as T);
+            onCompleteRef.current?.(chunk.metadata as T);
+          }
+          
+          updateState('complete');
+        } else if (chunk.type === 'error') {
+          const err = new Error(chunk.content);
+          setError(err);
+          updateState('error');
+          onErrorRef.current?.(err);
         }
-      }
-    } catch (err) {
-      // Preserve partial data on error
-      flushTokenBuffer();
+      },
+      onError: (err) => {
+        // Preserve partial data on error
+        flushTokenBuffer();
+        setError(err);
+        updateState('error');
+        onErrorRef.current?.(err);
+      },
+      onReconnect: (attempt) => {
+        updateState('reconnecting');
+        onReconnectRef.current?.(attempt);
+      },
+      onComplete: () => {
+        // Flush any remaining tokens
+        flushTokenBuffer();
+        // Only update to complete if not already in error state
+        setState(prev => prev !== 'error' ? 'complete' : prev);
+      },
+      onStreamId: (id) => {
+        setStreamId(id);
+      },
+    });
 
-      const error = err instanceof Error ? err : new Error(String(err));
-      
-      // Don't treat abort as error
-      if (error.name === 'AbortError') {
-        updateState('idle');
-        return;
-      }
-
-      setError(error);
+    resilientSourceRef.current = source;
+    source.connect().catch((err) => {
+      setError(err);
       updateState('error');
-      onErrorRef.current?.(error);
-    }
-  }, [authToken, batchInterval, flushTokenBuffer, updateState]);
+      onErrorRef.current?.(err);
+    });
+  }, [authToken, batchInterval, flushTokenBuffer, updateState, maxRetries, heartbeatTimeout]);
 
   // Retry last request
   const retry = useCallback(() => {
@@ -321,8 +304,8 @@ export function useSSEStream<T = unknown>(
 
   // Abort current stream
   const abort = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (resilientSourceRef.current) {
+      resilientSourceRef.current.abort();
     }
     if (batchTimeoutRef.current) {
       clearTimeout(batchTimeoutRef.current);
@@ -337,6 +320,7 @@ export function useSSEStream<T = unknown>(
     setData(null);
     setPartialData('');
     setError(null);
+    setStreamId(null);
     tokenBuffer.current = [];
     lastRequestRef.current = null;
   }, [abort]);
@@ -346,6 +330,7 @@ export function useSSEStream<T = unknown>(
     data,
     partialData,
     error,
+    streamId,
     start,
     retry,
     abort,

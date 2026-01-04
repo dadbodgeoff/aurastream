@@ -1,16 +1,38 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@aurastream/shared';
-import { DashboardShell, LoadingState } from '@/components/dashboard';
-import { CelebrationOverlay } from '@/components/celebrations/CelebrationOverlay';
-import { OnboardingProvider } from '@/providers/OnboardingProvider';
-import { UndoToastContainer } from '@/components/undo';
-import { SocialHub } from '@/components/social/SocialHub';
+/**
+ * Dashboard Layout - Redirect to Intel
+ * 
+ * The dashboard has been unified into the Intel experience.
+ * This layout redirects all /dashboard/* routes to /intel/*.
+ */
 
-// Admin email whitelist
-const ADMIN_EMAILS = ['dadbodgeoff@gmail.com'];
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@aurastream/shared';
+import { LoadingState } from '@/components/dashboard';
+
+// Route mapping from old dashboard to new intel
+const ROUTE_MAP: Record<string, string> = {
+  '/dashboard': '/intel',
+  '/dashboard/studio': '/intel/create',
+  '/dashboard/create': '/intel/create',
+  '/dashboard/brand-kits': '/intel/brand-kits',
+  '/dashboard/assets': '/intel/assets',
+  '/dashboard/intel': '/intel',
+  '/dashboard/profile-creator': '/intel/logos',
+  '/dashboard/aura-lab': '/intel/aura-lab',
+  '/dashboard/settings': '/intel/settings',
+  '/dashboard/quick-create': '/intel/create',
+  '/dashboard/generate': '/intel/generate',
+  '/dashboard/coach': '/intel/create',
+  '/dashboard/twitch': '/intel/create',
+  '/dashboard/trends': '/intel/observatory',
+  '/dashboard/clip-radar': '/intel/observatory',
+  '/dashboard/playbook': '/intel',
+  '/dashboard/templates': '/intel/create',
+  '/dashboard/analytics': '/intel/settings',
+};
 
 export default function DashboardLayout({
   children,
@@ -18,59 +40,42 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isLoading) return;
+    
+    if (!isAuthenticated) {
       router.push('/login');
+      return;
     }
-  }, [isLoading, isAuthenticated, router]);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      router.push('/login');
-    } catch (error) {
-      console.error('Logout failed:', error);
+    // Find the best matching redirect
+    let redirectTo = '/intel';
+    
+    // Check exact match first
+    if (ROUTE_MAP[pathname]) {
+      redirectTo = ROUTE_MAP[pathname];
+    } else {
+      // Check prefix matches
+      for (const [oldPath, newPath] of Object.entries(ROUTE_MAP)) {
+        if (pathname.startsWith(oldPath + '/')) {
+          // Preserve the rest of the path
+          const suffix = pathname.slice(oldPath.length);
+          redirectTo = newPath + suffix;
+          break;
+        }
+      }
     }
-  };
 
-  // Show loading state while checking auth
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background-default flex items-center justify-center">
-        <LoadingState message="Loading..." size="lg" />
-      </div>
-    );
-  }
+    router.replace(redirectTo);
+  }, [isLoading, isAuthenticated, pathname, router]);
 
-  // Don't render if not authenticated
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const isAdmin = user?.email ? ADMIN_EMAILS.includes(user.email) : false;
-
+  // Show loading while redirecting
   return (
-    <OnboardingProvider>
-      <>
-        <DashboardShell
-          user={user ? {
-            displayName: user.displayName,
-            email: user.email,
-            avatarUrl: user.avatarUrl ?? undefined,
-            subscriptionTier: user.subscriptionTier,
-          } : undefined}
-          isAdmin={isAdmin}
-          onLogout={handleLogout}
-        >
-          {children}
-        </DashboardShell>
-        <CelebrationOverlay />
-        <UndoToastContainer />
-        {user?.id && <SocialHub currentUserId={user.id} />}
-      </>
-    </OnboardingProvider>
+    <div className="min-h-screen bg-background-default flex items-center justify-center">
+      <LoadingState message="Redirecting..." size="lg" />
+    </div>
   );
 }

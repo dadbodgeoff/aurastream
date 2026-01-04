@@ -46,10 +46,16 @@ from backend.services.exceptions import (
     GenerationError,
     JobNotFoundError,
 )
+from backend.workers.execution_report import (
+    create_report,
+    submit_execution_report,
+    ExecutionOutcome,
+)
 
 
 logger = logging.getLogger(__name__)
 
+WORKER_NAME = "twitch_worker"
 QUEUE_NAME = "twitch_generation"
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 
@@ -323,12 +329,46 @@ def process_twitch_generation_job_sync(
     game_id: Optional[str] = None,
     text_overlay: Optional[str] = None,
 ) -> dict:
-    """Synchronous wrapper for process_twitch_generation_job."""
-    return asyncio.run(
+    """Synchronous wrapper for process_twitch_generation_job with execution reporting."""
+    import time
+    start_time = time.time()
+    
+    result = asyncio.run(
         process_twitch_generation_job(
             job_id, user_id, brand_kit_id, asset_type, custom_prompt, game_id, text_overlay
         )
     )
+    
+    duration_ms = int((time.time() - start_time) * 1000)
+    
+    # Submit execution report
+    report = create_report(WORKER_NAME)
+    report.duration_ms = duration_ms
+    
+    status = result.get("status", "unknown")
+    if status == "completed":
+        report.outcome = ExecutionOutcome.SUCCESS
+        report.data_verification.records_processed = 1
+        report.data_verification.records_stored = 1
+        report.custom_metrics = {
+            "job_id": job_id,
+            "asset_type": asset_type,
+            "asset_id": result.get("asset_id"),
+        }
+    elif status == "skipped":
+        report.outcome = ExecutionOutcome.SKIPPED
+        report.custom_metrics = {
+            "job_id": job_id,
+            "reason": result.get("reason", "unknown"),
+        }
+    else:
+        report.outcome = ExecutionOutcome.FAILED
+        report.error_message = result.get("error", "Unknown error")
+        report.custom_metrics = {"job_id": job_id, "asset_type": asset_type}
+    
+    submit_execution_report(report)
+    
+    return result
 
 
 def process_pack_generation_job_sync(
@@ -339,12 +379,41 @@ def process_pack_generation_job_sync(
     custom_prompt: Optional[str] = None,
     game_id: Optional[str] = None,
 ) -> dict:
-    """Synchronous wrapper for process_pack_generation_job."""
-    return asyncio.run(
+    """Synchronous wrapper for process_pack_generation_job with execution reporting."""
+    import time
+    start_time = time.time()
+    
+    result = asyncio.run(
         process_pack_generation_job(
             pack_id, user_id, brand_kit_id, pack_type, custom_prompt, game_id
         )
     )
+    
+    duration_ms = int((time.time() - start_time) * 1000)
+    
+    # Submit execution report
+    report = create_report(WORKER_NAME)
+    report.duration_ms = duration_ms
+    
+    status = result.get("status", "unknown")
+    if status == "completed":
+        report.outcome = ExecutionOutcome.SUCCESS
+        assets = result.get("assets", [])
+        report.data_verification.records_processed = len(assets)
+        report.data_verification.records_stored = len(assets)
+        report.custom_metrics = {
+            "pack_id": pack_id,
+            "pack_type": pack_type,
+            "assets_generated": len(assets),
+        }
+    else:
+        report.outcome = ExecutionOutcome.FAILED
+        report.error_message = result.get("error", "Unknown error")
+        report.custom_metrics = {"pack_id": pack_id, "pack_type": pack_type}
+    
+    submit_execution_report(report)
+    
+    return result
 
 
 def enqueue_twitch_generation_job(

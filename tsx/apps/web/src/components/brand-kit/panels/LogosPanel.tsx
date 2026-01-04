@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { SectionCard, SectionHeader } from '../shared';
 import { ImageIcon, SparklesIcon, TrashIcon } from '../icons';
@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
  * - showErrorToast for BRAND_KIT_UPLOAD_FAILED
  * - showSuccessToast for successful operations
  * - Loading skeletons during data fetch
+ * - Race condition prevention for concurrent uploads/deletes
  */
 export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
   const { data: logosData, isLoading, error: loadError, refetch } = useLogos(brandKitId || undefined);
@@ -28,6 +29,11 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [selectedLogo, setSelectedLogo] = useState<LogoType | null>(null);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  
+  // Track in-progress operations to prevent race conditions
+  const uploadingLogosRef = useRef<Set<LogoType>>(new Set());
+  const deletingLogosRef = useRef<Set<LogoType>>(new Set());
+  const progressIntervalsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const logos = logosData?.logos || {
     primary: null,
@@ -39,8 +45,28 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
   
   const defaultLogoType = logosData?.defaultLogoType || 'primary';
 
-  const handleFileSelect = async (logoType: LogoType, file: File) => {
+  // Cleanup progress interval helper
+  const clearProgressInterval = useCallback((logoType: LogoType) => {
+    if (progressIntervalsRef.current[logoType]) {
+      clearInterval(progressIntervalsRef.current[logoType]);
+      delete progressIntervalsRef.current[logoType];
+    }
+  }, []);
+
+  const handleFileSelect = useCallback(async (logoType: LogoType, file: File) => {
     if (!brandKitId) return;
+    
+    // Prevent concurrent uploads of same logo type
+    if (uploadingLogosRef.current.has(logoType)) {
+      showErrorToast({ code: 'UPLOAD_IN_PROGRESS', message: 'Upload already in progress for this logo type.' });
+      return;
+    }
+    
+    // Prevent upload while delete is in progress
+    if (deletingLogosRef.current.has(logoType)) {
+      showErrorToast({ code: 'DELETE_IN_PROGRESS', message: 'Cannot upload while delete is in progress.' });
+      return;
+    }
     
     const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'];
     if (!allowedTypes.includes(file.type)) {
@@ -52,13 +78,19 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
       return;
     }
 
+    // Mark as uploading
+    uploadingLogosRef.current.add(logoType);
+    
+    // Clear any existing progress interval
+    clearProgressInterval(logoType);
+
     // Simulate upload progress
     setUploadProgress(prev => ({ ...prev, [logoType]: 0 }));
-    const progressInterval = setInterval(() => {
+    progressIntervalsRef.current[logoType] = setInterval(() => {
       setUploadProgress(prev => {
         const current = prev[logoType] || 0;
         if (current >= 90) {
-          clearInterval(progressInterval);
+          clearProgressInterval(logoType);
           return prev;
         }
         return { ...prev, [logoType]: current + 10 };
@@ -80,8 +112,13 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
           return rest;
         });
       }, 500);
+      
+      // Clear file input
+      if (fileInputRefs.current[logoType]) {
+        fileInputRefs.current[logoType]!.value = '';
+      }
     } catch (error) {
-      clearInterval(progressInterval);
+      clearProgressInterval(logoType);
       setUploadProgress(prev => {
         const { [logoType]: _, ...rest } = prev;
         return rest;
@@ -90,11 +127,28 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
       showErrorToast({ code: 'BRAND_KIT_UPLOAD_FAILED' }, {
         onRetry: () => handleFileSelect(logoType, file),
       });
+    } finally {
+      // Always remove from uploading set
+      uploadingLogosRef.current.delete(logoType);
     }
-  };
+  }, [brandKitId, uploadMutation, clearProgressInterval]);
 
-  const handleDelete = async (logoType: LogoType) => {
+  const handleDelete = useCallback(async (logoType: LogoType) => {
     if (!brandKitId) return;
+    
+    // Prevent delete while upload is in progress
+    if (uploadingLogosRef.current.has(logoType)) {
+      showErrorToast({ code: 'UPLOAD_IN_PROGRESS', message: 'Cannot delete while upload is in progress.' });
+      return;
+    }
+    
+    // Prevent concurrent deletes of same logo type
+    if (deletingLogosRef.current.has(logoType)) {
+      return;
+    }
+    
+    // Mark as deleting
+    deletingLogosRef.current.add(logoType);
     
     try {
       await deleteMutation.mutateAsync({ brandKitId, logoType });
@@ -105,10 +159,13 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
       showErrorToast(error, {
         onRetry: () => handleDelete(logoType),
       });
+    } finally {
+      // Always remove from deleting set
+      deletingLogosRef.current.delete(logoType);
     }
-  };
+  }, [brandKitId, deleteMutation]);
 
-  const handleSetDefault = async (logoType: LogoType) => {
+  const handleSetDefault = useCallback(async (logoType: LogoType) => {
     if (!brandKitId) return;
     try {
       await setDefaultMutation.mutateAsync({ brandKitId, logoType });
@@ -120,7 +177,12 @@ export function LogosPanel({ brandKitId, isNew }: LogosPanelProps) {
         onRetry: () => handleSetDefault(logoType),
       });
     }
-  };
+  }, [brandKitId, setDefaultMutation]);
+  
+  // Check if a logo type has an operation in progress
+  const isLogoOperationInProgress = useCallback((logoType: LogoType) => {
+    return uploadingLogosRef.current.has(logoType) || deletingLogosRef.current.has(logoType);
+  }, []);
 
   // Get uploaded logos for the gallery
   const uploadedLogos = Object.entries(logos).filter(([_, url]) => url != null) as [LogoType, string][];

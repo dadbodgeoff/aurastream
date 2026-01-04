@@ -282,7 +282,7 @@ export default function CoachScreen() {
    * Check if user has premium access.
    * Premium tier is 'studio' in this system.
    */
-  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio' || user?.subscriptionTier === 'unlimited';
 
   /**
    * Handle starting the chat from context form.

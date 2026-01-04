@@ -30,6 +30,8 @@ export interface ModeConfig {
   icon: string;
   badge?: string;
   isPremium?: boolean;
+  /** If true, mode is hidden from the UI but code is preserved */
+  hidden?: boolean;
 }
 
 // =============================================================================

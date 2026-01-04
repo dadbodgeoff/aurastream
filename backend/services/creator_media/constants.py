@@ -69,13 +69,13 @@ BG_REMOVAL_DEFAULT_TYPES: Set[MediaAssetType] = {
     "emote",       # Emotes are always transparent
     "badge",       # Badges are always transparent
     "game_skin",   # Game skins for compositing
+    "reference",   # Reference images - auto remove bg for compositing
 }
 
 # Asset types that should NEVER have background removed
 # These need their backgrounds to function properly
 BG_REMOVAL_EXCLUDED_TYPES: Set[MediaAssetType] = {
     "background",  # Backgrounds ARE the background
-    "reference",   # Reference images should stay as-is
     "panel",       # Panels have designed backgrounds
     "overlay",     # Overlays may have intentional backgrounds
     "alert",       # Alerts may have designed backgrounds

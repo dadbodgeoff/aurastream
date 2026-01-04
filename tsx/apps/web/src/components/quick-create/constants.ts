@@ -176,7 +176,7 @@ export const TEMPLATES: QuickTemplate[] = [
     name: 'Logo / Avatar',
     tagline: 'Brand identity',
     category: 'branding',
-    assetType: 'logo',
+    assetType: 'streamer_logo',
     dimensions: '512×512',
     emoji: '🎨',
     fields: [], // All fields come from backend

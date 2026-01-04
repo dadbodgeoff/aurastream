@@ -1,9 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, Users, Eye, TrendingUp, RefreshCw, Calendar, ArrowUp, ArrowDown } from 'lucide-react';
+import { BarChart3, Users, Eye, TrendingUp, RefreshCw, Calendar, ArrowUp, ArrowDown, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAnalyticsDashboard } from '@aurastream/api-client';
+import { useAuth } from '@aurastream/shared';
+
+const ADMIN_EMAIL = 'dadbodgeoff@gmail.com';
 
 // =============================================================================
 // Stat Card
@@ -45,8 +48,24 @@ function StatCard({ label, value, icon, trend, color = 'bg-interactive-600/20' }
 // =============================================================================
 
 export function AnalyticsView() {
+  const { user } = useAuth();
   const [days, setDays] = useState(30);
   const { summary, trend, topPages, generations, isLoading, refetch } = useAnalyticsDashboard(days);
+
+  // Only show to admin
+  if (user?.email !== ADMIN_EMAIL) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="w-16 h-16 bg-background-surface/50 rounded-full flex items-center justify-center mb-4">
+          <Lock className="w-8 h-8 text-text-muted" />
+        </div>
+        <h2 className="text-lg font-semibold text-text-primary mb-2">Admin Access Required</h2>
+        <p className="text-sm text-text-muted max-w-sm">
+          Analytics dashboard is only available to administrators.
+        </p>
+      </div>
+    );
+  }
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;

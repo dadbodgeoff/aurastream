@@ -21,13 +21,12 @@ from backend.api.schemas.promo import (
     UserBadges,
     LinkPreview,
 )
+from backend.api.service_dependencies import PromoServiceDep, AuditServiceDep
 from backend.services.promo_service import (
-    get_promo_service,
     PromoError,
     PromoMessageNotFoundError,
     PromoMessageNotOwnedError,
 )
-from backend.services.audit_service import get_audit_service
 
 router = APIRouter(tags=["Promo Chatroom"])
 
@@ -79,9 +78,10 @@ async def create_checkout_session(
     data: PromoCheckoutRequest,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: PromoServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> PromoCheckoutResponse:
     """Create a Stripe checkout session for posting a promo message."""
-    service = get_promo_service()
     try:
         success_url = data.success_url or "https://aurastream.io/promo?success=true"
         cancel_url = data.cancel_url or "https://aurastream.io/promo?cancelled=true"
@@ -91,7 +91,6 @@ async def create_checkout_session(
         )
         session_id = checkout_url.split("/")[-1].split("?")[0] if checkout_url else ""
 
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub, action="promo.checkout", resource_type="promo_payment",
             resource_id=session_id, details={"amount_cents": 100, "has_link": bool(data.link_url)},
@@ -113,11 +112,11 @@ async def create_checkout_session(
     responses={200: {"description": "Messages retrieved successfully"}},
 )
 async def get_messages(
+    service: PromoServiceDep,
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     limit: int = Query(20, ge=1, le=100, description="Number of messages to return"),
 ) -> PromoMessagesListResponse:
     """Get paginated promo messages. Public endpoint."""
-    service = get_promo_service()
     try:
         messages, next_cursor = await service.get_messages(cursor=cursor, limit=limit)
         pinned = await service.get_pinned_message()
@@ -137,9 +136,10 @@ async def get_messages(
     description="Get the currently pinned promo message. Public endpoint.",
     responses={200: {"description": "Pinned message retrieved (or null if none)"}},
 )
-async def get_pinned_message() -> Optional[PromoMessageResponse]:
+async def get_pinned_message(
+    service: PromoServiceDep,
+) -> Optional[PromoMessageResponse]:
     """Get the currently pinned promo message. Public endpoint."""
-    service = get_promo_service()
     try:
         pinned = await service.get_pinned_message()
         return _map_message_to_response(pinned) if pinned else None
@@ -162,13 +162,13 @@ async def delete_message(
     message_id: str,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: PromoServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> dict:
     """Delete own promo message. Auth required."""
-    service = get_promo_service()
     try:
         await service.delete_message(message_id=message_id, user_id=current_user.sub)
 
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub, action="promo.delete", resource_type="promo_message",
             resource_id=message_id, details={},
@@ -203,9 +203,10 @@ async def dev_gift_message(
     data: PromoCheckoutRequest,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: PromoServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> PromoMessageResponse:
     """[DEV] Gift a promo message without payment - simulates completed purchase."""
-    service = get_promo_service()
     try:
         msg = await service.create_gift_message(
             user_id=current_user.sub,
@@ -213,7 +214,6 @@ async def dev_gift_message(
             link_url=data.link_url,
         )
         
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub, action="promo.dev_gift", resource_type="promo_message",
             resource_id=msg.id, details={"gifted": True, "has_link": bool(data.link_url)},
@@ -233,10 +233,10 @@ async def dev_gift_message(
     responses={200: {"description": "Leaderboard retrieved successfully"}},
 )
 async def get_leaderboard(
+    service: PromoServiceDep,
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
 ) -> LeaderboardResponse:
     """Get donation leaderboard. Optional auth to show user's rank."""
-    service = get_promo_service()
     try:
         user_id = current_user.sub if current_user else None
         result = await service.get_leaderboard(user_id=user_id)

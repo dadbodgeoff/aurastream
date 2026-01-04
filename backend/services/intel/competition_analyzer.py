@@ -31,8 +31,8 @@ logger = logging.getLogger(__name__)
 # Constants
 # =============================================================================
 
-# Cache TTL for competition analysis (15 minutes)
-ANALYSIS_CACHE_TTL = 900
+# Cache TTL for competition analysis (72 hours - stale data better than no data)
+ANALYSIS_CACHE_TTL = 72 * 60 * 60
 
 # Redis key patterns
 COMPETITION_CACHE_KEY = "intel:competition:{category_key}"

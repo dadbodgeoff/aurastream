@@ -50,47 +50,48 @@ function AssetTypeCard({
     <button
       onClick={onClick}
       className={cn(
-        "relative p-3 rounded-xl border-2 text-left transition-all duration-200 group",
+        "relative flex items-center gap-3 px-3 py-2.5 rounded-lg border text-left transition-all duration-150 group",
         "hover:scale-[1.01] active:scale-[0.99]",
         selected
-          ? "border-interactive-600 bg-interactive-600/5 shadow-sm shadow-interactive-600/10"
+          ? "border-interactive-600 bg-interactive-600/10"
           : "border-border-subtle hover:border-interactive-500/50 bg-background-surface/50"
       )}
     >
-      {/* Selection indicator */}
-      {selected && (
-        <div className="absolute top-2 right-2 w-5 h-5 bg-interactive-600 rounded-full flex items-center justify-center text-white">
-          <CheckIcon />
-        </div>
-      )}
+      {/* Icon */}
+      <div className={cn(
+        "w-8 h-8 rounded-md flex items-center justify-center text-base flex-shrink-0",
+        selected 
+          ? "bg-interactive-600/10" 
+          : "bg-background-elevated group-hover:bg-interactive-600/10"
+      )}>
+        {icon}
+      </div>
       
-      {/* Icon + Content inline */}
-      <div className="flex items-start gap-3">
-        <div className={cn(
-          "w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0",
-          selected 
-            ? "bg-interactive-600/10" 
-            : "bg-background-elevated"
-        )}>
-          {icon}
-        </div>
-        
-        <div className="min-w-0 flex-1">
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
           <h3 className={cn(
-            "font-semibold text-sm leading-tight",
+            "font-medium text-sm truncate",
             selected ? "text-interactive-600" : "text-text-primary"
           )}>
             {asset.label}
           </h3>
-          <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{asset.description}</p>
-          <p className={cn(
-            "text-micro font-mono mt-1",
-            selected ? "text-interactive-500" : "text-text-muted"
+          <span className={cn(
+            "text-[10px] font-mono flex-shrink-0 px-1.5 py-0.5 rounded",
+            selected ? "text-interactive-500 bg-interactive-600/10" : "text-text-muted bg-background-elevated"
           )}>
             {asset.dimensions}
-          </p>
+          </span>
         </div>
+        <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{asset.description}</p>
       </div>
+
+      {/* Selection indicator */}
+      {selected && (
+        <div className="w-5 h-5 bg-interactive-600 rounded-full flex items-center justify-center text-white flex-shrink-0">
+          <CheckIcon />
+        </div>
+      )}
     </button>
   );
 }
@@ -103,7 +104,7 @@ export function AssetTypeSelector({ platform, selected, onChange }: AssetTypeSel
   }, [platform]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
       {filteredAssetTypes.map((asset) => (
         <AssetTypeCard
           key={asset.id}

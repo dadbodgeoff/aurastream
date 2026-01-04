@@ -1,21 +1,20 @@
 /**
  * UnifiedCreateFlow Component
  * 
- * Container component that provides a unified tabbed interface for all asset
- * creation methods: Templates (Quick Create), Custom, and AI Coach.
+ * Container component that provides a unified card-based interface for asset
+ * creation methods: Quick Create and Build Your Own (with integrated AI Coach).
  * 
  * Features:
- * - Tab navigation using CreateTabs component
- * - Lazy loading of tab content for performance
- * - Scroll position preservation on tab switch
- * - URL-based tab state management
+ * - Card-based method selection
+ * - Lazy loading of method content for performance
+ * - Scroll position preservation on method switch
+ * - URL-based method state management
  * - Accessibility compliant (ARIA, keyboard navigation)
  * 
  * @module create/UnifiedCreateFlow
- * @see CreateTabs - Tab navigation component
- * @see QuickCreateWizard - Templates tab content
- * @see CreatePageContent - Custom tab content
- * @see CoachPageContent - AI Coach tab content
+ * @see MethodSelector - Card-based method selection
+ * @see QuickCreateWizard - Quick Create content
+ * @see CreatePageContent - Build Your Own content (with integrated Coach)
  */
 
 'use client';
@@ -23,20 +22,62 @@
 import { Suspense, lazy, useCallback, useRef, useEffect, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { CreateTabs, type CreateTabValue, validateTab } from './CreateTabs';
+import { useAuth } from '@aurastream/shared';
+import { MethodSelector, type CreationMethod } from './MethodSelector';
+import { CreateStudioHeader } from './CreateStudioHeader';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+// Legacy tab support for backwards compatibility
+import { type CreateTabValue, validateTab } from './CreateTabs';
 
 // =============================================================================
 // Types
 // =============================================================================
 
 export interface UnifiedCreateFlowProps {
-  /** Initial tab to display (overrides URL param) */
-  initialTab?: CreateTabValue;
+  /** Initial method to display (overrides URL param) */
+  initialMethod?: CreationMethod;
   /** Additional className for the container */
   className?: string;
   /** Test ID for e2e testing */
   testId?: string;
+}
+
+// =============================================================================
+// Method Validation
+// =============================================================================
+
+const VALID_METHODS: CreationMethod[] = ['quick', 'custom'];
+const DEFAULT_METHOD: CreationMethod = 'quick';
+
+/**
+ * Convert legacy tab value to new method value
+ */
+function tabToMethod(tab: CreateTabValue | null): CreationMethod {
+  if (tab === 'templates') return 'quick';
+  if (tab === 'custom' || tab === 'coach') return 'custom'; // Coach now part of custom
+  return DEFAULT_METHOD;
+}
+
+/**
+ * Convert method value to legacy tab value (for URL backwards compat)
+ */
+function methodToTab(method: CreationMethod): CreateTabValue {
+  if (method === 'quick') return 'templates';
+  return method;
+}
+
+/**
+ * Validate and return a valid method value
+ */
+function validateMethod(value: string | null): CreationMethod {
+  // Check new method param first
+  if (value && VALID_METHODS.includes(value as CreationMethod)) {
+    return value as CreationMethod;
+  }
+  // Fall back to legacy tab param conversion
+  const legacyTab = validateTab(value);
+  return tabToMethod(legacyTab);
 }
 
 // =============================================================================
@@ -53,10 +94,6 @@ const QuickCreateWizard = lazy(() =>
 
 const CreatePageContent = lazy(() => 
   import('./CreatePageContent').then(mod => ({ default: mod.CreatePageContent }))
-);
-
-const CoachPageContent = lazy(() => 
-  import('../coach/CoachPageContent').then(mod => ({ default: mod.CoachPageContent }))
 );
 
 // =============================================================================
@@ -127,57 +164,26 @@ function CustomLoadingSkeleton() {
   );
 }
 
-/**
- * Loading skeleton for Coach tab (CoachPageContent)
- */
-function CoachLoadingSkeleton() {
-  return (
-    <div className="space-y-6 animate-pulse" aria-label="Loading AI coach...">
-      {/* Header skeleton */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded bg-background-elevated" />
-          <div className="h-5 w-32 bg-background-elevated rounded" />
-        </div>
-        <div className="h-4 w-48 bg-background-elevated rounded" />
-      </div>
-      
-      {/* Form skeleton */}
-      <div className="space-y-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="space-y-2">
-            <div className="h-4 w-24 bg-background-elevated rounded" />
-            <div className="h-12 w-full bg-background-elevated rounded-lg" />
-          </div>
-        ))}
-      </div>
-      
-      {/* Button skeleton */}
-      <div className="h-12 w-full bg-background-elevated rounded-xl" />
-    </div>
-  );
-}
-
 // =============================================================================
 // Scroll Position Manager
 // =============================================================================
 
 /**
- * Hook to preserve and restore scroll positions for each tab.
+ * Hook to preserve and restore scroll positions for each method.
  */
 function useScrollPositionManager() {
-  const scrollPositions = useRef<Map<CreateTabValue, number>>(new Map());
+  const scrollPositions = useRef<Map<CreationMethod, number>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const saveScrollPosition = useCallback((tab: CreateTabValue) => {
+  const saveScrollPosition = useCallback((method: CreationMethod) => {
     if (containerRef.current) {
-      scrollPositions.current.set(tab, containerRef.current.scrollTop);
+      scrollPositions.current.set(method, containerRef.current.scrollTop);
     }
   }, []);
 
-  const restoreScrollPosition = useCallback((tab: CreateTabValue) => {
+  const restoreScrollPosition = useCallback((method: CreationMethod) => {
     if (containerRef.current) {
-      const savedPosition = scrollPositions.current.get(tab) ?? 0;
+      const savedPosition = scrollPositions.current.get(method) ?? 0;
       // Use requestAnimationFrame to ensure DOM has updated
       requestAnimationFrame(() => {
         if (containerRef.current) {
@@ -201,110 +207,103 @@ function useScrollPositionManager() {
 /**
  * UnifiedCreateFlow - Main container for the unified asset creation experience.
  * 
- * Provides a tabbed interface that consolidates:
- * - Templates: Quick Create wizard with pre-built templates
- * - Custom: Full custom asset creation flow
+ * Provides a card-based interface that consolidates:
+ * - Quick Create: Template-based fast creation
+ * - Build Your Own: Full custom asset creation flow
  * - AI Coach: AI-powered prompt refinement
  * 
  * @example
  * ```tsx
- * // Basic usage (reads tab from URL)
+ * // Basic usage (reads method from URL)
  * <UnifiedCreateFlow />
  * 
- * // With initial tab override
- * <UnifiedCreateFlow initialTab="custom" />
+ * // With initial method override
+ * <UnifiedCreateFlow initialMethod="custom" />
  * ```
  */
 export function UnifiedCreateFlow({
-  initialTab,
+  initialMethod,
   className,
   testId = 'unified-create-flow',
 }: UnifiedCreateFlowProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  
+  // Check if user is premium
+  const isPremiumUser = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio' || user?.subscriptionTier === 'unlimited';
   
   // Scroll position management
   const { containerRef, saveScrollPosition, restoreScrollPosition } = useScrollPositionManager();
   
-  // Track which tabs have been loaded (for lazy loading optimization)
-  const [loadedTabs, setLoadedTabs] = useState<Set<CreateTabValue>>(new Set());
+  // Track which methods have been loaded (for lazy loading optimization)
+  const [loadedMethods, setLoadedMethods] = useState<Set<CreationMethod>>(new Set());
   
-  // Get active tab from URL or use initial/default
-  const urlTab = searchParams.get('tab');
-  const activeTab = initialTab ?? validateTab(urlTab);
+  // Get active method from URL or use initial/default
+  // Support both new 'method' param and legacy 'tab' param
+  const urlMethod = searchParams.get('method') || searchParams.get('tab');
+  const activeMethod = initialMethod ?? validateMethod(urlMethod);
   
-  // Mark initial tab as loaded
+  // Mark initial method as loaded
   useEffect(() => {
-    setLoadedTabs(prev => new Set(prev).add(activeTab));
-  }, [activeTab]);
+    setLoadedMethods(prev => new Set(prev).add(activeMethod));
+  }, [activeMethod]);
 
   /**
-   * Handle tab change with scroll position preservation.
+   * Handle method change with scroll position preservation.
    */
-  const handleTabChange = useCallback((newTab: CreateTabValue) => {
+  const handleMethodChange = useCallback((newMethod: CreationMethod) => {
     // Save current scroll position
-    saveScrollPosition(activeTab);
+    saveScrollPosition(activeMethod);
     
-    // Mark new tab as loaded
-    setLoadedTabs(prev => new Set(prev).add(newTab));
+    // Mark new method as loaded
+    setLoadedMethods(prev => new Set(prev).add(newMethod));
     
-    // Update URL
+    // Update URL (use 'method' param, keep 'tab' for backwards compat)
     const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', newTab);
+    params.set('method', newMethod);
+    params.set('tab', methodToTab(newMethod)); // Backwards compat
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
     
-    // Restore scroll position for new tab (after render)
-    restoreScrollPosition(newTab);
-  }, [activeTab, pathname, router, searchParams, saveScrollPosition, restoreScrollPosition]);
+    // Restore scroll position for new method (after render)
+    restoreScrollPosition(newMethod);
+  }, [activeMethod, pathname, router, searchParams, saveScrollPosition, restoreScrollPosition]);
 
   /**
-   * Handle navigation to coach tab from custom tab.
+   * Get the appropriate loading skeleton for a method.
    */
-  const handleNavigateToCoach = useCallback(() => {
-    handleTabChange('coach');
-  }, [handleTabChange]);
-
-  /**
-   * Get the appropriate loading skeleton for a tab.
-   */
-  const getLoadingSkeleton = (tab: CreateTabValue) => {
-    switch (tab) {
-      case 'templates':
+  const getLoadingSkeleton = (method: CreationMethod) => {
+    switch (method) {
+      case 'quick':
         return <TemplatesLoadingSkeleton />;
       case 'custom':
         return <CustomLoadingSkeleton />;
-      case 'coach':
-        return <CoachLoadingSkeleton />;
       default:
         return <TemplatesLoadingSkeleton />;
     }
   };
 
   /**
-   * Render tab content with lazy loading and suspense.
+   * Render method content with lazy loading and suspense.
    */
-  const renderTabContent = (tab: CreateTabValue) => {
-    // Only render if tab has been accessed (lazy loading)
-    if (!loadedTabs.has(tab)) {
+  const renderMethodContent = (method: CreationMethod) => {
+    // Only render if method has been accessed (lazy loading)
+    if (!loadedMethods.has(method)) {
       return null;
     }
 
+    const methodLabel = method === 'quick' ? 'Quick Create' : 'Build Your Own';
+
     return (
       <ErrorBoundary 
-        name={`CreateFlow:${tab}`} 
-        errorMessage={`Failed to load ${tab === 'templates' ? 'templates' : tab === 'custom' ? 'custom create' : 'AI coach'}.`}
+        name={`CreateFlow:${method}`} 
+        errorMessage={`Failed to load ${methodLabel}.`}
       >
-        <Suspense fallback={getLoadingSkeleton(tab)}>
-          {tab === 'templates' && <QuickCreateWizard />}
-          {tab === 'custom' && (
-            <CreatePageContent 
-              onNavigateToCoach={handleNavigateToCoach}
-              testId="unified-create-custom"
-            />
-          )}
-          {tab === 'coach' && (
-            <CoachPageContent testId="unified-create-coach" />
+        <Suspense fallback={getLoadingSkeleton(method)}>
+          {method === 'quick' && <QuickCreateWizard />}
+          {method === 'custom' && (
+            <CreatePageContent testId="unified-create-custom" />
           )}
         </Suspense>
       </ErrorBoundary>
@@ -313,42 +312,28 @@ export function UnifiedCreateFlow({
 
   return (
     <div 
-      className={cn('w-full', className)} 
+      className={cn('w-full space-y-4', className)} 
       data-testid={testId}
       role="region"
       aria-label="Asset creation interface"
     >
-      {/* Tab Navigation */}
-      <CreateTabs
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        panels={{
-          templates: (
-            <div 
-              ref={activeTab === 'templates' ? containerRef : undefined}
-              className="overflow-y-auto"
-            >
-              {renderTabContent('templates')}
-            </div>
-          ),
-          custom: (
-            <div 
-              ref={activeTab === 'custom' ? containerRef : undefined}
-              className="overflow-y-auto"
-            >
-              {renderTabContent('custom')}
-            </div>
-          ),
-          coach: (
-            <div 
-              ref={activeTab === 'coach' ? containerRef : undefined}
-              className="overflow-y-auto min-h-[500px]"
-            >
-              {renderTabContent('coach')}
-            </div>
-          ),
-        }}
+      {/* Header */}
+      <CreateStudioHeader />
+
+      {/* Method Selector Cards */}
+      <MethodSelector
+        selectedMethod={activeMethod}
+        onMethodChange={handleMethodChange}
+        isPremiumUser={isPremiumUser}
       />
+
+      {/* Method Content */}
+      <div 
+        ref={containerRef}
+        className="min-h-[400px]"
+      >
+        {renderMethodContent(activeMethod)}
+      </div>
     </div>
   );
 }

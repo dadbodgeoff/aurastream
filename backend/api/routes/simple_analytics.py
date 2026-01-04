@@ -163,6 +163,37 @@ async def get_dashboard_summary(
     return service.get_dashboard_summary(days)
 
 
+@router.get("/dashboard/real-users")
+async def get_real_users_stats(
+    service: SimpleAnalyticsService = Depends(get_simple_analytics_service),
+):
+    """
+    Get real user statistics (excluding @aurastream.shop test emails).
+    """
+    return service.get_real_users_stats()
+
+
+@router.get("/dashboard/debug")
+async def get_debug_stats(
+    service: SimpleAnalyticsService = Depends(get_simple_analytics_service),
+):
+    """
+    Debug endpoint to check raw table counts.
+    """
+    return service.get_debug_stats()
+
+
+@router.post("/cleanup-test-data")
+async def cleanup_test_data(
+    service: SimpleAnalyticsService = Depends(get_simple_analytics_service),
+):
+    """
+    Remove test data from analytics tables.
+    Removes localhost visits and events from test emails.
+    """
+    return service.cleanup_test_data()
+
+
 @router.get("/dashboard/trend", response_model=list[TrendDataPoint])
 async def get_dashboard_trend(
     days: int = 30,
@@ -205,6 +236,96 @@ async def get_generation_stats(
     """Get generation statistics by asset type."""
     days = max(1, min(365, days))
     return service.get_generation_stats(days)
+
+
+# =============================================================================
+# Paginated Table Endpoints (for detailed data exploration)
+# =============================================================================
+
+@router.get("/visits")
+async def get_visits_paginated(
+    page: int = 1,
+    page_size: int = 25,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
+    days: int = 30,
+    search: Optional[str] = None,
+    filter_device_type: Optional[str] = None,
+    filter_browser: Optional[str] = None,
+    service: SimpleAnalyticsService = Depends(get_simple_analytics_service),
+):
+    """Get paginated visits with filtering and sorting."""
+    page = max(1, page)
+    page_size = max(1, min(100, page_size))
+    days = max(1, min(365, days))
+    
+    return service.get_visits_paginated(
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        days=days,
+        search=search,
+        device_type=filter_device_type,
+        browser=filter_browser,
+    )
+
+
+@router.get("/events")
+async def get_events_paginated(
+    page: int = 1,
+    page_size: int = 25,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
+    days: int = 30,
+    event_type: Optional[str] = None,
+    service: SimpleAnalyticsService = Depends(get_simple_analytics_service),
+):
+    """Get paginated user events with filtering and sorting."""
+    page = max(1, page)
+    page_size = max(1, min(100, page_size))
+    days = max(1, min(365, days))
+    
+    return service.get_events_paginated(
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        days=days,
+        event_type=event_type,
+    )
+
+
+@router.get("/sessions")
+async def get_sessions_paginated(
+    page: int = 1,
+    page_size: int = 25,
+    sort_by: str = "started_at",
+    sort_dir: str = "desc",
+    days: int = 30,
+    converted: Optional[str] = None,
+    service: SimpleAnalyticsService = Depends(get_simple_analytics_service),
+):
+    """Get paginated sessions with filtering and sorting."""
+    page = max(1, page)
+    page_size = max(1, min(100, page_size))
+    days = max(1, min(365, days))
+    
+    # Convert string to bool if provided
+    converted_bool = None
+    if converted == "true":
+        converted_bool = True
+    elif converted == "false":
+        converted_bool = False
+    
+    return service.get_sessions_paginated(
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        days=days,
+        converted=converted_bool,
+    )
 
 
 # =============================================================================

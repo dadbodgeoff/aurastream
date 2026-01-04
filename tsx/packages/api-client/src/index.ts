@@ -194,6 +194,7 @@ export type {
   CoachColorInfo,
   CoachFontInfo,
   CoachBrandContext,
+  CoachReferenceAsset,
   StartCoachRequest,
   ContinueChatRequest,
   CoachValidationIssue,
@@ -703,6 +704,10 @@ export type {
   PanelType,
   PanelConfig,
   PanelSize,
+  // NEW: Intel redesign header badge types
+  MarketOpportunityData as IntelMarketOpportunityData,
+  DailyAssetsData as IntelDailyAssetsData,
+  EnhancedDailyBrief,
 } from './types/intel';
 
 // Intel hooks exports
@@ -814,6 +819,17 @@ export {
   useGetMediaForPrompt,
 } from './hooks/useCreatorMedia';
 
+// Canvas Snapshot hooks exports
+export {
+  useUploadCanvasSnapshot,
+  blobToBase64,
+  dataUrlToBase64,
+} from './hooks/useCanvasSnapshot';
+export type {
+  CanvasSnapshotUploadRequest,
+  CanvasSnapshotUploadResponse,
+} from './hooks/useCanvasSnapshot';
+
 // Trends type exports
 export type {
   DailyBrief,
@@ -836,6 +852,9 @@ export type {
   YouTubeGameTrendingResponse,
   AvailableGame,
   AvailableGamesResponse,
+  // NEW: Intel redesign header badge types
+  MarketOpportunityData,
+  DailyAssetsData,
 } from './types/trends';
 
 // Trends hooks exports
@@ -855,6 +874,10 @@ export {
   useYouTubeGameTrending,
   useYouTubeSearch,
   useCrossPlatformTrends,
+  // NEW: Transform functions for Intel redesign
+  transformMarketOpportunity,
+  transformDailyAssets,
+  transformDailyBrief,
 } from './hooks/useTrends';
 
 export type { CrossPlatformData, RisingCreator } from './hooks/useTrends';
@@ -1014,3 +1037,17 @@ export {
   useOrchestratorStatus,
   useIntelCategories,
 } from './hooks/useIntelV2';
+
+
+// SSE (Server-Sent Events) exports
+export {
+  ResilientEventSource,
+  useResilientSSE,
+} from './sse';
+export type {
+  SSEEvent,
+  ResilientSSEOptions,
+  ResilientSSEState,
+  UseResilientSSEOptions,
+  UseResilientSSEResult,
+} from './sse';

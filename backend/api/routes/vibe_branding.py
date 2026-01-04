@@ -23,8 +23,9 @@ from backend.api.schemas.vibe_branding import (
     VibeAnalysisSchema,
     FontsSchema,
 )
-from backend.services.vibe_branding_service import (
-    get_vibe_branding_service,
+from backend.api.service_dependencies import (
+    VibeBrandingServiceDep,
+    UsageLimitServiceDep,
 )
 from backend.services.exceptions import (
     ContentPolicyError,
@@ -69,7 +70,9 @@ async def analyze_uploaded_image(
     file: UploadFile = File(...),
     auto_create_kit: bool = Query(True, description="Automatically create brand kit"),
     kit_name: Optional[str] = Query(None, max_length=100, description="Name for brand kit"),
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    service: VibeBrandingServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
 ):
     """
     Analyze an uploaded image and extract brand identity.
@@ -82,11 +85,6 @@ async def analyze_uploaded_image(
     
     **Supported formats:** JPEG, PNG, WebP (max 15MB)
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    service = get_vibe_branding_service()
-    usage_service = get_usage_limit_service()
-    
     # Check usage limit
     usage = await usage_service.check_limit(current_user.sub, "vibe_branding")
     if not usage.can_use:
@@ -171,7 +169,9 @@ async def analyze_uploaded_image(
 @router.post("/analyze/url", response_model=AnalyzeResponse)
 async def analyze_image_url(
     request: AnalyzeURLRequest,
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    service: VibeBrandingServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
 ):
     """
     Analyze an image from URL and extract brand identity.
@@ -182,11 +182,6 @@ async def analyze_image_url(
     - Free: 1 analysis/month
     - Pro: 10 analyses/month
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    service = get_vibe_branding_service()
-    usage_service = get_usage_limit_service()
-    
     # Check usage limit
     usage = await usage_service.check_limit(current_user.sub, "vibe_branding")
     if not usage.can_use:
@@ -275,7 +270,8 @@ async def analyze_image_url(
 
 @router.get("/usage", response_model=UsageResponse)
 async def get_usage(
-    current_user: TokenPayload = Depends(get_current_user)
+    current_user: TokenPayload = Depends(get_current_user),
+    usage_service: UsageLimitServiceDep = None,
 ):
     """
     Get user's vibe branding usage.
@@ -287,9 +283,6 @@ async def get_usage(
     - Free: 1 analysis/month
     - Pro: 10 analyses/month
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    usage_service = get_usage_limit_service()
     usage = await usage_service.check_limit(current_user.sub, "vibe_branding")
     
     return UsageResponse(

@@ -138,7 +138,7 @@ export function CreateTabs({
   const prefersReducedMotion = useReducedMotion();
 
   // Determine if user is Pro/Studio tier
-  const isPro = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+  const isPro = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio' || user?.subscriptionTier === 'unlimited';
 
   // Get initial tab from URL or use default
   const urlTab = searchParams.get('tab');

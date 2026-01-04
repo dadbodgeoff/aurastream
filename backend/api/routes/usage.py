@@ -11,7 +11,7 @@ from datetime import datetime
 
 from backend.api.middleware.auth import get_current_user
 from backend.services.jwt_service import TokenPayload
-from backend.services.usage_limit_service import get_usage_limit_service
+from backend.api.service_dependencies import UsageLimitServiceDep
 
 
 router = APIRouter()
@@ -77,9 +77,9 @@ class UsageCheckResponse(BaseModel):
 )
 async def get_usage_status(
     current_user: TokenPayload = Depends(get_current_user),
+    service: UsageLimitServiceDep = None,
 ) -> UsageStatusResponse:
     """Get complete usage status for the current user."""
-    service = get_usage_limit_service()
     status = await service.get_status(current_user.sub)
     
     return UsageStatusResponse(
@@ -140,6 +140,7 @@ async def get_usage_status(
 async def check_feature_usage(
     feature: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: UsageLimitServiceDep = None,
 ) -> UsageCheckResponse:
     """Check if user can use a specific feature."""
     valid_features = ["vibe_branding", "aura_lab", "coach", "creations", "profile_creator"]
@@ -149,7 +150,6 @@ async def check_feature_usage(
             detail=f"Invalid feature. Must be one of: {', '.join(valid_features)}",
         )
     
-    service = get_usage_limit_service()
     check = await service.check_limit(current_user.sub, feature)
     
     # Build upgrade message if limit reached

@@ -25,10 +25,23 @@ export function PlacementCanvas({
   assets,
   placements,
   onPlacementsChange,
+  selectedId: controlledSelectedId,
+  onSelectionChange,
   className,
 }: PlacementCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  
+  // Support both controlled and uncontrolled selection
+  const [internalSelectedId, setInternalSelectedId] = useState<string | null>(null);
+  const selectedId = controlledSelectedId !== undefined ? controlledSelectedId : internalSelectedId;
+  const setSelectedId = useCallback((id: string | null) => {
+    if (onSelectionChange) {
+      onSelectionChange(id);
+    } else {
+      setInternalSelectedId(id);
+    }
+  }, [onSelectionChange]);
+  
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     isResizing: false,
@@ -123,16 +136,20 @@ export function PlacementCanvas({
           },
         });
       } else if (dragState.isResizing) {
-        // Resize the asset
+        // Resize the asset - scale deltas for better responsiveness
+        const resizeMultiplier = 1.5; // Make resize more responsive
+        const scaledDeltaX = deltaX * resizeMultiplier;
+        const scaledDeltaY = deltaY * resizeMultiplier;
+        
         let newWidth = dragState.startSize.width;
         let newHeight = dragState.startSize.height;
         
         const handle = dragState.resizeHandle;
         
-        if (handle?.includes('e')) newWidth = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.width + deltaX);
-        if (handle?.includes('w')) newWidth = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.width - deltaX);
-        if (handle?.includes('s')) newHeight = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.height + deltaY);
-        if (handle?.includes('n')) newHeight = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.height - deltaY);
+        if (handle?.includes('e')) newWidth = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.width + scaledDeltaX);
+        if (handle?.includes('w')) newWidth = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.width - scaledDeltaX);
+        if (handle?.includes('s')) newHeight = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.height + scaledDeltaY);
+        if (handle?.includes('n')) newHeight = Math.max(SIZE_CONSTRAINTS.minPercent, dragState.startSize.height - scaledDeltaY);
         
         // Maintain aspect ratio if enabled
         if (dragState.startSize.maintainAspectRatio) {
@@ -172,12 +189,13 @@ export function PlacementCanvas({
     };
   }, [dragState, selectedId, getCanvasCoords, snapToGrid, updatePlacement]);
 
-  // Deselect on canvas click
+  // Deselect on canvas click (only if clicking the canvas background, not an asset)
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    // Only deselect if the click target is the canvas itself, not a child element
     if (e.target === canvasRef.current) {
       setSelectedId(null);
     }
-  }, []);
+  }, [setSelectedId]);
 
   // Keyboard controls for selected asset
   useEffect(() => {
@@ -225,18 +243,33 @@ export function PlacementCanvas({
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, placements, updatePlacement, onPlacementsChange]);
+  }, [selectedId, placements, updatePlacement, onPlacementsChange, setSelectedId]);
 
   const selectedPlacement = placements.find(p => p.assetId === selectedId);
 
+  // Check if we're being used as an overlay (absolute positioning from parent)
+  // In this case, we should fill the parent container, not create our own dimensions
+  const isOverlayMode = className?.includes('absolute');
+
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn(
+      'relative',
+      isOverlayMode ? 'w-full h-full' : 'flex items-center justify-center',
+      className
+    )}>
       {/* Canvas Container */}
       <div 
-        className="relative mx-auto bg-background-elevated rounded-xl overflow-hidden border-2 border-border-subtle"
-        style={{ 
+        className={cn(
+          "relative bg-background-elevated overflow-hidden",
+          isOverlayMode 
+            ? "w-full h-full" 
+            : "mx-auto rounded-xl border-2 border-border-subtle"
+        )}
+        style={isOverlayMode ? undefined : { 
           aspectRatio: `${dimensions.width} / ${dimensions.height}`,
           maxHeight: '60vh',
+          maxWidth: dimensions.width > dimensions.height ? '100%' : `calc(60vh * ${dimensions.width / dimensions.height})`,
+          width: '100%',
         }}
       >
         {/* Grid Overlay */}
@@ -260,7 +293,7 @@ export function PlacementCanvas({
         {/* Interactive Canvas */}
         <div
           ref={canvasRef}
-          className="absolute inset-0 cursor-crosshair"
+          className="absolute inset-0 cursor-default"
           onClick={handleCanvasClick}
         >
           {/* Placed Assets */}
@@ -336,14 +369,16 @@ export function PlacementCanvas({
             })}
         </div>
         
-        {/* Dimension Label */}
-        <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded text-xs text-white/80 pointer-events-none">
-          {dimensions.width} × {dimensions.height}px
-        </div>
+        {/* Dimension Label - only show when not in overlay mode */}
+        {!isOverlayMode && (
+          <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 rounded text-xs text-white/80 pointer-events-none">
+            {dimensions.width} × {dimensions.height}px
+          </div>
+        )}
       </div>
       
-      {/* Position Info */}
-      {selectedPlacement && (
+      {/* Position Info - only show when not in overlay mode */}
+      {!isOverlayMode && selectedPlacement && (
         <div className="mt-3 flex items-center justify-center gap-4 text-xs text-text-secondary">
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-interactive-500" />

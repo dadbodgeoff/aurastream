@@ -5,16 +5,17 @@
  * where users interact with the AI coach to refine their prompts.
  * 
  * Enterprise UX Features:
- * - Connection loss recovery with auto-reconnect
- * - Streaming progress feedback (Thinking, Searching, Responding)
+ * - Connection loss recovery with auto-reconnect via ResilientEventSource
+ * - Streaming progress feedback (Thinking, Searching, Responding, Reconnecting)
  * - Session timeout recovery
  * - Rate limit handling with countdown
+ * - Completion recovery for interrupted streams
  * 
  * @module useCoachChat
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { apiClient } from '@aurastream/api-client';
+import { apiClient, ResilientEventSource, type SSEEvent } from '@aurastream/api-client';
 import type { StartCoachRequest } from './useCoachContext';
 
 // ============================================================================
@@ -95,7 +96,19 @@ export interface ChatMessage {
   isStreaming?: boolean;
   intentStatus?: IntentStatus;
   groundingUsed?: boolean;
+  /** Reference assets attached to this message (user messages only) */
+  referenceAssets?: ReferenceAsset[];
   timestamp: Date;
+}
+
+/** Reference asset from user's media library */
+export interface ReferenceAsset {
+  assetId: string;
+  displayName: string;
+  assetType: string;
+  url: string;
+  thumbnailUrl?: string;
+  description?: string;
 }
 
 /**
@@ -107,7 +120,8 @@ export interface ChatMessage {
  * - On validation event: 'streaming' → 'validating'
  * - On done: 'validating' → 'complete'
  * - On error: any → 'error'
- * - On reconnect: 'error' → 'reconnecting' → 'connecting'
+ * - On reconnect: 'error' → 'reconnecting' → 'streaming'
+ * - On heartbeat timeout: 'streaming' → 'reconnecting'
  */
 export type StreamingStage =
   | 'idle'
@@ -146,6 +160,8 @@ export interface UseCoachChatState {
   streamingStage: StreamingStage;
   /** Current session ID (null if not started) */
   sessionId: string | null;
+  /** Current stream ID for recovery (null if not streaming) */
+  streamId: string | null;
   /** Current refined description from coach */
   refinedDescription: string | null;
   /** Whether the intent is ready for generation */
@@ -172,8 +188,8 @@ export interface UseCoachChatState {
 export interface UseCoachChatReturn extends UseCoachChatState {
   /** Start a new coaching session */
   startSession: (request: StartCoachRequest) => Promise<void>;
-  /** Send a message to continue the chat */
-  sendMessage: (message: string) => Promise<void>;
+  /** Send a message to continue the chat, optionally with reference assets */
+  sendMessage: (message: string, referenceAssets?: ReferenceAsset[]) => Promise<void>;
   /** End the current session */
   endSession: () => Promise<void>;
   /** Clear all messages and reset state */
@@ -289,7 +305,66 @@ function parseErrorResponse(error: unknown, status?: number): CoachError {
 }
 
 /**
+ * Stream SSE events from a POST endpoint using ResilientEventSource.
+ * Returns a controller object for managing the stream.
+ */
+interface StreamController {
+  /** Abort the stream */
+  abort: () => void;
+  /** Get the stream ID */
+  getStreamId: () => string | null;
+}
+
+function createResilientStream(
+  url: string,
+  body: object,
+  accessToken: string | null,
+  callbacks: {
+    onChunk: (chunk: StreamChunk) => void;
+    onError: (error: Error, status?: number) => void;
+    onReconnect: (attempt: number) => void;
+    onComplete: () => void;
+    onStreamId: (streamId: string) => void;
+  }
+): StreamController {
+  const source = new ResilientEventSource({
+    url,
+    method: 'POST',
+    body,
+    authToken: accessToken || undefined,
+    maxRetries: MAX_RETRY_ATTEMPTS,
+    heartbeatTimeout: 35000,
+    onMessage: (event: SSEEvent) => {
+      const chunk = event.data as StreamChunk;
+      callbacks.onChunk(chunk);
+    },
+    onError: (error) => {
+      callbacks.onError(error);
+    },
+    onReconnect: (attempt) => {
+      callbacks.onReconnect(attempt);
+    },
+    onComplete: () => {
+      callbacks.onComplete();
+    },
+    onStreamId: (streamId) => {
+      callbacks.onStreamId(streamId);
+    },
+  });
+
+  source.connect().catch((err) => {
+    callbacks.onError(err);
+  });
+
+  return {
+    abort: () => source.abort(),
+    getStreamId: () => source.getStreamId(),
+  };
+}
+
+/**
  * Stream SSE events from a POST endpoint.
+ * @deprecated Use createResilientStream for new code
  */
 async function* streamSSE(
   url: string,
@@ -414,6 +489,7 @@ export function useCoachChat(): UseCoachChatReturn {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingStage, setStreamingStage] = useState<StreamingStage>('idle');
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [streamId, setStreamId] = useState<string | null>(null);
   const [refinedDescription, setRefinedDescription] = useState<string | null>(null);
   const [isGenerationReady, setIsGenerationReady] = useState(false);
   const [confidence, setConfidence] = useState(0);
@@ -427,11 +503,15 @@ export function useCoachChat(): UseCoachChatReturn {
   // Track if we've received the first token (for stage transitions)
   const hasReceivedFirstTokenRef = useRef(false);
 
-  // Refs for abort controller
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Refs for stream controller
+  const streamControllerRef = useRef<StreamController | null>(null);
   
   // Ref for last request (for retry functionality)
-  const lastRequestRef = useRef<{ type: 'start' | 'message'; data: StartCoachRequest | string } | null>(null);
+  const lastRequestRef = useRef<{ 
+    type: 'start' | 'message'; 
+    data: StartCoachRequest | string;
+    referenceAssets?: ReferenceAsset[];
+  } | null>(null);
 
   // Token batching refs to reduce re-renders during streaming
   // Instead of updating on every token, we batch updates every 100ms
@@ -499,18 +579,19 @@ export function useCoachChat(): UseCoachChatReturn {
   /**
    * Flush the token buffer and update the message with accumulated content.
    * This batches multiple token updates into a single state update.
+   * 
+   * Note: accumulatedContentRef is already updated when tokens arrive in onChunk,
+   * so we only need to clear the buffer and trigger a re-render with the current content.
    */
   const flushTokenBuffer = useCallback(() => {
     if (tokenBufferRef.current && currentMessageIdRef.current) {
-      // Append buffered tokens to accumulated content
-      accumulatedContentRef.current += tokenBufferRef.current;
       const newContent = accumulatedContentRef.current;
       const messageId = currentMessageIdRef.current;
       
-      // Clear the buffer
+      // Clear the buffer (content already in accumulatedContentRef)
       tokenBufferRef.current = '';
       
-      // Update the message with the new accumulated content
+      // Update the message with the current accumulated content
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === messageId
@@ -717,10 +798,9 @@ export function useCoachChat(): UseCoachChatReturn {
   const startSession = useCallback(
     async (request: StartCoachRequest): Promise<void> => {
       // Cancel any existing stream
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (streamControllerRef.current) {
+        streamControllerRef.current.abort();
       }
-      abortControllerRef.current = new AbortController();
 
       // Store request for retry
       lastRequestRef.current = { type: 'start', data: request };
@@ -730,6 +810,7 @@ export function useCoachChat(): UseCoachChatReturn {
       setStreamingStage('connecting');
       setIsSessionExpired(false);
       setRetryCount(0);
+      setStreamId(null);
 
       // Add user message (the initial description)
       const userMessage: ChatMessage = {
@@ -750,38 +831,149 @@ export function useCoachChat(): UseCoachChatReturn {
 
       setMessages([userMessage, assistantMessage]);
 
-      try {
-        const accessToken = getAccessToken();
-        
-        // Transition to thinking after connection is established
-        setStreamingStage('thinking');
-        
-        const stream = streamSSE(
-          `${API_BASE_URL}/api/v1/coach/start`,
-          request,
-          accessToken
-        );
-        await processStream(stream, assistantMessage.id);
-        
-        // Set session start time on successful start
-        setSessionStartTime(new Date());
-      } catch (err) {
-        const errorInfo = parseErrorResponse(err);
-        setError(errorInfo);
-        setIsStreaming(false);
-        setStreamingStage('error');
-        // Remove the placeholder assistant message on error
-        setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessage.id));
-      }
+      // Initialize batching refs for this stream
+      hasReceivedFirstTokenRef.current = false;
+      tokenBufferRef.current = '';
+      accumulatedContentRef.current = '';
+      currentMessageIdRef.current = assistantMessage.id;
+
+      const accessToken = getAccessToken();
+      
+      // Transition to thinking after connection is established
+      setStreamingStage('thinking');
+      
+      // Create resilient stream with callbacks
+      streamControllerRef.current = createResilientStream(
+        `${API_BASE_URL}/api/v1/coach/start`,
+        request,
+        accessToken,
+        {
+          onChunk: (chunk) => {
+            switch (chunk.type) {
+              case 'token':
+              case 'redirect':
+                // Transition to 'streaming' on first token
+                if (!hasReceivedFirstTokenRef.current) {
+                  hasReceivedFirstTokenRef.current = true;
+                  setStreamingStage('streaming');
+                  startFlushInterval();
+                }
+                tokenBufferRef.current += chunk.content;
+                accumulatedContentRef.current += chunk.content;
+                break;
+
+              case 'intent_ready':
+                stopFlushInterval();
+                if (chunk.metadata) {
+                  const intentStatus: IntentStatus = {
+                    isReady: chunk.metadata.is_ready ?? false,
+                    confidence: chunk.metadata.confidence ?? 0,
+                    refinedDescription: chunk.metadata.refined_description ?? '',
+                    turn: chunk.metadata.turn,
+                  };
+                  setIsGenerationReady(intentStatus.isReady);
+                  setConfidence(intentStatus.confidence);
+                  if (intentStatus.refinedDescription) {
+                    setRefinedDescription(intentStatus.refinedDescription);
+                  }
+                  setStreamingStage('validating');
+                  
+                  // Update message with intent status
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, intentStatus }
+                        : msg
+                    )
+                  );
+                }
+                break;
+
+              case 'grounding':
+                stopFlushInterval();
+                setIsGrounding(true);
+                setGroundingQuery(chunk.metadata?.searching || null);
+                break;
+
+              case 'grounding_complete':
+                setIsGrounding(false);
+                setGroundingQuery(null);
+                if (hasReceivedFirstTokenRef.current) {
+                  startFlushInterval();
+                }
+                break;
+
+              case 'done':
+                stopFlushInterval();
+                if (chunk.metadata?.session_id) {
+                  setSessionId(chunk.metadata.session_id);
+                }
+                setStreamingStage('complete');
+                setIsStreaming(false);
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: accumulatedContentRef.current, isStreaming: false }
+                      : msg
+                  )
+                );
+                setSessionStartTime(new Date());
+                break;
+
+              case 'error':
+                stopFlushInterval();
+                const errorInfo = parseErrorResponse(chunk.content || 'An error occurred');
+                setError(errorInfo);
+                setStreamingStage('error');
+                setIsStreaming(false);
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, isStreaming: false }
+                      : msg
+                  )
+                );
+                break;
+            }
+          },
+          onError: (err) => {
+            stopFlushInterval();
+            const errorInfo = parseErrorResponse(err);
+            setError(errorInfo);
+            setStreamingStage('error');
+            setIsStreaming(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessage.id
+                  ? { ...msg, isStreaming: false }
+                  : msg
+              )
+            );
+          },
+          onReconnect: (attempt) => {
+            setStreamingStage('reconnecting');
+            setRetryCount(attempt);
+          },
+          onComplete: () => {
+            stopFlushInterval();
+            setIsStreaming(false);
+            setIsGrounding(false);
+            setGroundingQuery(null);
+          },
+          onStreamId: (id) => {
+            setStreamId(id);
+          },
+        }
+      );
     },
-    [getAccessToken, processStream]
+    [getAccessToken, startFlushInterval, stopFlushInterval]
   );
 
   /**
-   * Send a message to continue the chat.
+   * Send a message to continue the chat, optionally with reference assets.
    */
   const sendMessage = useCallback(
-    async (message: string): Promise<void> => {
+    async (message: string, referenceAssets?: ReferenceAsset[]): Promise<void> => {
       if (!sessionId) {
         setError({
           code: 'COACH_SESSION_EXPIRED',
@@ -806,23 +998,24 @@ export function useCoachChat(): UseCoachChatReturn {
       }
 
       // Cancel any existing stream
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (streamControllerRef.current) {
+        streamControllerRef.current.abort();
       }
-      abortControllerRef.current = new AbortController();
 
-      // Store message for retry
-      lastRequestRef.current = { type: 'message', data: message };
+      // Store message for retry (include reference assets)
+      lastRequestRef.current = { type: 'message', data: message, referenceAssets };
 
       setError(null);
       setIsStreaming(true);
       setStreamingStage('connecting');
+      setStreamId(null);
 
-      // Add user message
+      // Add user message with reference assets
       const userMessage: ChatMessage = {
         id: generateId(),
         role: 'user',
         content: message,
+        referenceAssets,
         timestamp: new Date(),
       };
 
@@ -837,28 +1030,155 @@ export function useCoachChat(): UseCoachChatReturn {
 
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
-      try {
-        const accessToken = getAccessToken();
-        
-        // Transition to thinking after connection is established
-        setStreamingStage('thinking');
-        
-        const stream = streamSSE(
-          `${API_BASE_URL}/api/v1/coach/sessions/${sessionId}/messages`,
-          { message },
-          accessToken
-        );
-        await processStream(stream, assistantMessage.id);
-      } catch (err) {
-        const errorInfo = parseErrorResponse(err);
-        setError(errorInfo);
-        setIsStreaming(false);
-        setStreamingStage('error');
-        // Remove the placeholder assistant message on error
-        setMessages((prev) => prev.filter((msg) => msg.id !== assistantMessage.id));
+      // Initialize batching refs for this stream
+      hasReceivedFirstTokenRef.current = false;
+      tokenBufferRef.current = '';
+      accumulatedContentRef.current = '';
+      currentMessageIdRef.current = assistantMessage.id;
+
+      const accessToken = getAccessToken();
+      
+      // Transition to thinking after connection is established
+      setStreamingStage('thinking');
+      
+      // Build request body with optional reference assets
+      const requestBody: { message: string; reference_assets?: Array<{
+        asset_id: string;
+        display_name: string;
+        asset_type: string;
+        url: string;
+        description?: string;
+      }> } = { message };
+      
+      if (referenceAssets && referenceAssets.length > 0) {
+        requestBody.reference_assets = referenceAssets.map(asset => ({
+          asset_id: asset.assetId,
+          display_name: asset.displayName,
+          asset_type: asset.assetType,
+          url: asset.url,
+          description: asset.description,
+        }));
       }
+      
+      // Create resilient stream with callbacks
+      streamControllerRef.current = createResilientStream(
+        `${API_BASE_URL}/api/v1/coach/sessions/${sessionId}/messages`,
+        requestBody,
+        accessToken,
+        {
+          onChunk: (chunk) => {
+            switch (chunk.type) {
+              case 'token':
+              case 'redirect':
+                if (!hasReceivedFirstTokenRef.current) {
+                  hasReceivedFirstTokenRef.current = true;
+                  setStreamingStage('streaming');
+                  startFlushInterval();
+                }
+                tokenBufferRef.current += chunk.content;
+                accumulatedContentRef.current += chunk.content;
+                break;
+
+              case 'intent_ready':
+                stopFlushInterval();
+                if (chunk.metadata) {
+                  const intentStatus: IntentStatus = {
+                    isReady: chunk.metadata.is_ready ?? false,
+                    confidence: chunk.metadata.confidence ?? 0,
+                    refinedDescription: chunk.metadata.refined_description ?? '',
+                    turn: chunk.metadata.turn,
+                  };
+                  setIsGenerationReady(intentStatus.isReady);
+                  setConfidence(intentStatus.confidence);
+                  if (intentStatus.refinedDescription) {
+                    setRefinedDescription(intentStatus.refinedDescription);
+                  }
+                  setStreamingStage('validating');
+                  
+                  setMessages((prev) =>
+                    prev.map((msg) =>
+                      msg.id === assistantMessage.id
+                        ? { ...msg, intentStatus }
+                        : msg
+                    )
+                  );
+                }
+                break;
+
+              case 'grounding':
+                stopFlushInterval();
+                setIsGrounding(true);
+                setGroundingQuery(chunk.metadata?.searching || null);
+                break;
+
+              case 'grounding_complete':
+                setIsGrounding(false);
+                setGroundingQuery(null);
+                if (hasReceivedFirstTokenRef.current) {
+                  startFlushInterval();
+                }
+                break;
+
+              case 'done':
+                stopFlushInterval();
+                setStreamingStage('complete');
+                setIsStreaming(false);
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, content: accumulatedContentRef.current, isStreaming: false }
+                      : msg
+                  )
+                );
+                break;
+
+              case 'error':
+                stopFlushInterval();
+                const errorInfo = parseErrorResponse(chunk.content || 'An error occurred');
+                setError(errorInfo);
+                setStreamingStage('error');
+                setIsStreaming(false);
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === assistantMessage.id
+                      ? { ...msg, isStreaming: false }
+                      : msg
+                  )
+                );
+                break;
+            }
+          },
+          onError: (err) => {
+            stopFlushInterval();
+            const errorInfo = parseErrorResponse(err);
+            setError(errorInfo);
+            setStreamingStage('error');
+            setIsStreaming(false);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessage.id
+                  ? { ...msg, isStreaming: false }
+                  : msg
+              )
+            );
+          },
+          onReconnect: (attempt) => {
+            setStreamingStage('reconnecting');
+            setRetryCount(attempt);
+          },
+          onComplete: () => {
+            stopFlushInterval();
+            setIsStreaming(false);
+            setIsGrounding(false);
+            setGroundingQuery(null);
+          },
+          onStreamId: (id) => {
+            setStreamId(id);
+          },
+        }
+      );
     },
-    [sessionId, isStreaming, isSessionExpired, getAccessToken, processStream]
+    [sessionId, isStreaming, isSessionExpired, getAccessToken, startFlushInterval, stopFlushInterval]
   );
 
   /**
@@ -870,8 +1190,8 @@ export function useCoachChat(): UseCoachChatReturn {
     }
 
     // Cancel any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort();
     }
 
     try {
@@ -894,6 +1214,7 @@ export function useCoachChat(): UseCoachChatReturn {
     }
 
     setSessionId(null);
+    setStreamId(null);
   }, [sessionId, getAccessToken]);
 
   /**
@@ -901,8 +1222,8 @@ export function useCoachChat(): UseCoachChatReturn {
    */
   const reset = useCallback((): void => {
     // Cancel any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
+    if (streamControllerRef.current) {
+      streamControllerRef.current.abort();
     }
     
     // Clean up flush interval
@@ -921,6 +1242,7 @@ export function useCoachChat(): UseCoachChatReturn {
     setIsStreaming(false);
     setStreamingStage('idle');
     setSessionId(null);
+    setStreamId(null);
     setRefinedDescription(null);
     setIsGenerationReady(false);
     setConfidence(0);
@@ -971,7 +1293,7 @@ export function useCoachChat(): UseCoachChatReturn {
     if (lastRequest.type === 'start') {
       await startSession(lastRequest.data as StartCoachRequest);
     } else {
-      await sendMessage(lastRequest.data as string);
+      await sendMessage(lastRequest.data as string, lastRequest.referenceAssets);
     }
   }, [error, retryCount, startSession, sendMessage]);
 
@@ -985,8 +1307,8 @@ export function useCoachChat(): UseCoachChatReturn {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      if (streamControllerRef.current) {
+        streamControllerRef.current.abort();
       }
       // Clean up flush interval on unmount
       if (flushIntervalRef.current) {
@@ -1007,6 +1329,7 @@ export function useCoachChat(): UseCoachChatReturn {
     isStreaming,
     streamingStage,
     sessionId,
+    streamId,
     refinedDescription,
     isGenerationReady,
     confidence,

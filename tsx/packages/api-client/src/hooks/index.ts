@@ -172,3 +172,14 @@ export {
   useMediaForPrompt,
   useGetMediaForPrompt,
 } from './useCreatorMedia';
+
+// Canvas Snapshot hooks
+export {
+  useUploadCanvasSnapshot,
+  blobToBase64,
+  dataUrlToBase64,
+} from './useCanvasSnapshot';
+export type {
+  CanvasSnapshotUploadRequest,
+  CanvasSnapshotUploadResponse,
+} from './useCanvasSnapshot';

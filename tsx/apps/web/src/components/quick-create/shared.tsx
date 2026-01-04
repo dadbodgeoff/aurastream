@@ -30,7 +30,7 @@ export function StepIndicator({
   steps: string[];
 }) {
   return (
-    <div className="flex items-center gap-1 mb-8 p-1 bg-background-surface/30 backdrop-blur-sm rounded-xl border border-white/5 w-fit">
+    <div className="flex items-center gap-0.5 mb-4 p-0.5 bg-background-surface/30 backdrop-blur-sm rounded-lg border border-white/5 w-fit">
       {steps.map((label, i) => {
         const isActive = i === currentStep;
         const isCompleted = i < currentStep;
@@ -38,15 +38,15 @@ export function StepIndicator({
         return (
           <div key={label} className="flex items-center">
             <div className={cn(
-              "flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-150",
               isActive 
-                ? "bg-interactive-600 text-white shadow-lg shadow-interactive-600/25" 
+                ? "bg-interactive-600 text-white shadow-md shadow-interactive-600/20" 
                 : isCompleted
                   ? "text-interactive-400 hover:bg-white/5"
                   : "text-text-muted hover:text-text-secondary hover:bg-white/5"
             )}>
               <span className={cn(
-                "w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+                "w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold transition-all",
                 isActive 
                   ? "bg-white/20 text-white"
                   : isCompleted
@@ -54,7 +54,7 @@ export function StepIndicator({
                     : "bg-white/10 text-text-muted"
               )}>
                 {isCompleted ? (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
@@ -65,7 +65,7 @@ export function StepIndicator({
             </div>
             {i < steps.length - 1 && (
               <div className={cn(
-                "w-6 h-0.5 mx-0.5 rounded-full transition-colors duration-200",
+                "w-4 h-0.5 mx-0.5 rounded-full transition-colors duration-150",
                 isCompleted ? "bg-interactive-500/50" : "bg-white/10"
               )} />
             )}

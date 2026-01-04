@@ -348,7 +348,8 @@ export class APIClient {
       }
 
       // Transform media asset placements from camelCase to snake_case
-      const mediaAssetPlacements = data.mediaAssetPlacements?.map(p => ({
+      // Only include if NOT using canvas snapshot mode
+      const mediaAssetPlacements = !data.canvasSnapshotUrl && data.mediaAssetPlacements?.map(p => ({
         asset_id: p.assetId,
         display_name: p.displayName,
         asset_type: p.assetType,
@@ -363,6 +364,13 @@ export class APIClient {
         opacity: p.opacity,
       }));
 
+      // DEBUG: Log what we're sending
+      console.log('[CANVAS DEBUG] API Client: Sending generate request', {
+        hasCanvasSnapshotUrl: !!data.canvasSnapshotUrl,
+        canvasSnapshotUrl: data.canvasSnapshotUrl,
+        canvasSnapshotDescription: data.canvasSnapshotDescription,
+      });
+
       return this.request<JobResponse>('POST', '/api/v1/generate', {
         body: {
           asset_type: data.assetType,
@@ -370,7 +378,10 @@ export class APIClient {
           custom_prompt: data.customPrompt,
           brand_customization: brandCustomization,
           media_asset_ids: data.mediaAssetIds,
-          media_asset_placements: mediaAssetPlacements,
+          media_asset_placements: mediaAssetPlacements || undefined,
+          // Canvas snapshot mode - more cost-effective for multiple assets
+          canvas_snapshot_url: data.canvasSnapshotUrl,
+          canvas_snapshot_description: data.canvasSnapshotDescription,
         },
         requiresAuth: true,
       });

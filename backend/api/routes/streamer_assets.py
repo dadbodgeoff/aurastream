@@ -11,13 +11,13 @@ Endpoints for managing streamer-specific assets:
 - Stinger transition
 """
 
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from backend.api.middleware.auth import get_current_user
 from backend.services.jwt_service import TokenPayload
-from backend.services.streamer_asset_service import get_streamer_asset_service
+from backend.api.service_dependencies import StreamerAssetServiceDep
 from backend.services.exceptions import BrandKitNotFoundError, AuthorizationError, StorageError
 
 
@@ -112,9 +112,9 @@ async def upload_overlay(
     duration_seconds: Optional[int] = Form(default=None, description="Display duration in seconds"),
     file: UploadFile = File(..., description="Overlay image/video file"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> OverlayResponse:
     """Upload a stream overlay."""
-    service = get_streamer_asset_service()
     try:
         file_data = await file.read()
         result = await service.upload_overlay(
@@ -161,9 +161,9 @@ async def upload_alert(
     image: UploadFile = File(..., description="Alert image/animation"),
     sound: Optional[UploadFile] = File(default=None, description="Alert sound (optional)"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> AlertResponse:
     """Upload an alert with image and optional sound."""
-    service = get_streamer_asset_service()
     try:
         image_data = await image.read()
         sound_data = await sound.read() if sound else None
@@ -212,9 +212,9 @@ async def upload_panel(
     name: str = Form(..., description="Panel name (e.g., About, Schedule, Rules)"),
     file: UploadFile = File(..., description="Panel image file"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> PanelResponse:
     """Upload a channel panel."""
-    service = get_streamer_asset_service()
     try:
         file_data = await file.read()
         result = await service.upload_panel(
@@ -259,9 +259,9 @@ async def upload_emote(
     tier: int = Form(default=1, description="Subscriber tier (1, 2, or 3)"),
     file: UploadFile = File(..., description="Emote image file"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> EmoteResponse:
     """Upload a custom emote."""
-    service = get_streamer_asset_service()
     try:
         file_data = await file.read()
         result = await service.upload_emote(
@@ -306,9 +306,9 @@ async def upload_badge(
     months: int = Form(..., description="Months of subscription (1-120)"),
     file: UploadFile = File(..., description="Badge image file"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> BadgeResponse:
     """Upload a subscriber badge."""
-    service = get_streamer_asset_service()
     try:
         file_data = await file.read()
         result = await service.upload_badge(
@@ -352,9 +352,9 @@ async def upload_facecam(
     position: str = Form(default="bottom-right", description="Position on stream"),
     file: UploadFile = File(..., description="Frame image file"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> FacecamResponse:
     """Upload a facecam frame."""
-    service = get_streamer_asset_service()
     try:
         file_data = await file.read()
         result = await service.upload_facecam_frame(
@@ -398,9 +398,9 @@ async def upload_stinger(
     duration_ms: int = Form(default=1000, description="Transition duration in milliseconds"),
     file: UploadFile = File(..., description="Stinger video file"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> StingerResponse:
     """Upload a stinger transition."""
-    service = get_streamer_asset_service()
     try:
         file_data = await file.read()
         result = await service.upload_stinger(
@@ -442,9 +442,9 @@ async def delete_asset(
     category: str,
     asset_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: StreamerAssetServiceDep = None,
 ) -> DeleteResponse:
     """Delete a streamer asset."""
-    service = get_streamer_asset_service()
     try:
         deleted = await service.delete_asset(
             user_id=current_user.sub,

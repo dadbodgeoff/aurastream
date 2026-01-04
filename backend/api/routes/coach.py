@@ -23,11 +23,12 @@ Security Features:
 """
 
 import json
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
 
 from backend.api.middleware.auth import get_current_user
-from backend.api.middleware.rate_limit import (
+from backend.services.rate_limit import (
     check_coach_message_rate_limit,
     check_coach_session_rate_limit,
     get_coach_rate_limit_status,
@@ -49,12 +50,17 @@ from backend.api.schemas.coach import (
     SessionListResponse,
     SessionSummary,
 )
+from backend.api.service_dependencies import (
+    CoachServiceDep,
+    TipsServiceDep,
+    SessionManagerDep,
+    AuditServiceDep,
+    UsageLimitServiceDep,
+    GenerationServiceDep,
+    CoachAnalyticsServiceDep,
+)
 from backend.services.jwt_service import TokenPayload
-from backend.services.audit_service import get_audit_service
 from backend.services.coach import (
-    get_coach_service,
-    get_tips_service,
-    get_session_manager,
     SessionNotFoundError,
     SessionExpiredError,
 )
@@ -70,7 +76,8 @@ router = APIRouter()
 TIER_ACCESS = {
     "free": {"coach_access": True, "feature": "full_coach", "grounding": False},  # Limited by monthly quota
     "pro": {"coach_access": True, "feature": "full_coach", "grounding": True},   # Pro gets grounding
-    "studio": {"coach_access": True, "feature": "full_coach", "grounding": True},  # Studio placeholder (not active yet)
+    "studio": {"coach_access": True, "feature": "full_coach", "grounding": True},  # Studio tier
+    "unlimited": {"coach_access": True, "feature": "full_coach", "grounding": True},  # Unlimited tier - full access
 }
 
 
@@ -89,21 +96,19 @@ def check_premium_access(tier: str) -> bool:
     return TIER_ACCESS.get(tier, TIER_ACCESS["free"])["coach_access"]
 
 
-async def check_usage_eligibility(user_id: str, tier: str) -> dict:
+async def check_usage_eligibility(user_id: str, tier: str, usage_service) -> dict:
     """
     Check if user can use coach based on monthly usage limits.
     
     Args:
         user_id: User's ID
         tier: User's subscription tier
+        usage_service: Injected UsageLimitService (required)
         
     Returns:
         dict with can_use_coach, remaining, limit, resets_at
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    service = get_usage_limit_service()
-    check = await service.check_limit(user_id, "coach")
+    check = await usage_service.check_limit(user_id, "coach")
     
     return {
         "can_use_coach": check.can_use,
@@ -115,12 +120,9 @@ async def check_usage_eligibility(user_id: str, tier: str) -> dict:
     }
 
 
-async def increment_coach_usage(user_id: str) -> None:
+async def increment_coach_usage(user_id: str, usage_service) -> None:
     """Increment coach usage counter."""
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    service = get_usage_limit_service()
-    await service.increment(user_id, "coach")
+    await usage_service.increment(user_id, "coach")
 
 
 # =============================================================================
@@ -161,6 +163,7 @@ async def get_tips(
         examples=["twitch_emote", "youtube_thumbnail", "twitch_banner"],
     ),
     current_user: TokenPayload = Depends(get_current_user),
+    tips_service: TipsServiceDep = None,
 ) -> TipsResponse:
     """
     Get static prompt tips for an asset type.
@@ -171,11 +174,11 @@ async def get_tips(
     Args:
         asset_type: Type of asset to get tips for
         current_user: Authenticated user's token payload
+        tips_service: Injected TipsService
         
     Returns:
         TipsResponse: List of tips with upgrade CTA
     """
-    tips_service = get_tips_service()
     response = tips_service.format_tips_response(asset_type)
     
     return TipsResponse(
@@ -220,6 +223,7 @@ async def get_tips(
 )
 async def check_access(
     current_user: TokenPayload = Depends(get_current_user),
+    usage_service: UsageLimitServiceDep = None,
 ) -> CoachAccessResponse:
     """
     Check what coach features the user can access.
@@ -229,6 +233,7 @@ async def check_access(
     
     Args:
         current_user: Authenticated user's token payload
+        usage_service: Injected UsageLimitService
         
     Returns:
         CoachAccessResponse: Access level information
@@ -237,12 +242,12 @@ async def check_access(
     access = TIER_ACCESS.get(tier, TIER_ACCESS["free"])
     
     # Check usage limits
-    usage_info = await check_usage_eligibility(current_user.sub, tier)
+    usage_info = await check_usage_eligibility(current_user.sub, tier, usage_service)
     
     # Get rate limit status for users who can use coach
     rate_limits = None
     if usage_info["can_use_coach"]:
-        rate_limits = get_coach_rate_limit_status(current_user.sub)
+        rate_limits = await get_coach_rate_limit_status(current_user.sub, tier)
     
     # Determine effective access
     has_access = usage_info["can_use_coach"]
@@ -324,6 +329,9 @@ async def start_coach_session(
     request: Request,
     data: StartCoachRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    coach_service: CoachServiceDep = None,
+    audit: AuditServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
 ):
     """
     Start a new coach session with pre-loaded context.
@@ -336,6 +344,9 @@ async def start_coach_session(
         request: FastAPI request object for audit logging
         data: StartCoachRequest with brand context and user input
         current_user: Authenticated user's token payload
+        coach_service: Injected CoachService
+        audit: Injected AuditService
+        usage_service: Injected UsageLimitService
         
     Returns:
         StreamingResponse: SSE stream with coach response
@@ -348,7 +359,7 @@ async def start_coach_session(
     
     # Check usage limits - but don't increment yet
     # Usage is only counted when an image is actually generated
-    usage_info = await check_usage_eligibility(current_user.sub, tier)
+    usage_info = await check_usage_eligibility(current_user.sub, tier, usage_service)
     
     if not usage_info["can_use_coach"]:
         raise HTTPException(
@@ -363,13 +374,11 @@ async def start_coach_session(
             },
         )
     
-    # Check rate limit for session creation
-    await check_coach_session_rate_limit(current_user.sub)
+    # Check rate limit for session creation (pass tier for proper limits)
+    await check_coach_session_rate_limit(current_user.sub, tier)
     
     # NOTE: Usage is NOT incremented here - only when image is generated
     is_free_tier = usage_info["is_free_tier"]
-    
-    coach_service = get_coach_service()
     
     # Handle optional brand_context - use empty context if not provided
     brand_context_data = data.brand_context.model_dump() if data.brand_context else {
@@ -388,16 +397,50 @@ async def start_coach_session(
             p.model_dump() for p in data.media_asset_placements
         ]
     
+    # Add canvas snapshot to brand context for session storage
+    if data.canvas_snapshot_url:
+        brand_context_data["canvas_snapshot_url"] = data.canvas_snapshot_url
+    if data.canvas_snapshot_description:
+        brand_context_data["canvas_snapshot_description"] = data.canvas_snapshot_description
+    
     # Extract preferences for coach service
     preferences_data = data.preferences.model_dump() if data.preferences else None
     
+    # Generate stream ID for tracking
+    stream_id = f"coach:start:{uuid.uuid4().hex[:8]}"
+    
+    # Import SSE services
+    from backend.services.sse import (
+        get_stream_registry,
+        get_completion_store,
+        StreamType,
+    )
+    registry = get_stream_registry()
+    completion_store = get_completion_store()
+    
     async def event_generator():
         """Generate SSE events from coach service."""
+        event_counter = 0
+        session_id = None
+        
+        # Register stream
+        try:
+            await registry.register(
+                stream_id=stream_id,
+                stream_type=StreamType.COACH_START,
+                user_id=current_user.sub,
+                metadata={"asset_type": data.asset_type, "mood": data.mood},
+            )
+        except Exception:
+            pass
+        
         try:
             # Send usage info at start for UI feedback
             # Note: Usage is only counted when an image is generated, not at session start
             if is_free_tier:
+                event_counter += 1
                 usage_event = json.dumps({
+                    "id": f"{stream_id}:{event_counter}",
                     "type": "usage_info",
                     "content": f"Coach session started. You have {usage_info['remaining']} creation(s) remaining this month.",
                     "metadata": {
@@ -408,6 +451,7 @@ async def start_coach_session(
                     },
                 })
                 yield f"data: {usage_event}\n\n"
+                await registry.heartbeat(stream_id)
             
             async for chunk in coach_service.start_with_context(
                 user_id=current_user.sub,
@@ -421,22 +465,39 @@ async def start_coach_session(
                 tier="pro" if tier in ("free", "pro") else tier,  # All users get pro-level coach access
                 preferences=preferences_data,
             ):
-                event_data = json.dumps({
+                event_counter += 1
+                event_data = {
+                    "id": f"{stream_id}:{event_counter}",
                     "type": chunk.type,
                     "content": chunk.content,
                     "metadata": chunk.metadata,
-                })
-                yield f"data: {event_data}\n\n"
+                }
+                yield f"data: {json.dumps(event_data)}\n\n"
+                await registry.heartbeat(stream_id)
+                
+                # Track session_id from done event
+                if chunk.type == "done" and chunk.metadata:
+                    session_id = chunk.metadata.get("session_id")
+                    await completion_store.store_completion(stream_id, "done", event_data)
+                    
         except Exception as e:
-            error_data = json.dumps({
+            event_counter += 1
+            error_data = {
+                "id": f"{stream_id}:{event_counter}",
                 "type": "error",
                 "content": str(e),
                 "metadata": None,
-            })
-            yield f"data: {error_data}\n\n"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            await completion_store.store_completion(stream_id, "error", error_data)
+            
+        finally:
+            try:
+                await registry.unregister(stream_id)
+            except Exception:
+                pass
     
     # Audit log the session start
-    audit = get_audit_service()
     await audit.log(
         user_id=current_user.sub,
         action="coach.start",
@@ -457,6 +518,7 @@ async def start_coach_session(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Stream-ID": stream_id,
         },
     )
 
@@ -468,6 +530,10 @@ async def start_coach_session(
     Send a message to continue the coach conversation.
     
     **Premium or Active Trial** - Requires Studio subscription or active trial session.
+    
+    **Reference Assets:**
+    Users can attach up to 2 reference images from their media library per message.
+    These provide visual context to help the coach understand the user's vision.
     
     **Returns Server-Sent Events stream with:**
     - token: Each token of the response
@@ -498,6 +564,8 @@ async def continue_coach_chat(
     session_id: str,
     data: ContinueChatRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    session_manager: SessionManagerDep = None,
+    coach_service: CoachServiceDep = None,
 ):
     """
     Continue an existing coach session with a new message.
@@ -506,12 +574,17 @@ async def continue_coach_chat(
     The coach will modify the previous prompt suggestion based on
     the user's feedback.
     
+    Users can attach reference assets from their media library to provide
+    visual context for their refinement requests.
+    
     Trial users can continue their trial session until it ends.
     
     Args:
         session_id: UUID of the session to continue
-        data: ContinueChatRequest with user's message
+        data: ContinueChatRequest with user's message and optional reference assets
         current_user: Authenticated user's token payload
+        session_manager: Injected SessionManager
+        coach_service: Injected CoachService
         
     Returns:
         StreamingResponse: SSE stream with coach response
@@ -522,7 +595,6 @@ async def continue_coach_chat(
     """
     # For continue, we need to verify the user owns this session
     # Free tier users can continue their own session even after cooldown starts
-    session_manager = get_session_manager()
     
     try:
         # This verifies ownership
@@ -536,39 +608,101 @@ async def continue_coach_chat(
     # Premium users always have access, non-premium can continue their own sessions
     # (ownership already verified above)
     
-    # Check rate limit for messages
-    await check_coach_message_rate_limit(current_user.sub)
+    # Check rate limit for messages (pass tier for proper limits)
+    tier = current_user.tier or "free"
+    await check_coach_message_rate_limit(current_user.sub, tier)
     
-    coach_service = get_coach_service()
+    # Serialize reference assets for the coach service
+    reference_assets_data = None
+    if data.reference_assets:
+        reference_assets_data = [
+            {
+                "asset_id": ref.asset_id,
+                "display_name": ref.display_name,
+                "asset_type": ref.asset_type,
+                "url": ref.url,
+                "description": ref.description,
+            }
+            for ref in data.reference_assets
+        ]
+    
+    # Generate stream ID for tracking
+    stream_id = f"coach:{session_id}:{uuid.uuid4().hex[:8]}"
+    
+    # Import SSE services
+    from backend.services.sse import (
+        get_stream_registry,
+        get_completion_store,
+        StreamType,
+    )
+    registry = get_stream_registry()
+    completion_store = get_completion_store()
     
     async def event_generator():
         """Generate SSE events from coach service."""
+        event_counter = 0
+        
+        # Register stream
+        try:
+            await registry.register(
+                stream_id=stream_id,
+                stream_type=StreamType.COACH_CONTINUE,
+                user_id=current_user.sub,
+                metadata={
+                    "session_id": session_id,
+                    "has_reference_assets": bool(reference_assets_data),
+                },
+            )
+        except Exception:
+            pass
+        
         try:
             async for chunk in coach_service.continue_chat(
                 session_id=session_id,
                 user_id=current_user.sub,
                 message=data.message,
+                reference_assets=reference_assets_data,
             ):
-                event_data = json.dumps({
+                event_counter += 1
+                event_data = {
+                    "id": f"{stream_id}:{event_counter}",
                     "type": chunk.type,
                     "content": chunk.content,
                     "metadata": chunk.metadata,
-                })
-                yield f"data: {event_data}\n\n"
+                }
+                yield f"data: {json.dumps(event_data)}\n\n"
+                await registry.heartbeat(stream_id)
+                
+                # Store completion on done event
+                if chunk.type == "done":
+                    await completion_store.store_completion(stream_id, "done", event_data)
+                    
         except SessionNotFoundError as e:
-            error_data = json.dumps({
+            event_counter += 1
+            error_data = {
+                "id": f"{stream_id}:{event_counter}",
                 "type": "error",
                 "content": "Session not found or expired",
                 "metadata": e.to_dict(),
-            })
-            yield f"data: {error_data}\n\n"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            await completion_store.store_completion(stream_id, "error", error_data)
         except Exception as e:
-            error_data = json.dumps({
+            event_counter += 1
+            error_data = {
+                "id": f"{stream_id}:{event_counter}",
                 "type": "error",
                 "content": str(e),
                 "metadata": None,
-            })
-            yield f"data: {error_data}\n\n"
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            await completion_store.store_completion(stream_id, "error", error_data)
+            
+        finally:
+            try:
+                await registry.unregister(stream_id)
+            except Exception:
+                pass
     
     return StreamingResponse(
         event_generator(),
@@ -577,6 +711,7 @@ async def continue_coach_chat(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Stream-ID": stream_id,
         },
     )
 
@@ -612,6 +747,7 @@ async def continue_coach_chat(
 async def get_session_state(
     session_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    session_manager: SessionManagerDep = None,
 ) -> SessionStateResponse:
     """
     Get the current state of a coach session.
@@ -622,6 +758,7 @@ async def get_session_state(
     Args:
         session_id: UUID of the session
         current_user: Authenticated user's token payload
+        session_manager: Injected SessionManager
         
     Returns:
         SessionStateResponse: Current session state
@@ -641,8 +778,6 @@ async def get_session_state(
                 "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
-    
-    session_manager = get_session_manager()
     
     try:
         session = await session_manager.get_or_raise(session_id, current_user.sub)
@@ -699,6 +834,8 @@ async def end_coach_session(
     request: Request,
     session_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    coach_service: CoachServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> EndSessionResponse:
     """
     End a coach session and get the final prompt.
@@ -710,6 +847,8 @@ async def end_coach_session(
         request: FastAPI request object for audit logging
         session_id: UUID of the session to end
         current_user: Authenticated user's token payload
+        coach_service: Injected CoachService
+        audit: Injected AuditService
         
     Returns:
         EndSessionResponse: Final prompt and session metadata
@@ -729,8 +868,6 @@ async def end_coach_session(
             },
         )
     
-    coach_service = get_coach_service()
-    
     try:
         output = await coach_service.end_session(session_id, current_user.sub)
     except SessionNotFoundError as e:
@@ -740,7 +877,6 @@ async def end_coach_session(
         )
     
     # Audit log the session end
-    audit = get_audit_service()
     await audit.log(
         user_id=current_user.sub,
         action="coach.end",
@@ -803,6 +939,11 @@ async def generate_from_session(
     session_id: str,
     data: GenerateFromSessionRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    session_manager: SessionManagerDep = None,
+    generation_service: GenerationServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
+    audit: AuditServiceDep = None,
+    coach_analytics: CoachAnalyticsServiceDep = None,
 ) -> GenerateFromSessionResponse:
     """
     Generate an asset using the refined prompt from a coach session.
@@ -817,15 +958,14 @@ async def generate_from_session(
     1. Session context (set at session start)
     2. Request body (overrides session defaults)
     """
-    from backend.services.generation_service import get_generation_service
     from backend.workers.generation_worker import enqueue_generation_job
-    from backend.services.coach.analytics_service import get_analytics_service, SessionOutcome
+    from backend.services.coach.analytics_service import SessionOutcome
     from backend.services.coach.validator import get_validator
     
     tier = current_user.tier or "free"
     
     # Check usage limits before generating - this is where usage is counted
-    usage_info = await check_usage_eligibility(current_user.sub, tier)
+    usage_info = await check_usage_eligibility(current_user.sub, tier, usage_service)
     
     if not usage_info["can_use_coach"]:
         raise HTTPException(
@@ -839,8 +979,6 @@ async def generate_from_session(
                 "resets_at": usage_info["resets_at"],
             },
         )
-    
-    session_manager = get_session_manager()
     
     try:
         session = await session_manager.get_or_raise(session_id, current_user.sub)
@@ -891,6 +1029,10 @@ async def generate_from_session(
     media_asset_ids = data.media_asset_ids
     media_asset_placements = None
     
+    # Get canvas snapshot - request overrides session defaults
+    canvas_snapshot_url = data.canvas_snapshot_url
+    canvas_snapshot_description = data.canvas_snapshot_description
+    
     # If not provided in request, check session context
     if media_asset_ids is None and session.brand_context:
         media_asset_ids = session.brand_context.get("media_asset_ids")
@@ -899,6 +1041,11 @@ async def generate_from_session(
             session_placements = session.brand_context.get("media_asset_placements")
             if session_placements:
                 media_asset_placements = session_placements
+    
+    # Get canvas snapshot from session if not provided in request
+    if canvas_snapshot_url is None and session.brand_context:
+        canvas_snapshot_url = session.brand_context.get("canvas_snapshot_url")
+        canvas_snapshot_description = session.brand_context.get("canvas_snapshot_description")
     
     # Use request placements if provided
     if data.media_asset_placements:
@@ -914,8 +1061,7 @@ async def generate_from_session(
     if brand_kit_id:
         parameters["brand_kit_id"] = brand_kit_id
     
-    # Create generation job with media assets
-    generation_service = get_generation_service()
+    # Create generation job with media assets and canvas snapshot
     job = await generation_service.create_job(
         user_id=current_user.sub,
         brand_kit_id=brand_kit_id,
@@ -924,14 +1070,15 @@ async def generate_from_session(
         parameters=parameters,
         media_asset_ids=media_asset_ids,
         media_asset_placements=media_asset_placements,
+        canvas_snapshot_url=canvas_snapshot_url,
+        canvas_snapshot_description=canvas_snapshot_description,
     )
     
     # Increment usage counter NOW - when image generation is triggered
-    await increment_coach_usage(current_user.sub)
+    await increment_coach_usage(current_user.sub, usage_service)
     
     # Record analytics for learning loop
     try:
-        analytics = get_analytics_service()
         outcome = SessionOutcome(
             session_id=session_id,
             user_id=current_user.sub,
@@ -946,7 +1093,7 @@ async def generate_from_session(
             mood=session.mood,
             game_context=session.game_context,
         )
-        outcome_id = await analytics.record_outcome(outcome)
+        outcome_id = await coach_analytics.record_outcome(outcome)
         # Store outcome_id in job parameters for later viral score update
         parameters["analytics_outcome_id"] = outcome_id
     except Exception as e:
@@ -958,7 +1105,6 @@ async def generate_from_session(
     enqueue_generation_job(job.id, current_user.sub)
     
     # Audit log
-    audit = get_audit_service()
     await audit.log(
         user_id=current_user.sub,
         action="coach.generate",
@@ -969,6 +1115,7 @@ async def generate_from_session(
             "asset_type": session.asset_type,
             "include_logo": data.include_logo,
             "media_asset_count": len(media_asset_ids) if media_asset_ids else 0,
+            "has_canvas_snapshot": canvas_snapshot_url is not None,
             "quality_score": validation_result.quality_score,
         },
         ip_address=request.client.host if request.client else None,
@@ -1020,6 +1167,10 @@ async def refine_image(
     session_id: str,
     data: RefineImageRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    session_manager: SessionManagerDep = None,
+    generation_service: GenerationServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> RefineImageResponse:
     """
     Refine the last generated image using multi-turn conversation.
@@ -1027,9 +1178,8 @@ async def refine_image(
     Uses Gemini's conversation history to apply refinements without
     re-uploading the image, significantly reducing costs.
     """
-    from backend.services.generation_service import get_generation_service
     from backend.workers.generation_worker import enqueue_generation_job
-    from backend.services.usage_limit_service import get_usage_limit_service, TIER_LIMITS
+    from backend.services.usage_limit_service import TIER_LIMITS
     
     tier = current_user.tier or "free"
     
@@ -1043,8 +1193,6 @@ async def refine_image(
                 "feature": "refinements",
             },
         )
-    
-    session_manager = get_session_manager()
     
     try:
         session = await session_manager.get_or_raise(session_id, current_user.sub)
@@ -1070,7 +1218,6 @@ async def refine_image(
         )
     
     # Check refinement limits
-    usage_service = get_usage_limit_service()
     refinement_check = await usage_service.check_limit(current_user.sub, "refinements")
     
     # Determine if this counts as a creation (Pro users after 5 free)
@@ -1110,7 +1257,6 @@ async def refine_image(
         parameters["brand_kit_id"] = brand_kit_id
     
     # Create generation job with refinement flag
-    generation_service = get_generation_service()
     job = await generation_service.create_job(
         user_id=current_user.sub,
         brand_kit_id=brand_kit_id,
@@ -1133,7 +1279,6 @@ async def refine_image(
     enqueue_generation_job(job.id, current_user.sub)
     
     # Audit log
-    audit = get_audit_service()
     await audit.log(
         user_id=current_user.sub,
         action="coach.refine",
@@ -1183,6 +1328,7 @@ async def refine_image(
 async def get_session_assets(
     session_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    session_manager: SessionManagerDep = None,
 ) -> SessionAssetsResponse:
     """Get all assets generated from a coach session."""
     tier = current_user.tier or "free"
@@ -1195,8 +1341,6 @@ async def get_session_assets(
                 "message": "Prompt Coach requires Pro or Studio subscription",
             },
         )
-    
-    session_manager = get_session_manager()
     
     try:
         # Verify session exists and user owns it

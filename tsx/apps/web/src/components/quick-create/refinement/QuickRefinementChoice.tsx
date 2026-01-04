@@ -133,7 +133,7 @@ export const QuickRefinementChoice = memo(function QuickRefinementChoice({
       {/* Start fresh hint */}
       <p className="text-sm text-center text-text-tertiary">
         💡 Way off? Just{' '}
-        <Link href="/dashboard/quick-create" className="text-interactive-400 hover:text-interactive-300 underline">
+        <Link href="/intel/create" className="text-interactive-400 hover:text-interactive-300 underline">
           start fresh
         </Link>
       </p>

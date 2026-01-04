@@ -248,13 +248,43 @@ class IntentExtractor:
         """
         Check if the coach indicated the intent is clear enough for generation.
         
+        Only returns True when the coach is definitively stating readiness,
+        not when asking questions like "Ready to create?"
+        
         Args:
             response: The coach's response text
             
         Returns:
             True if the coach indicated readiness
         """
-        return any(marker in response for marker in self.READY_MARKERS)
+        # Explicit marker is always ready
+        if "[INTENT_READY]" in response:
+            return True
+        
+        # Check if the response ends with a question mark (asking for confirmation)
+        # If so, it's NOT ready
+        if response.rstrip().endswith("?"):
+            return False
+        
+        # Check for ready statements
+        # These patterns indicate the coach is stating readiness (not asking)
+        ready_patterns = [
+            r"(?:✨\s*)?(?:Ready to create|ready to create)",  # "Ready to create..."
+            r"(?:✨\s*)?Ready!",  # "Ready!"
+            r"(?:✨\s*)?Let's create",  # "Let's create..."
+            r"(?:✨\s*)?Perfect!",  # "Perfect!"
+            r"(?:✨\s*)?Ready\s+to\s+go",  # "Ready to go"
+        ]
+        
+        for pattern in ready_patterns:
+            if re.search(pattern, response, re.IGNORECASE):
+                return True
+        
+        # "✨ Perfect" or "✨ Ready" followed by content (not a question)
+        if "✨ Perfect" in response or "✨ Ready" in response:
+            return True
+        
+        return False
     
     def _extract_description(self, response: str) -> Tuple[Optional[str], str]:
         """

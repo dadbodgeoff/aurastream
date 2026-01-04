@@ -8,9 +8,13 @@
  * - Signups & conversions
  * - Generation success/failure rates
  * - Trends over time
+ * 
+ * Access restricted to admin email only.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@aurastream/shared';
 import {
   useAnalyticsDashboard,
   type DashboardSummary,
@@ -19,6 +23,8 @@ import {
   type RecentSignup,
   type GenerationStats,
 } from '@aurastream/api-client';
+
+const ADMIN_EMAIL = 'dadbodgeoff@gmail.com';
 
 // =============================================================================
 // Stat Card Component
@@ -249,8 +255,31 @@ const ClockIcon = () => (
 // =============================================================================
 
 export default function AnalyticsDashboardPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [days, setDays] = useState(30);
   const { summary, trend, topPages, recentSignups, generations, isLoading, refetch } = useAnalyticsDashboard(days);
+
+  // Redirect non-admin users
+  useEffect(() => {
+    if (!authLoading && (!isAuthenticated || user?.email !== ADMIN_EMAIL)) {
+      router.replace('/intel');
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      </div>
+    );
+  }
+
+  // Don't render if not admin
+  if (!isAuthenticated || user?.email !== ADMIN_EMAIL) {
+    return null;
+  }
   
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">

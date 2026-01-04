@@ -38,6 +38,14 @@ export interface CreateCoachIntegrationProps {
   assetType: string;
   /** Selected brand kit ID (optional) */
   brandKitId?: string;
+  /** User's selected mood */
+  mood?: string;
+  /** User's custom mood (when mood is 'custom') */
+  customMood?: string;
+  /** User's game context (optional) */
+  game?: string;
+  /** User's description of what they want to create */
+  description?: string;
   /** Callback when user clicks "Generate Now" with refined prompt */
   onGenerateNow: (prompt: string) => void;
   /** Callback when generation completes (for new UX) */
@@ -48,6 +56,14 @@ export interface CreateCoachIntegrationProps {
   selectedMediaAssets?: MediaAsset[];
   /** Media asset placements with precise positioning */
   mediaAssetPlacements?: AssetPlacement[];
+  /** Sketch elements from canvas studio */
+  sketchElements?: AnySketchElement[];
+  /** Pre-prepared canvas snapshot URL (if already uploaded) */
+  canvasSnapshotUrl?: string;
+  /** Canvas snapshot description for AI context */
+  canvasSnapshotDescription?: string;
+  /** Whether to use canvas mode for generation (prepares snapshot at generation time) */
+  useCanvasMode?: boolean;
   /** Additional CSS classes */
   className?: string;
 }
@@ -55,6 +71,7 @@ export interface CreateCoachIntegrationProps {
 // Import media types
 import type { MediaAsset } from '@aurastream/api-client';
 import type { AssetPlacement } from '../media-library/placement';
+import type { AnySketchElement } from '../media-library/canvas-export/types';
 
 // ============================================================================
 // Icons
@@ -80,6 +97,10 @@ const LoadingSpinner = ({ className }: { className?: string }) => (
 interface LegacyCoachIntegrationProps {
   assetType: string;
   brandKitId?: string;
+  mood?: string;
+  customMood?: string;
+  game?: string;
+  description?: string;
   onGenerateNow: (prompt: string) => void;
   className?: string;
 }
@@ -90,6 +111,10 @@ interface LegacyCoachIntegrationProps {
 function LegacyCoachIntegration({
   assetType,
   brandKitId,
+  mood,
+  customMood,
+  game,
+  description,
   onGenerateNow,
   className,
 }: LegacyCoachIntegrationProps) {
@@ -118,45 +143,57 @@ function LegacyCoachIntegration({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Auto-start session when component mounts with valid context
-  // Wait for brand kits to load if brandKitId is provided
-  useEffect(() => {
-    // If brandKitId is provided but brand kits are still loading, wait
-    if (brandKitId && isLoadingBrandKits) {
-      return;
+  // Build the start request from user input
+  const buildStartRequest = useCallback((): StartCoachRequest => {
+    // Determine the effective mood
+    // If no mood is selected, default to 'chill' (not 'custom' which requires custom_mood)
+    const effectiveMood = mood || 'chill';
+    const effectiveCustomMood = mood === 'custom' ? (customMood || 'creative and unique') : undefined;
+    
+    // Build description with game context if provided
+    let fullDescription = description || `I want to create a ${assetType.replace(/_/g, ' ')}.`;
+    if (game) {
+      fullDescription = `${fullDescription} This is for ${game}.`;
     }
     
-    if (!hasStarted && assetType) {
-      setHasStarted(true);
-      
-      // Build a minimal StartCoachRequest - brand kit is optional
-      const request: StartCoachRequest = {
-        brand_context: selectedBrandKit ? {
-          brand_kit_id: brandKitId || '',
-          colors: [
-            ...(selectedBrandKit.primary_colors || []),
-            ...(selectedBrandKit.accent_colors || []),
-          ].map((hex, i) => ({ hex, name: `Color ${i + 1}` })),
-          tone: selectedBrandKit.tone || 'professional',
-          fonts: {
-            headline: selectedBrandKit.fonts?.headline || 'Inter',
-            body: selectedBrandKit.fonts?.body || 'Inter',
-          },
-        } : {
-          brand_kit_id: '',
-          colors: [],
-          tone: 'professional',
-          fonts: { headline: 'Inter', body: 'Inter' },
+    return {
+      brand_context: selectedBrandKit ? {
+        brand_kit_id: brandKitId || '',
+        colors: [
+          ...(selectedBrandKit.primary_colors || []),
+          ...(selectedBrandKit.accent_colors || []),
+        ].map((hex, i) => ({ hex, name: `Color ${i + 1}` })),
+        tone: selectedBrandKit.tone || 'professional',
+        fonts: {
+          headline: selectedBrandKit.fonts?.headline || 'Inter',
+          body: selectedBrandKit.fonts?.body || 'Inter',
         },
-        asset_type: assetType as any,
-        mood: 'custom',
-        custom_mood: 'Help me figure out the perfect mood',
-        description: `I want to create a ${assetType.replace(/_/g, ' ')}. Help me describe exactly what I'm looking for.`,
-      };
+      } : {
+        brand_kit_id: '',
+        colors: [],
+        tone: 'professional',
+        fonts: { headline: 'Inter', body: 'Inter' },
+      },
+      asset_type: assetType as any,
+      mood: effectiveMood as any,
+      custom_mood: effectiveCustomMood,
+      description: fullDescription,
+    };
+  }, [assetType, brandKitId, selectedBrandKit, mood, customMood, game, description]);
 
-      startSession(request);
-    }
-  }, [hasStarted, selectedBrandKit, assetType, brandKitId, startSession, isLoadingBrandKits]);
+  // Handle starting the chat session
+  const handleStartChat = useCallback(() => {
+    if (hasStarted || isLoadingBrandKits) return;
+    
+    setHasStarted(true);
+    const request = buildStartRequest();
+    log.info('Starting coach session with user input:', {
+      mood: request.mood,
+      customMood: request.custom_mood,
+      description: request.description,
+    });
+    startSession(request);
+  }, [hasStarted, isLoadingBrandKits, buildStartRequest, startSession]);
 
   const handleSend = useCallback(async () => {
     const trimmedValue = inputValue.trim();
@@ -180,6 +217,65 @@ function LegacyCoachIntegration({
   }, [refinedDescription, isGenerationReady, onGenerateNow]);
 
   const showEmptyState = messages.length === 0;
+
+  // Show start button if session hasn't started yet
+  if (!hasStarted) {
+    return (
+      <div className={cn('flex flex-col h-full bg-background-base', className)}>
+        <div className="flex-1 flex flex-col items-center justify-center p-8">
+          <div className="w-16 h-16 rounded-full bg-interactive-600/10 flex items-center justify-center mb-6">
+            <SparklesIcon />
+          </div>
+          <h3 className="text-xl font-semibold text-text-primary mb-3">
+            Ready to start?
+          </h3>
+          <p className="text-sm text-text-secondary text-center max-w-md mb-6">
+            The AI Coach will help you refine your vision into the perfect prompt based on your inputs.
+          </p>
+          
+          {/* Summary of user input */}
+          <div className="w-full max-w-md bg-background-surface rounded-xl p-4 mb-6 space-y-2">
+            {mood && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-text-tertiary">Mood:</span>
+                <span className="text-text-primary">{mood === 'custom' ? customMood : mood}</span>
+              </div>
+            )}
+            {game && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-text-tertiary">Game:</span>
+                <span className="text-text-primary">{game}</span>
+              </div>
+            )}
+            {description && (
+              <div className="text-sm">
+                <span className="text-text-tertiary">Description:</span>
+                <p className="text-text-primary mt-1">{description}</p>
+              </div>
+            )}
+          </div>
+          
+          <button
+            onClick={handleStartChat}
+            disabled={isLoadingBrandKits}
+            className="flex items-center gap-2 px-6 py-3 rounded-lg bg-interactive-600 text-white font-medium hover:bg-interactive-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLoadingBrandKits ? (
+              <>
+                <LoadingSpinner className="w-5 h-5" />
+                Loading...
+              </>
+            ) : (
+              <>
+                <SparklesIcon />
+                Start Chat
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn('flex flex-col h-full bg-background-base', className)}>
@@ -270,18 +366,26 @@ function LegacyCoachIntegration({
 export function CreateCoachIntegration({
   assetType,
   brandKitId,
+  mood,
+  customMood,
+  game,
+  description,
   onGenerateNow,
   onGenerateComplete,
   onEndSession,
   selectedMediaAssets,
   mediaAssetPlacements,
+  sketchElements,
+  canvasSnapshotUrl,
+  canvasSnapshotDescription,
+  useCanvasMode,
   className,
 }: CreateCoachIntegrationProps) {
   const { data: brandKitsData, isLoading: isLoadingBrandKits } = useBrandKits();
   const brandKits = brandKitsData?.brandKits ?? [];
   const selectedBrandKit = brandKits.find(k => k.id === brandKitId);
 
-  // Build initial request for the new UX
+  // Build initial request for the new UX - using user's actual input
   // Only build when brand kits are loaded (or no brandKitId was provided)
   const initialRequest = useMemo((): StartCoachRequest | null => {
     // If brandKitId is provided but brand kits are still loading, wait
@@ -295,13 +399,24 @@ export function CreateCoachIntegration({
       log.warn('Brand kit not found:', brandKitId);
     }
     
-    log.info('Building initialRequest with brand context:', {
+    // Determine the effective mood from user input
+    // If no mood is selected, default to 'chill' (not 'custom' which requires custom_mood)
+    const effectiveMood = mood || 'chill';
+    const effectiveCustomMood = mood === 'custom' ? (customMood || 'creative and unique') : undefined;
+    
+    // Build description with game context if provided
+    let fullDescription = description || `I want to create a ${assetType.replace(/_/g, ' ')}.`;
+    if (game) {
+      fullDescription = `${fullDescription} This is for ${game}.`;
+    }
+    
+    log.info('Building initialRequest with user input:', {
       brandKitId,
       selectedBrandKit: selectedBrandKit?.name,
-      colors: selectedBrandKit ? [
-        ...(selectedBrandKit.primary_colors || []),
-        ...(selectedBrandKit.accent_colors || []),
-      ].length : 0,
+      mood: effectiveMood,
+      customMood: effectiveCustomMood,
+      game,
+      description: fullDescription,
     });
     
     return {
@@ -323,11 +438,14 @@ export function CreateCoachIntegration({
         fonts: { headline: 'Inter', body: 'Inter' },
       },
       asset_type: assetType as any,
-      mood: 'custom',
-      custom_mood: 'Help me figure out the perfect mood',
-      description: `I want to create a ${assetType.replace(/_/g, ' ')}. Help me describe exactly what I'm looking for.`,
+      mood: effectiveMood as any,
+      custom_mood: effectiveCustomMood,
+      description: fullDescription,
+      // Include canvas snapshot data if provided (for AI context during coaching)
+      canvas_snapshot_url: canvasSnapshotUrl,
+      canvas_snapshot_description: canvasSnapshotDescription,
     };
-  }, [selectedBrandKit, assetType, brandKitId, isLoadingBrandKits]);
+  }, [selectedBrandKit, assetType, brandKitId, isLoadingBrandKits, mood, customMood, game, description, canvasSnapshotUrl, canvasSnapshotDescription]);
 
   // Handle generate complete - also call onGenerateNow for backwards compatibility
   const handleGenerateComplete = useCallback((asset: Asset) => {
@@ -350,6 +468,10 @@ export function CreateCoachIntegration({
         initialRequest={initialRequest ?? undefined}
         selectedMediaAssets={selectedMediaAssets}
         mediaAssetPlacements={mediaAssetPlacements}
+        sketchElements={sketchElements}
+        canvasSnapshotUrl={canvasSnapshotUrl}
+        canvasSnapshotDescription={canvasSnapshotDescription}
+        useCanvasMode={useCanvasMode}
         className={className}
         testId="create-coach-integration"
       />
@@ -362,6 +484,10 @@ export function CreateCoachIntegration({
     <LegacyCoachIntegration
       assetType={assetType}
       brandKitId={brandKitId}
+      mood={mood}
+      customMood={customMood}
+      game={game}
+      description={description}
       onGenerateNow={onGenerateNow}
       className={className}
     />

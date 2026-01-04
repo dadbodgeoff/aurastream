@@ -82,8 +82,8 @@ class BaseAnalyzer(ABC):
     - analyzer_name: Property returning the analyzer name
     """
     
-    # Default cache TTL (5 hours)
-    DEFAULT_CACHE_TTL: int = 18000
+    # Default cache TTL (72 hours - stale data better than no data)
+    DEFAULT_CACHE_TTL: int = 72 * 60 * 60
     
     # Minimum videos required for analysis
     MIN_VIDEOS_REQUIRED: int = 10

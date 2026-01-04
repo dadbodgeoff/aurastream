@@ -66,8 +66,14 @@ const MODES: ModeConfig[] = [
     icon: '🤖',
     badge: 'Pro',
     isPremium: true,
+    // DISABLED: Coach tab hidden from /intel/create UX to reduce confusion
+    // The coach functionality is still available via CreatePageContent's internal coach phase
+    hidden: true,
   },
 ];
+
+// Filter out hidden modes for display
+const VISIBLE_MODES = MODES.filter(mode => !mode.hidden);
 
 // Mode icons mapping
 const MODE_ICONS: Record<CreationMode, React.FC<{ className?: string }>> = {
@@ -156,7 +162,7 @@ export function ModeSelector({
     e: React.KeyboardEvent,
     currentIndex: number
   ) => {
-    const modes = MODES;
+    const modes = VISIBLE_MODES;
     let nextIndex = currentIndex;
 
     switch (e.key) {
@@ -185,23 +191,14 @@ export function ModeSelector({
   }, [onModeSelect]);
 
   return (
-    <div className={cn('space-y-4', className)}>
-      {/* Section header */}
-      <div className="flex items-center gap-2">
-        <div className="h-px flex-1 bg-gradient-to-r from-border-subtle to-transparent" />
-        <h2 className="text-xs font-medium text-text-tertiary uppercase tracking-wider px-2">
-          Choose Your Creation Method
-        </h2>
-        <div className="h-px flex-1 bg-gradient-to-l from-border-subtle to-transparent" />
-      </div>
-
-      {/* Mode cards */}
+    <div className={cn('space-y-2', className)}>
+      {/* Mode cards - Compact inline layout */}
       <div 
-        className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        className="grid grid-cols-2 gap-3"
         role="tablist"
         aria-label="Creation mode"
       >
-        {MODES.map((mode, index) => {
+        {VISIBLE_MODES.map((mode, index) => {
           const isActive = activeMode === mode.id;
           const isLocked = mode.isPremium && !isPremium;
           const colors = MODE_COLORS[mode.id];
@@ -221,8 +218,8 @@ export function ModeSelector({
               whileHover={{ scale: isLocked ? 1 : 1.01 }}
               whileTap={{ scale: isLocked ? 1 : 0.99 }}
               className={cn(
-                'relative flex flex-col items-start gap-3',
-                'p-5 rounded-2xl text-left',
+                'relative flex flex-col items-start gap-2',
+                'p-4 rounded-xl text-left',
                 'transition-all duration-300 ease-out',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-interactive-500/50',
                 'border overflow-hidden',
@@ -255,10 +252,10 @@ export function ModeSelector({
               {/* Content */}
               <div className="relative z-10 w-full">
                 {/* Icon and label row */}
-                <div className="flex items-center gap-3 w-full mb-2">
+                <div className="flex items-center gap-2.5 w-full mb-1">
                   {/* Icon container */}
                   <div className={cn(
-                    'w-11 h-11 rounded-xl flex items-center justify-center',
+                    'w-9 h-9 rounded-lg flex items-center justify-center',
                     'transition-all duration-300',
                     'ring-1',
                     isActive
@@ -268,14 +265,14 @@ export function ModeSelector({
                           'group-hover:bg-white/10 group-hover:text-text-secondary'
                         )
                   )}>
-                    <IconComponent className="w-5 h-5" />
+                    <IconComponent className="w-4 h-4" />
                   </div>
 
                   {/* Label and badge */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        'font-semibold text-base tracking-tight',
+                        'font-semibold text-sm tracking-tight',
                         'transition-colors duration-200',
                         isActive ? 'text-white' : 'text-text-secondary group-hover:text-text-primary'
                       )}>
@@ -286,7 +283,7 @@ export function ModeSelector({
                       {mode.badge && (
                         <span
                           className={cn(
-                            'px-2 py-0.5 text-micro font-bold rounded-md',
+                            'px-1.5 py-0.5 text-[10px] font-bold rounded',
                             'uppercase tracking-wider',
                             'transition-colors duration-200',
                             isPremium
@@ -306,18 +303,18 @@ export function ModeSelector({
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
                       className={cn(
-                        'w-6 h-6 rounded-full flex items-center justify-center',
+                        'w-5 h-5 rounded-full flex items-center justify-center',
                         colors.iconBg
                       )}
                     >
-                      <CheckIcon className={cn('w-3.5 h-3.5', colors.icon)} />
+                      <CheckIcon className={cn('w-3 h-3', colors.icon)} />
                     </motion.div>
                   )}
                 </div>
 
                 {/* Description */}
                 <p className={cn(
-                  'text-sm leading-relaxed pl-14',
+                  'text-xs leading-relaxed pl-[46px]',
                   'transition-colors duration-200',
                   isActive ? 'text-white/70' : 'text-text-muted group-hover:text-text-tertiary'
                 )}>
@@ -327,8 +324,8 @@ export function ModeSelector({
 
               {/* Locked overlay for premium */}
               {isLocked && (
-                <div className="absolute inset-0 rounded-2xl bg-background-base/60 backdrop-blur-[2px] flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-200 z-20">
-                  <span className="px-4 py-2 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded-full ring-1 ring-amber-500/30 shadow-lg">
+                <div className="absolute inset-0 rounded-xl bg-background-base/60 backdrop-blur-[2px] flex items-center justify-center opacity-0 hover:opacity-100 transition-all duration-200 z-20">
+                  <span className="px-3 py-1.5 bg-amber-500/20 text-amber-400 text-xs font-semibold rounded-full ring-1 ring-amber-500/30 shadow-lg">
                     Upgrade to Pro
                   </span>
                 </div>
@@ -338,17 +335,12 @@ export function ModeSelector({
         })}
       </div>
 
-      {/* Helper text - more subtle */}
-      <motion.p 
-        key={activeMode}
-        initial={{ opacity: 0, y: -5 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-xs text-text-muted/70 text-center"
-      >
-        {activeMode === 'templates' && '✨ Best for quick results — most users start here'}
-        {activeMode === 'custom' && '🎯 For power users who want complete control'}
-        {activeMode === 'coach' && '🧠 AI helps you write better prompts for better results'}
-      </motion.p>
+      {/* Helper text - subtle inline hint */}
+      <p className="text-[11px] text-text-muted/60 text-center">
+        {activeMode === 'templates' && '✨ Best for quick results'}
+        {activeMode === 'custom' && '🎯 Full control mode'}
+        {activeMode === 'coach' && '🧠 AI-guided prompts'}
+      </p>
     </div>
   );
 }

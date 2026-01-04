@@ -87,6 +87,7 @@ from backend.services.coach.tips_service import (
 from backend.services.coach.llm_client import (
     CoachLLMClient,
     get_llm_client,
+    GroundingMetadata,
 )
 from backend.services.coach.partial_validator import (
     StreamingCoachResponse,
@@ -162,6 +163,7 @@ __all__ = [
     # LLM Client
     "CoachLLMClient",
     "get_llm_client",
+    "GroundingMetadata",
     # Partial Validator
     "StreamingCoachResponse",
     "StreamingValidator",

@@ -268,7 +268,7 @@ export const TipsSection = memo(function TipsSection({
     
     const hasBrandKits = (brandKitsData?.brandKits?.length ?? 0) > 0;
     const hasAssets = (assetsData?.assets?.length ?? 0) > 0;
-    const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+    const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio' || user?.subscriptionTier === 'unlimited';
     
     // Priority 1: No brand kits
     if (!hasBrandKits && !dismissedTips.has('create_brand_kit')) {

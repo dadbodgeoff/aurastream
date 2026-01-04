@@ -7,7 +7,7 @@ Provides endpoints for accessing thumbnail analysis data.
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 
 from backend.api.schemas.thumbnail_intel import (
     CategoryInsightResponse,
@@ -15,7 +15,7 @@ from backend.api.schemas.thumbnail_intel import (
     ThumbnailAnalysisResponse,
     CategoryListItem,
 )
-from backend.services.thumbnail_intel import get_thumbnail_intel_service
+from backend.api.service_dependencies import ThumbnailIntelServiceDep
 from backend.services.thumbnail_intel.constants import GAMING_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -24,13 +24,14 @@ router = APIRouter(prefix="/thumbnail-intel", tags=["Thumbnail Intelligence"])
 
 
 @router.get("/categories", response_model=List[CategoryListItem])
-async def list_categories():
+async def list_categories(
+    service: ThumbnailIntelServiceDep = None,
+):
     """
     List all available gaming categories for thumbnail analysis.
     
     Returns category keys, names, and theme colors.
     """
-    service = get_thumbnail_intel_service()
     insights = await service.get_latest_insights()
     
     # Build lookup for latest analysis dates
@@ -51,13 +52,14 @@ async def list_categories():
 
 
 @router.get("/overview", response_model=ThumbnailIntelOverviewResponse)
-async def get_overview():
+async def get_overview(
+    service: ThumbnailIntelServiceDep = None,
+):
     """
     Get overview of all category thumbnail insights.
     
     Returns the latest analysis for all categories.
     """
-    service = get_thumbnail_intel_service()
     insights = await service.get_latest_insights()
     
     if not insights:
@@ -98,6 +100,12 @@ async def get_overview():
                 color_recipe=t.color_recipe,
                 why_it_works=t.why_it_works,
                 difficulty=t.difficulty,
+                # NEW: Enhanced metadata for Intel redesign
+                aspect_ratio=getattr(t, 'aspect_ratio', None),
+                hashtags=getattr(t, 'hashtags', None) or [],
+                format_type=getattr(t, 'format_type', None),
+                channel_name=getattr(t, 'channel_name', None),
+                published_at=getattr(t, 'published_at', None),
             )
             for t in insight.thumbnails
         ]
@@ -129,7 +137,8 @@ async def get_overview():
 
 @router.post("/analyze")
 async def trigger_analysis(
-    category_key: Optional[str] = Query(None, description="Specific category to analyze (optional)")
+    category_key: Optional[str] = Query(None, description="Specific category to analyze (optional)"),
+    service: ThumbnailIntelServiceDep = None,
 ):
     """
     Manually trigger thumbnail analysis.
@@ -137,7 +146,6 @@ async def trigger_analysis(
     Normally runs automatically at 6am EST daily.
     Use this for testing or to force an immediate analysis.
     """
-    service = get_thumbnail_intel_service()
     
     try:
         if category_key:
@@ -178,7 +186,10 @@ async def trigger_analysis(
 
 
 @router.get("/category/{category_key}", response_model=CategoryInsightResponse)
-async def get_category_insight(category_key: str):
+async def get_category_insight(
+    category_key: str,
+    service: ThumbnailIntelServiceDep = None,
+):
     """
     Get thumbnail insight for a specific gaming category.
     
@@ -192,7 +203,6 @@ async def get_category_insight(category_key: str):
                    f"Valid categories: {list(GAMING_CATEGORIES.keys())}"
         )
     
-    service = get_thumbnail_intel_service()
     insight = await service.get_category_insight(category_key)
     
     if not insight:
@@ -228,6 +238,12 @@ async def get_category_insight(category_key: str):
             color_recipe=t.color_recipe,
             why_it_works=t.why_it_works,
             difficulty=t.difficulty,
+            # NEW: Enhanced metadata for Intel redesign
+            aspect_ratio=getattr(t, 'aspect_ratio', None),
+            hashtags=getattr(t, 'hashtags', None) or [],
+            format_type=getattr(t, 'format_type', None),
+            channel_name=getattr(t, 'channel_name', None),
+            published_at=getattr(t, 'published_at', None),
         )
         for t in insight.thumbnails
     ]

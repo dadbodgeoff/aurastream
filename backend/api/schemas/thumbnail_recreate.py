@@ -11,6 +11,85 @@ from pydantic import BaseModel, Field
 from backend.api.schemas.thumbnail_intel import ThumbnailAnalysisResponse
 
 
+# ============================================================================
+# Media Asset Placement Schema (reused from generation.py)
+# ============================================================================
+
+SizeUnitEnum = Literal["percent", "px"]
+
+
+class MediaAssetPlacement(BaseModel):
+    """
+    Precise placement data for a media asset on the generation canvas.
+    
+    Allows users to specify exact position, size, rotation, and opacity
+    for their media assets in the generated output.
+    """
+    asset_id: str = Field(
+        ...,
+        description="ID of the media asset to place"
+    )
+    display_name: str = Field(
+        ...,
+        description="Display name of the asset"
+    )
+    asset_type: str = Field(
+        ...,
+        description="Type of the asset (face, logo, character, etc.)"
+    )
+    url: str = Field(
+        ...,
+        description="URL of the asset (preferably processed/transparent version)"
+    )
+    x: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="X position as percentage (0-100) from left edge"
+    )
+    y: float = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Y position as percentage (0-100) from top edge"
+    )
+    width: float = Field(
+        ...,
+        gt=0,
+        description="Width value (percentage or pixels based on size_unit)"
+    )
+    height: float = Field(
+        ...,
+        gt=0,
+        description="Height value (percentage or pixels based on size_unit)"
+    )
+    size_unit: SizeUnitEnum = Field(
+        default="percent",
+        description="Unit for width/height values"
+    )
+    z_index: int = Field(
+        default=1,
+        ge=1,
+        description="Layer order (higher = on top)"
+    )
+    rotation: float = Field(
+        default=0,
+        ge=0,
+        le=360,
+        description="Rotation in degrees"
+    )
+    opacity: float = Field(
+        default=100,
+        ge=0,
+        le=100,
+        description="Opacity percentage (0-100)"
+    )
+
+
+# ============================================================================
+# Recreation Request/Response Schemas
+# ============================================================================
+
 class RecreateRequest(BaseModel):
     """Request to recreate a thumbnail with user's face."""
     
@@ -24,7 +103,7 @@ class RecreateRequest(BaseModel):
         description="Pre-analyzed thumbnail data from Gemini"
     )
     
-    # User's face - one of these must be provided
+    # User's face - one of these must be provided (if original has face)
     face_image_base64: Optional[str] = Field(
         default=None,
         description="Base64 encoded face image (new upload)"
@@ -50,6 +129,28 @@ class RecreateRequest(BaseModel):
     additional_instructions: Optional[str] = Field(
         default=None,
         description="Additional generation instructions"
+    )
+    
+    # NEW: Creator Media Library integration
+    media_asset_ids: Optional[List[str]] = Field(
+        default=None,
+        max_length=2,
+        description="Media asset IDs to include (logo, character, object, etc.). Max 2 assets."
+    )
+    media_asset_placements: Optional[List[MediaAssetPlacement]] = Field(
+        default=None,
+        max_length=2,
+        description="Precise placement data for media assets. Overrides media_asset_ids if provided."
+    )
+    
+    # Canvas snapshot mode - more cost-effective for complex compositions
+    canvas_snapshot_url: Optional[str] = Field(
+        default=None,
+        description="URL of canvas snapshot image. When provided, uses single-image mode instead of media_asset_placements."
+    )
+    canvas_snapshot_description: Optional[str] = Field(
+        default=None,
+        description="Description of canvas contents for AI context."
     )
 
 

@@ -52,9 +52,17 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
 
       {/* Info */}
       <div className="p-3">
-        <h4 className="text-sm font-medium text-text-primary line-clamp-2 mb-2">
+        <h4 className="text-sm font-medium text-text-primary line-clamp-2 mb-1">
           {thumbnail.title}
         </h4>
+
+        {/* Channel + Time */}
+        <div className="flex items-center gap-2 mb-2 text-micro text-text-muted">
+          {thumbnail.channelName && <span>{thumbnail.channelName}</span>}
+          {thumbnail.publishedAt && (
+            <span>• {new Date(thumbnail.publishedAt).toLocaleDateString()}</span>
+          )}
+        </div>
 
         {/* Quick Tags */}
         <div className="flex flex-wrap gap-1 mb-2">
@@ -64,10 +72,24 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
           <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-micro">
             {thumbnail.colorMood}
           </span>
+          {thumbnail.formatType && thumbnail.formatType !== 'standard' && (
+            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded text-micro">
+              {thumbnail.formatType}
+            </span>
+          )}
           <span className={cn("px-2 py-0.5 rounded text-micro", getDifficultyColor(thumbnail.difficulty))}>
             {thumbnail.difficulty}
           </span>
         </div>
+
+        {/* Hashtags */}
+        {thumbnail.hashtags && thumbnail.hashtags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {thumbnail.hashtags.slice(0, 4).map((tag, i) => (
+              <span key={i} className="text-micro text-interactive-400">#{tag}</span>
+            ))}
+          </div>
+        )}
 
         {/* Expand Button */}
         <button
@@ -95,6 +117,47 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
               </div>
             </div>
 
+            {/* Layout Details */}
+            <div className="grid grid-cols-2 gap-2 text-micro">
+              {thumbnail.focalPoint && (
+                <div>
+                  <span className="text-text-muted">Focal Point:</span>
+                  <span className="text-text-primary ml-1">{thumbnail.focalPoint}</span>
+                </div>
+              )}
+              {thumbnail.textPlacement && (
+                <div>
+                  <span className="text-text-muted">Text:</span>
+                  <span className="text-text-primary ml-1">{thumbnail.textPlacement}</span>
+                </div>
+              )}
+              {thumbnail.backgroundStyle && (
+                <div>
+                  <span className="text-text-muted">Background:</span>
+                  <span className="text-text-primary ml-1">{thumbnail.backgroundStyle}</span>
+                </div>
+              )}
+              {thumbnail.aspectRatio && (
+                <div>
+                  <span className="text-text-muted">Aspect:</span>
+                  <span className="text-text-primary ml-1">{thumbnail.aspectRatio}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Face Details */}
+            {thumbnail.hasFace && thumbnail.faceExpression && (
+              <div className="p-2 bg-yellow-500/10 rounded">
+                <span className="text-micro text-yellow-400 block mb-1">👤 Face Details</span>
+                <div className="grid grid-cols-2 gap-1 text-micro">
+                  <span>Expression: <span className="text-text-primary">{thumbnail.faceExpression}</span></span>
+                  {thumbnail.facePosition && <span>Position: <span className="text-text-primary">{thumbnail.facePosition}</span></span>}
+                  {thumbnail.faceSize && <span>Size: <span className="text-text-primary">{thumbnail.faceSize}</span></span>}
+                  {thumbnail.faceLookingDirection && <span>Looking: <span className="text-text-primary">{thumbnail.faceLookingDirection}</span></span>}
+                </div>
+              </div>
+            )}
+
             {/* Layout Recipe */}
             <div className="p-2 bg-purple-500/10 rounded">
               <span className="text-micro text-purple-400 block mb-1">📐 Layout Recipe</span>
@@ -116,9 +179,10 @@ function ThumbnailCard({ thumbnail }: ThumbnailCardProps) {
             {/* Design Elements */}
             <div className="flex flex-wrap gap-2 text-micro">
               {thumbnail.hasFace && <span className="px-2 py-1 bg-white/5 rounded">👤 Face</span>}
-              {thumbnail.hasText && <span className="px-2 py-1 bg-white/5 rounded">📝 Text</span>}
+              {thumbnail.hasText && <span className="px-2 py-1 bg-white/5 rounded">📝 Text{thumbnail.textContent ? `: "${thumbnail.textContent}"` : ''}</span>}
               {thumbnail.hasGlowEffects && <span className="px-2 py-1 bg-white/5 rounded">✨ Glow</span>}
               {thumbnail.hasBorder && <span className="px-2 py-1 bg-white/5 rounded">🔲 Border</span>}
+              {thumbnail.hasArrowsCircles && <span className="px-2 py-1 bg-white/5 rounded">⭕ Arrows/Circles</span>}
             </div>
           </div>
         )}
@@ -170,6 +234,44 @@ function CategorySection({ insight, isExpanded, onToggle }: CategorySectionProps
           {/* Style Summary */}
           <div className="p-3 bg-purple-500/10 rounded-lg">
             <p className="text-sm text-text-primary">{insight.categoryStyleSummary}</p>
+          </div>
+
+          {/* Common Patterns */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Common Layout */}
+            {insight.commonLayout && (
+              <div className="p-3 bg-white/5 rounded-lg">
+                <span className="text-xs font-medium text-text-muted block mb-2">📊 Common Layout</span>
+                <p className="text-sm text-text-primary">{insight.commonLayout}</p>
+              </div>
+            )}
+            {/* Common Colors */}
+            {insight.commonColors && insight.commonColors.length > 0 && (
+              <div className="p-3 bg-white/5 rounded-lg">
+                <span className="text-xs font-medium text-text-muted block mb-2">🎨 Common Colors</span>
+                <div className="flex gap-2">
+                  {insight.commonColors.slice(0, 5).map((color, i) => (
+                    <div
+                      key={i}
+                      className="w-6 h-6 rounded border border-white/20"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Common Elements */}
+            {insight.commonElements && insight.commonElements.length > 0 && (
+              <div className="p-3 bg-white/5 rounded-lg">
+                <span className="text-xs font-medium text-text-muted block mb-2">🧩 Common Elements</span>
+                <div className="flex flex-wrap gap-1">
+                  {insight.commonElements.map((el, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-white/10 text-text-primary rounded text-xs">{el}</span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Ideal Layout & Colors */}

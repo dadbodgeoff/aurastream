@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from backend.api.middleware.auth import get_current_user, get_current_user_optional
 from backend.services.jwt_service import TokenPayload
 from backend.api.schemas.playbook import TodaysPlaybook
-from backend.services.playbook import get_playbook_service
+from backend.api.service_dependencies import PlaybookServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/playbook", tags=["Playbook"])
 @router.get("/latest", response_model=TodaysPlaybook)
 async def get_latest_playbook(
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    service: PlaybookServiceDep = None,
 ) -> TodaysPlaybook:
     """
     Get the most recent playbook report.
@@ -30,7 +31,6 @@ async def get_latest_playbook(
     strategies, and recommendations.
     """
     try:
-        service = get_playbook_service()
         playbook = await service.get_latest_playbook()
         
         if not playbook:
@@ -55,6 +55,7 @@ async def get_latest_playbook(
 async def list_playbook_reports(
     limit: int = Query(20, ge=1, le=50),
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    service: PlaybookServiceDep = None,
 ) -> List[dict]:
     """
     List recent playbook reports.
@@ -63,7 +64,6 @@ async def list_playbook_reports(
     allowing users to browse historical reports.
     """
     try:
-        service = get_playbook_service()
         reports = await service.repository.list_recent_reports(limit)
         
         return [
@@ -91,6 +91,7 @@ async def list_playbook_reports(
 async def get_playbook_report(
     report_id: str,
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    service: PlaybookServiceDep = None,
 ) -> TodaysPlaybook:
     """
     Get a specific playbook report by ID.
@@ -98,7 +99,6 @@ async def get_playbook_report(
     Allows users to view historical reports.
     """
     try:
-        service = get_playbook_service()
         playbook = await service.get_playbook_by_id(report_id)
         
         if not playbook:
@@ -128,6 +128,7 @@ async def get_playbook_report(
 @router.post("/generate", response_model=TodaysPlaybook)
 async def generate_playbook(
     current_user: TokenPayload = Depends(get_current_user),
+    service: PlaybookServiceDep = None,
 ) -> TodaysPlaybook:
     """
     Manually trigger playbook generation.
@@ -146,7 +147,6 @@ async def generate_playbook(
         )
     
     try:
-        service = get_playbook_service()
         playbook = await service.generate_playbook(save_to_db=True)
         return playbook
         
@@ -161,6 +161,7 @@ async def generate_playbook(
 @router.get("/unviewed-count")
 async def get_unviewed_count(
     current_user: TokenPayload = Depends(get_current_user),
+    service: PlaybookServiceDep = None,
 ) -> dict:
     """
     Get count of unviewed playbook reports for the current user.
@@ -168,7 +169,6 @@ async def get_unviewed_count(
     Used to show "new" badges in the UI.
     """
     try:
-        service = get_playbook_service()
         count = await service.repository.get_unviewed_count(current_user.sub)
         return {"unviewedCount": count}
         

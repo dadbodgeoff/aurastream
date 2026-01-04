@@ -293,19 +293,20 @@ class StartCoachRequest(BaseModel):
     
     Brand context is optional - users can start sessions without a brand kit.
     Media assets can be pre-selected for injection into the generated asset.
+    Canvas snapshot mode is supported for complex compositions with sketches.
     """
     brand_context: Optional[BrandContext] = Field(
         default_factory=BrandContext,
         description="Pre-loaded brand kit context (optional - defaults provided for users without brand kits)"
     )
-    asset_type: AssetTypeEnum = Field(
-        ...,
-        description="Type of asset to generate",
+    asset_type: Optional[AssetTypeEnum] = Field(
+        None,
+        description="Type of asset to generate (optional - can be determined during conversation)",
         examples=["twitch_emote"]
     )
-    mood: MoodEnum = Field(
-        ...,
-        description="Mood/style selection",
+    mood: Optional[MoodEnum] = Field(
+        None,
+        description="Mood/style selection (optional - can be determined during conversation)",
         examples=["hype"]
     )
     custom_mood: Optional[str] = Field(
@@ -343,6 +344,16 @@ class StartCoachRequest(BaseModel):
         None,
         max_length=2,
         description="Placement configurations for media assets"
+    )
+    # Canvas Studio integration - single-image mode for complex compositions
+    canvas_snapshot_url: Optional[str] = Field(
+        None,
+        description="URL of canvas snapshot image. When provided, uses single-image mode instead of media_asset_placements. More cost-effective for multiple assets with sketches."
+    )
+    canvas_snapshot_description: Optional[str] = Field(
+        None,
+        max_length=2000,
+        description="Description of canvas snapshot contents for AI context (asset names, positions, sketch annotations)."
     )
     # Coach preferences for this session
     preferences: Optional[CoachPreferences] = Field(
@@ -382,8 +393,39 @@ class StartCoachRequest(BaseModel):
     }
 
 
+class ReferenceAsset(BaseModel):
+    """
+    Reference asset from user's media library to provide visual context.
+    
+    Users can attach up to 2 reference images per message to help the coach
+    understand their vision better.
+    """
+    asset_id: str = Field(
+        ...,
+        description="Media asset UUID from user's library"
+    )
+    display_name: str = Field(
+        ...,
+        max_length=100,
+        description="Display name of the asset"
+    )
+    asset_type: str = Field(
+        ...,
+        description="Type of the asset (face, logo, character, etc.)"
+    )
+    url: str = Field(
+        ...,
+        description="URL of the asset for AI context"
+    )
+    description: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="Optional description of what this reference shows"
+    )
+
+
 class ContinueChatRequest(BaseModel):
-    """Continue chat for refinement."""
+    """Continue chat for refinement with optional reference assets."""
     message: str = Field(
         ...,
         min_length=1,
@@ -391,12 +433,29 @@ class ContinueChatRequest(BaseModel):
         description="User's refinement message",
         examples=["Make the colors more vibrant"]
     )
+    reference_assets: Optional[List[ReferenceAsset]] = Field(
+        None,
+        max_length=2,
+        description="Reference assets from user's media library (max 2 per message)"
+    )
 
     model_config = {
         "json_schema_extra": {
             "examples": [
                 {"message": "Make the colors more vibrant"},
-                {"message": "Add more energy to the pose"}
+                {"message": "Add more energy to the pose"},
+                {
+                    "message": "I want it to look more like this reference",
+                    "reference_assets": [
+                        {
+                            "asset_id": "550e8400-e29b-41d4-a716-446655440000",
+                            "display_name": "My Logo",
+                            "asset_type": "logo",
+                            "url": "https://cdn.aurastream.com/media/logo.png",
+                            "description": "My brand logo with blue gradient"
+                        }
+                    ]
+                }
             ]
         }
     }
@@ -748,6 +807,16 @@ class GenerateFromSessionRequest(BaseModel):
         max_length=2,
         description="Placement configurations for media assets"
     )
+    # Canvas Studio integration - can override session defaults
+    canvas_snapshot_url: Optional[str] = Field(
+        None,
+        description="URL of canvas snapshot image (overrides session defaults if provided). More cost-effective for complex compositions."
+    )
+    canvas_snapshot_description: Optional[str] = Field(
+        None,
+        max_length=2000,
+        description="Description of canvas snapshot contents for AI context."
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -987,6 +1056,8 @@ __all__ = [
     "CoachPreferences",
     # Media asset placement
     "MediaAssetPlacement",
+    # Reference asset for chat messages
+    "ReferenceAsset",
     # Request schemas
     "StartCoachRequest",
     "ContinueChatRequest",

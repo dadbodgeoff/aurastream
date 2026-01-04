@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 YOUTUBE_GAMES_KEY = "youtube:games:{game}"
 CATEGORY_STATS_KEY = "intel:category_stats:{category}"
-CATEGORY_STATS_TTL = 3600  # 1 hour
+CATEGORY_STATS_TTL = 72 * 60 * 60  # 72 hours - stale data better than no data
 
 
 class ScoringEngine:

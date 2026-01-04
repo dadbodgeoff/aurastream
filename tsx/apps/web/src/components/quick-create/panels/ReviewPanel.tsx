@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { SectionCard } from '../shared';
 import { ChevronLeftIcon, SparklesIcon } from '../icons';
+import { CanvasPreview } from '../../create/CanvasPreview';
 import type { QuickTemplate, VibeOption } from '../types';
 import type { ClassifiedError, MediaAsset } from '@aurastream/api-client';
+import type { AssetPlacement } from '../../media-library/placement';
+import type { AnySketchElement } from '../../media-library/canvas-export/types';
 
 interface ReviewPanelProps {
   template: QuickTemplate;
@@ -23,6 +26,10 @@ interface ReviewPanelProps {
   classifiedError?: ClassifiedError | null;
   // Media Library - read-only display
   selectedMediaAssets?: MediaAsset[];
+  // Asset placements for canvas preview
+  mediaAssetPlacements?: AssetPlacement[];
+  // Sketch elements for canvas preview
+  sketchElements?: AnySketchElement[];
 }
 
 /**
@@ -40,7 +47,12 @@ export function ReviewPanel(props: ReviewPanelProps) {
     template, formValues, selectedVibe, brandKitName, includeLogo, logoPosition, logoSize,
     onBack, onGenerate, onRetry, isGenerating, error, classifiedError,
     selectedMediaAssets = [],
+    mediaAssetPlacements = [],
+    sketchElements = [],
   } = props;
+
+  // Check if there's canvas content to preview
+  const hasCanvasContent = mediaAssetPlacements.length > 0 || sketchElements.length > 0;
 
   // Progress stage animation during generation
   const [progressStage, setProgressStage] = useState(0);
@@ -231,6 +243,23 @@ export function ReviewPanel(props: ReviewPanelProps) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Canvas Preview - Shows composition that will be sent to AI */}
+          {hasCanvasContent && (
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-4">
+              <CanvasPreview
+                placements={mediaAssetPlacements}
+                sketchElements={sketchElements}
+                assetType={template.assetType}
+              />
+              <p className="text-xs text-emerald-400 mt-3 text-center">
+                This canvas composition will be sent to AI for generation
+              </p>
+              <p className="text-xs text-text-muted mt-1 text-center">
+                AI will adapt your layout to best match your prompt and style choices
+              </p>
             </div>
           )}
 

@@ -148,7 +148,7 @@ export function useRecreateThumbnail() {
     mutationFn: async (request: RecreateRequest): Promise<RecreateResponse> => {
       const token = getToken();
       
-      const body = {
+      const body: Record<string, any> = {
         video_id: request.videoId,
         thumbnail_url: request.thumbnailUrl,
         analysis: transformAnalysisToSnake(request.analysis),
@@ -159,6 +159,36 @@ export function useRecreateThumbnail() {
         brand_kit_id: request.brandKitId,
         additional_instructions: request.additionalInstructions,
       };
+      
+      // Add media asset fields if provided
+      if (request.mediaAssetIds && request.mediaAssetIds.length > 0) {
+        body.media_asset_ids = request.mediaAssetIds;
+      }
+      
+      if (request.mediaAssetPlacements && request.mediaAssetPlacements.length > 0) {
+        body.media_asset_placements = request.mediaAssetPlacements.map(p => ({
+          asset_id: p.assetId,
+          display_name: p.displayName,
+          asset_type: p.assetType,
+          url: p.url,
+          x: p.x,
+          y: p.y,
+          width: p.width,
+          height: p.height,
+          size_unit: p.sizeUnit,
+          z_index: p.zIndex,
+          rotation: p.rotation,
+          opacity: p.opacity,
+        }));
+      }
+      
+      // Add canvas snapshot fields if provided (more cost-effective for complex compositions)
+      if (request.canvasSnapshotUrl) {
+        body.canvas_snapshot_url = request.canvasSnapshotUrl;
+      }
+      if (request.canvasSnapshotDescription) {
+        body.canvas_snapshot_description = request.canvasSnapshotDescription;
+      }
       
       const response = await fetch(`${API_BASE}/thumbnails/recreate`, {
         method: 'POST',

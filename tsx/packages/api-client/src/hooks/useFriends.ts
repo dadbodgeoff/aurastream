@@ -91,6 +91,7 @@ function transformBlockedUsersListResponse(data: any): BlockedUsersListResponse 
 
 // Query Hooks
 export function useFriendsList() {
+  const token = getToken();
   return useQuery({
     queryKey: friendsKeys.list(),
     queryFn: async (): Promise<FriendsListResponse> => {
@@ -98,6 +99,7 @@ export function useFriendsList() {
       if (!res.ok) throw new Error('Failed to fetch friends');
       return transformFriendsListResponse(await res.json());
     },
+    enabled: !!token,
   });
 }
 
@@ -117,6 +119,7 @@ export function useUserSearch(query: string, enabled = true) {
 }
 
 export function useBlockedUsers() {
+  const token = getToken();
   return useQuery({
     queryKey: friendsKeys.blocked(),
     queryFn: async (): Promise<BlockedUsersListResponse> => {
@@ -124,6 +127,7 @@ export function useBlockedUsers() {
       if (!res.ok) throw new Error('Failed to fetch blocked users');
       return transformBlockedUsersListResponse(await res.json());
     },
+    enabled: !!token,
   });
 }
 

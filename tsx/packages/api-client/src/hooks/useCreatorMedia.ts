@@ -388,7 +388,16 @@ export function useUploadMedia() {
       };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: creatorMediaKeys.lists() });
+      // Invalidate only the specific asset type list, not all lists
+      queryClient.invalidateQueries({ 
+        queryKey: creatorMediaKeys.list({ assetType: data.asset.assetType }),
+        exact: false,
+      });
+      // Also invalidate the unfiltered list
+      queryClient.invalidateQueries({ 
+        queryKey: creatorMediaKeys.list({}),
+        exact: false,
+      });
       queryClient.invalidateQueries({ queryKey: creatorMediaKeys.summary() });
       if (data.asset.isPrimary) {
         queryClient.invalidateQueries({ 

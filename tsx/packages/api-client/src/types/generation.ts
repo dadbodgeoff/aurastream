@@ -61,6 +61,10 @@ export interface GenerateRequest {
   mediaAssetIds?: string[];
   // Asset placements with precise positioning (optional)
   mediaAssetPlacements?: SerializedPlacement[];
+  // Canvas snapshot mode - more cost-effective than individual placements
+  // When provided, uses single-image mode instead of media_asset_placements
+  canvasSnapshotUrl?: string;
+  canvasSnapshotDescription?: string;
   // Legacy logo options (deprecated, use brandCustomization instead)
   includeLogo?: boolean;
   logoPosition?: LogoPosition;

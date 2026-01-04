@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@aurastream/api-client';
-import { useAuth, createDevLogger } from '@aurastream/shared';
+import { useAuth, useSimpleAnalytics, createDevLogger } from '@aurastream/shared';
 import { useGenerationCelebration } from '@/hooks/useGenerationCelebration';
 import { showErrorToast, showSuccessToast } from '@/utils/errorMessages';
 import { QuickRefinementChoice, QuickRefineInput } from '@/components/quick-create/refinement';
@@ -49,6 +49,7 @@ export default function GenerationProgressPage() {
   const router = useRouter();
   const jobId = params.jobId as string;
   const { user } = useAuth();
+  const { trackGenerationCompleted, trackGenerationFailed } = useSimpleAnalytics();
 
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<'connecting' | 'queued' | 'processing' | 'completed' | 'failed'>('connecting');
@@ -115,6 +116,8 @@ export default function GenerationProgressPage() {
               height: firstAsset.height,
               file_size: firstAsset.file_size,
             });
+            // Track generation completed
+            trackGenerationCompleted(firstAsset.asset_type, jobId);
           }
         }
         setProgress(100);
@@ -127,6 +130,8 @@ export default function GenerationProgressPage() {
       if (jobStatus === 'failed') {
         setError(job.error_message || 'Generation failed');
         setErrorCode('GENERATION_FAILED');
+        // Track generation failed
+        trackGenerationFailed(job.asset_type || 'unknown', job.error_message || 'Unknown error', jobId);
         return true; // Stop polling
       }
       

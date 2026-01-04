@@ -79,6 +79,8 @@ class GenerationResponse:
     generation_id: str
     seed: int
     inference_time_ms: int
+    # Thought signature for multi-turn refinements (required by Gemini for referencing model-generated images)
+    thought_signature: Optional[bytes] = None
 
 
 class NanoBananaClient:
@@ -109,6 +111,14 @@ class NanoBananaClient:
     # This is prepended to every prompt to ensure the model only renders
     # what is explicitly provided and doesn't invent additional content
     STRICT_CONTENT_CONSTRAINT = """STRICT CONTENT RULES - YOU MUST FOLLOW THESE:
+
+## REFERENCE IMAGE / CANVAS LAYOUT - HIGHEST PRIORITY
+0. If a reference image or canvas layout is provided (the first image in this request):
+   - REPLICATE the exact composition, layout, and spatial arrangement shown
+   - PRESERVE all element positions, sizes, and relationships from the reference
+   - The reference image defines WHERE things go - your job is to make it look polished
+   - DO NOT rearrange, reposition, or ignore elements shown in the reference
+   - Treat sketches, annotations, and placeholders as placement guides
 
 ## TEXT RENDERING - HIGHEST PRIORITY
 1. If the prompt includes ANY text (title, subtitle, CTA, labels), you MUST render that text EXACTLY as written
@@ -270,12 +280,25 @@ class NanoBananaClient:
                     else:
                         image_b64 = image_data
                     
-                    parts.append({
+                    image_part = {
                         "inlineData": {
                             "mimeType": turn.get("image_mime_type", "image/png"),
                             "data": image_b64,
                         }
-                    })
+                    }
+                    
+                    # CRITICAL: Include thought_signature for model-generated images
+                    # This is required by Gemini API for multi-turn image refinements
+                    if turn.get("thought_signature"):
+                        sig = turn["thought_signature"]
+                        # Handle both bytes and base64 string
+                        if isinstance(sig, bytes):
+                            sig_b64 = base64.b64encode(sig).decode()
+                        else:
+                            sig_b64 = sig
+                        image_part["thoughtSignature"] = sig_b64
+                    
+                    parts.append(image_part)
                 
                 if parts:
                     contents.append({"role": role, "parts": parts})
@@ -403,22 +426,37 @@ Refinement request: """
             )
         else:
             # Single-turn: Original behavior
-            # Prepend strict content constraint to prevent hallucination
-            constrained_prompt = f"{self.STRICT_CONTENT_CONSTRAINT}{prompt}"
-            
-            # Build the parts array - text prompt first
-            parts = [{
-                "text": f"{constrained_prompt}\n\nGenerate this as a {width}x{height} pixel image."
-            }]
-            
-            # Add input image if provided (for image-to-image transformation)
+            # For canvas/reference image mode, use minimal prompt (the canvas IS the instruction)
+            # For regular generation, prepend strict content constraint
             if input_image is not None:
+                # Canvas mode - prompt is already optimized, just add dimensions
+                constrained_prompt = f"{prompt}\n\nOutput: {width}x{height} pixels."
+            else:
+                # Regular mode - use full constraint to prevent hallucination
+                constrained_prompt = f"{self.STRICT_CONTENT_CONSTRAINT}{prompt}\n\nGenerate this as a {width}x{height} pixel image."
+            
+            # Build the parts array
+            # IMPORTANT: For canvas/reference images, put the image FIRST so Gemini
+            # understands it's a reference to follow, not just an afterthought
+            parts = []
+            
+            # Add input image FIRST if provided (canvas snapshot or reference image)
+            # This ensures Gemini sees the visual reference before the instructions
+            if input_image is not None:
+                logger.info(f"[CANVAS DEBUG] NanoBanana: Adding input_image to request, size={len(input_image)} bytes")
                 parts.append({
                     "inlineData": {
                         "mimeType": input_mime_type,
                         "data": base64.b64encode(input_image).decode()
                     }
                 })
+            else:
+                logger.info("[CANVAS DEBUG] NanoBanana: No input_image provided")
+            
+            # Add the text prompt after the reference image
+            parts.append({
+                "text": constrained_prompt
+            })
             
             # Add media assets (logos, faces, characters, etc.)
             # These are referenced in the prompt by index: "Image 1 is the user's logo..."
@@ -430,6 +468,14 @@ Refinement request: """
                             "data": base64.b64encode(asset.image_data).decode()
                         }
                     })
+            
+            # DEBUG: Log the structure of what we're sending
+            logger.info(f"[CANVAS DEBUG] NanoBanana: Building request with {len(parts)} parts")
+            for i, part in enumerate(parts):
+                if "inlineData" in part:
+                    logger.info(f"[CANVAS DEBUG] NanoBanana: Part {i} = IMAGE ({part['inlineData']['mimeType']}, {len(part['inlineData']['data'])} base64 chars)")
+                elif "text" in part:
+                    logger.info(f"[CANVAS DEBUG] NanoBanana: Part {i} = TEXT ({len(part['text'])} chars)")
             
             contents = [{"parts": parts}]
         
@@ -461,13 +507,14 @@ Refinement request: """
                 
                 if response.status == 200:
                     data = await response.json()
-                    image_data = self._extract_image_data(data)
+                    image_data, thought_signature = self._extract_image_data(data)
                     
                     return GenerationResponse(
                         image_data=image_data,
                         generation_id=generation_id,
                         seed=used_seed,
-                        inference_time_ms=inference_time_ms
+                        inference_time_ms=inference_time_ms,
+                        thought_signature=thought_signature,
                     )
                 
                 elif response.status == 429:
@@ -505,9 +552,12 @@ Refinement request: """
                 details={"original_error": str(e)}
             )
     
-    def _extract_image_data(self, data: dict) -> bytes:
+    def _extract_image_data(self, data: dict) -> tuple[bytes, Optional[bytes]]:
         """
-        Extract image bytes from Gemini API response.
+        Extract image bytes and thought_signature from Gemini API response.
+        
+        Returns:
+            Tuple of (image_data, thought_signature)
         """
         candidates = data.get("candidates", [])
         if not candidates:
@@ -519,18 +569,30 @@ Refinement request: """
         content = candidates[0].get("content", {})
         parts = content.get("parts", [])
         
+        image_data = None
+        thought_signature = None
+        
         for part in parts:
             # Check for inlineData (base64 encoded image)
             if "inlineData" in part:
                 inline_data = part["inlineData"]
                 if "data" in inline_data:
-                    return base64.b64decode(inline_data["data"])
+                    image_data = base64.b64decode(inline_data["data"])
+                # Extract thought_signature if present (camelCase from API)
+                if "thoughtSignature" in part:
+                    thought_signature = base64.b64decode(part["thoughtSignature"])
             
             # Check for inline_data (snake_case variant)
             if "inline_data" in part:
                 inline_data = part["inline_data"]
                 if "data" in inline_data:
-                    return base64.b64decode(inline_data["data"])
+                    image_data = base64.b64decode(inline_data["data"])
+                # Extract thought_signature if present (snake_case variant)
+                if "thought_signature" in part:
+                    thought_signature = base64.b64decode(part["thought_signature"])
+        
+        if image_data:
+            return image_data, thought_signature
         
         # If no image found, check if there's text explaining why
         for part in parts:

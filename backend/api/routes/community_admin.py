@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 
 from backend.api.middleware.auth import get_current_user
 from backend.services.jwt_service import TokenPayload
-from backend.services.community_admin_service import get_community_admin_service
+from backend.api.service_dependencies import CommunityAdminServiceDep
 from backend.api.schemas.community import (
     CommunityPostResponse, ReportPostRequest, ReportResponse,
     ReviewReportRequest, PaginatedReportsResponse, REPORT_STATUSES,
@@ -38,9 +38,9 @@ class BanUserRequest(BaseModel):
 async def toggle_featured(
     post_id: str, data: ToggleFeaturedRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> CommunityPostResponse:
     """Toggle featured status of a post. Admin only."""
-    service = get_community_admin_service()
     try:
         return await service.toggle_featured(post_id, data.is_featured)
     except CommunityPostNotFoundError as e:
@@ -51,9 +51,9 @@ async def toggle_featured(
 async def toggle_hidden(
     post_id: str, data: ToggleHiddenRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> CommunityPostResponse:
     """Toggle hidden status of a post. Admin only."""
-    service = get_community_admin_service()
     try:
         return await service.toggle_hidden(post_id, data.is_hidden)
     except CommunityPostNotFoundError as e:
@@ -64,9 +64,9 @@ async def toggle_hidden(
 async def ban_user(
     user_id: str, data: BanUserRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> None:
     """Ban a user from community features. Admin only."""
-    service = get_community_admin_service()
     try:
         await service.ban_user(user_id, data.reason)
     except CommunityUserBannedError as e:
@@ -76,9 +76,9 @@ async def ban_user(
 @router.delete("/users/{user_id}/ban", status_code=status.HTTP_204_NO_CONTENT)
 async def unban_user(
     user_id: str, current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> None:
     """Unban a user from community features. Admin only."""
-    service = get_community_admin_service()
     await service.unban_user(user_id)
 
 
@@ -86,9 +86,9 @@ async def unban_user(
 async def report_post(
     post_id: str, data: ReportPostRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> ReportResponse:
     """Report a post for moderation. Available to all authenticated users."""
-    service = get_community_admin_service()
     try:
         return await service.report_post(current_user.sub, post_id, data)
     except CommunityPostNotFoundError as e:
@@ -102,9 +102,9 @@ async def list_reports(
     status_filter: Optional[REPORT_STATUSES] = Query(None, alias="status"),
     page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=50),
     current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> PaginatedReportsResponse:
     """List reports with optional status filter. Admin only."""
-    service = get_community_admin_service()
     items, total = await service.list_reports(status=status_filter, page=page, limit=limit)
     return PaginatedReportsResponse(
         items=items, total=total, page=page, limit=limit, has_more=(page * limit) < total
@@ -115,9 +115,9 @@ async def list_reports(
 async def review_report(
     report_id: str, data: ReviewReportRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: CommunityAdminServiceDep = None,
 ) -> ReportResponse:
     """Review a report and optionally hide the post. Admin only."""
-    service = get_community_admin_service()
     try:
         return await service.review_report(
             admin_id=current_user.sub, report_id=report_id,

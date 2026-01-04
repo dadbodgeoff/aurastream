@@ -21,11 +21,8 @@ from pydantic import BaseModel, Field
 
 from backend.api.middleware.auth import get_current_user, get_current_user_optional
 from backend.services.jwt_service import TokenPayload
-from backend.services.enterprise_analytics_service import (
-    get_enterprise_analytics_service,
-    EnterpriseAnalyticsService,
-    ANALYTICS_ADMIN_EMAIL,
-)
+from backend.api.service_dependencies import EnterpriseAnalyticsServiceDep
+from backend.services.enterprise_analytics_service import ANALYTICS_ADMIN_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -138,15 +135,6 @@ class BatchEventsRequest(BaseModel):
     events: list[dict[str, Any]] = Field(..., max_length=100)
 
 
-# =============================================================================
-# Dependencies
-# =============================================================================
-
-def get_service() -> EnterpriseAnalyticsService:
-    """Get analytics service."""
-    return get_enterprise_analytics_service()
-
-
 async def require_analytics_admin(
     current_user: TokenPayload = Depends(get_current_user),
 ) -> TokenPayload:
@@ -166,7 +154,7 @@ async def require_analytics_admin(
 @router.post("/visitor", status_code=status.HTTP_202_ACCEPTED)
 async def track_visitor(
     data: VisitorTrackRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Track a visitor."""
     return service.track_visitor(
@@ -189,7 +177,7 @@ async def track_visitor(
 @router.post("/session/start", status_code=status.HTTP_202_ACCEPTED)
 async def start_session(
     data: SessionStartRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Start a new session."""
     return service.start_session(
@@ -208,7 +196,7 @@ async def start_session(
 @router.post("/session/end", status_code=status.HTTP_202_ACCEPTED)
 async def end_session(
     request: Request,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """End a session. Supports sendBeacon (text/plain)."""
     content_type = request.headers.get('content-type', '')
@@ -235,7 +223,7 @@ async def end_session(
 @router.post("/pageview", status_code=status.HTTP_202_ACCEPTED)
 async def track_page_view(
     data: PageViewRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Track a page view."""
     return service.track_page_view(
@@ -252,7 +240,7 @@ async def track_page_view(
 @router.post("/click", status_code=status.HTTP_202_ACCEPTED)
 async def track_click(
     data: ClickTrackRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Track a click for heatmap."""
     return service.track_click(
@@ -273,7 +261,7 @@ async def track_click(
 @router.post("/funnel", status_code=status.HTTP_202_ACCEPTED)
 async def track_funnel_event(
     data: FunnelEventRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Track a funnel event."""
     return service.track_funnel_event(
@@ -287,7 +275,7 @@ async def track_funnel_event(
 @router.post("/abandonment", status_code=status.HTTP_202_ACCEPTED)
 async def track_abandonment(
     data: AbandonmentRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Track form/flow abandonment."""
     return service.track_abandonment(
@@ -308,7 +296,7 @@ async def track_abandonment(
 async def heartbeat(
     data: HeartbeatRequest,
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Heartbeat to keep presence alive."""
     return service.heartbeat(
@@ -323,7 +311,7 @@ async def heartbeat(
 @router.post("/batch", status_code=status.HTTP_202_ACCEPTED)
 async def batch_events(
     data: BatchEventsRequest,
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Process batch of events."""
     results = []
@@ -355,7 +343,7 @@ async def get_dashboard_summary(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get dashboard summary."""
     return service.get_dashboard_summary(start_date, end_date)
@@ -364,7 +352,7 @@ async def get_dashboard_summary(
 @router.get("/dashboard/realtime")
 async def get_realtime_active(
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get real-time active users."""
     return service.get_realtime_active()
@@ -375,7 +363,7 @@ async def get_daily_visitors(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get daily visitor chart data."""
     data = service.get_daily_visitors(start_date, end_date)
@@ -387,7 +375,7 @@ async def get_funnel_data(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get funnel conversion data."""
     return service.get_funnel_data(start_date, end_date)
@@ -400,7 +388,7 @@ async def get_heatmap_data(
     end_date: Optional[str] = None,
     viewport_width: int = 1920,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get heatmap click data for a page."""
     return service.get_heatmap_data(page_path, start_date, end_date, viewport_width)
@@ -412,7 +400,7 @@ async def get_top_journeys(
     end_date: Optional[str] = None,
     limit: int = 20,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get top user journeys."""
     data = service.get_top_journeys(start_date, end_date, limit)
@@ -425,7 +413,7 @@ async def get_abandonment_analysis(
     end_date: Optional[str] = None,
     abandonment_type: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get abandonment analysis."""
     data = service.get_abandonment_analysis(start_date, end_date, abandonment_type)
@@ -438,7 +426,7 @@ async def get_geo_breakdown(
     end_date: Optional[str] = None,
     limit: int = 20,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get geographic breakdown."""
     data = service.get_geo_breakdown(start_date, end_date, limit)
@@ -450,7 +438,7 @@ async def get_device_breakdown(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get device/browser breakdown."""
     data = service.get_device_breakdown(start_date, end_date)
@@ -463,7 +451,7 @@ async def get_page_flow(
     end_date: Optional[str] = None,
     limit: int = 20,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get page flow data."""
     return service.get_page_flow(start_date, end_date, limit)
@@ -475,7 +463,7 @@ async def get_top_pages(
     end_date: Optional[str] = None,
     limit: int = 20,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get top pages."""
     data = service.get_top_pages(start_date, end_date, limit)
@@ -486,7 +474,7 @@ async def get_top_pages(
 async def get_recent_sessions(
     limit: int = 50,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Get recent sessions."""
     data = service.get_recent_sessions(limit)
@@ -497,7 +485,7 @@ async def get_recent_sessions(
 async def trigger_aggregation(
     date: Optional[str] = None,
     current_user: TokenPayload = Depends(require_analytics_admin),
-    service: EnterpriseAnalyticsService = Depends(get_service),
+    service: EnterpriseAnalyticsServiceDep = None,
 ) -> dict:
     """Manually trigger daily aggregation."""
     return service.aggregate_daily(date)

@@ -26,7 +26,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 import redis.asyncio as redis
@@ -35,11 +35,19 @@ from backend.services.trends.youtube_collector import (
     YouTubeCollector,
     YouTubeVideoResponse,
     get_youtube_collector,
-    CATEGORY_IDS,
     TrendCategory,
+)
+from backend.services.distributed_lock import worker_lock
+from backend.workers.heartbeat import send_heartbeat, send_idle_heartbeat, report_execution
+from backend.workers.execution_report import (
+    create_report,
+    submit_execution_report,
+    ExecutionOutcome,
 )
 
 logger = logging.getLogger(__name__)
+
+WORKER_NAME = "youtube_worker"
 
 # Redis keys
 YOUTUBE_TRENDING_KEY = "youtube:trending:{category}"
@@ -47,9 +55,10 @@ YOUTUBE_GAMES_KEY = "youtube:games:{game}"
 YOUTUBE_LAST_FETCH_KEY = "youtube:last_fetch:{type}"
 YOUTUBE_QUOTA_USED_KEY = "youtube:quota_used:{date}"
 
-# Cache TTLs
-TRENDING_CACHE_TTL = 60 * 60  # 1 hour (fetched every 30 min, so always fresh)
-GAMES_CACHE_TTL = 60 * 60 * 25  # 25 hours (fetched once daily)
+# Cache TTLs - Long TTLs ensure data persists even when quota is exhausted
+# Data will be stale but always available
+TRENDING_CACHE_TTL = 60 * 60 * 72  # 72 hours (3 days) - stale data better than no data
+GAMES_CACHE_TTL = 60 * 60 * 72  # 72 hours (3 days) - survives quota exhaustion
 
 # Fetch intervals (in seconds)
 TRENDING_FETCH_INTERVAL = 60 * 30  # 30 minutes
@@ -74,10 +83,87 @@ GAMES_TO_FETCH = [
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 
+# Lock timeout for fetch operations (5 minutes should be plenty)
+FETCH_LOCK_TIMEOUT = 300
 
-def _get_redis_client() -> redis.Redis:
-    """Get async Redis client."""
-    return redis.from_url(REDIS_URL, decode_responses=True)
+# Lua script for atomic quota increment + expire
+# This ensures the increment and expire happen atomically to prevent race conditions
+QUOTA_INCREMENT_SCRIPT = """
+local current = redis.call('INCRBY', KEYS[1], ARGV[1])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return current
+"""
+
+
+# =============================================================================
+# Singleton Redis Client with Connection Pooling
+# =============================================================================
+
+class RedisClientManager:
+    """
+    Singleton Redis client manager with connection pooling.
+    
+    Prevents the Redis client lifecycle race condition by ensuring
+    only one client instance is created and reused across all functions.
+    """
+    
+    _instance: Optional["RedisClientManager"] = None
+    _client: Optional[redis.Redis] = None
+    _quota_script_sha: Optional[str] = None
+    
+    def __new__(cls) -> "RedisClientManager":
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    async def get_client(self) -> redis.Redis:
+        """Get the singleton Redis client, creating it if necessary."""
+        if self._client is None:
+            self._client = redis.from_url(
+                REDIS_URL,
+                decode_responses=True,
+                max_connections=10,  # Connection pool size
+            )
+            # Pre-load the Lua script for atomic quota tracking
+            self._quota_script_sha = await self._client.script_load(QUOTA_INCREMENT_SCRIPT)
+            logger.info("Redis client initialized with connection pooling")
+        return self._client
+    
+    async def get_quota_script_sha(self) -> str:
+        """Get the SHA of the pre-loaded quota increment script."""
+        if self._quota_script_sha is None:
+            client = await self.get_client()
+            self._quota_script_sha = await client.script_load(QUOTA_INCREMENT_SCRIPT)
+        return self._quota_script_sha
+    
+    async def close(self) -> None:
+        """Close the Redis client connection."""
+        if self._client is not None:
+            await self._client.aclose()
+            self._client = None
+            self._quota_script_sha = None
+            logger.info("Redis client closed")
+    
+    @classmethod
+    def reset(cls) -> None:
+        """Reset the singleton instance (for testing)."""
+        cls._instance = None
+        cls._client = None
+        cls._quota_script_sha = None
+
+
+# Global instance
+_redis_manager = RedisClientManager()
+
+
+async def get_redis_client() -> redis.Redis:
+    """Get the singleton Redis client."""
+    return await _redis_manager.get_client()
+
+
+async def close_redis_client() -> None:
+    """Close the singleton Redis client."""
+    await _redis_manager.close()
 
 
 def _serialize_video(video: YouTubeVideoResponse) -> dict:
@@ -112,24 +198,36 @@ def _serialize_video(video: YouTubeVideoResponse) -> dict:
 
 
 async def _track_quota_usage(redis_client: redis.Redis, units: int) -> int:
-    """Track quota usage for the day. Returns total used today."""
+    """
+    Track quota usage for the day atomically. Returns total used today.
+    
+    Uses a Lua script to atomically increment the counter and set expiry,
+    preventing race conditions where the key could expire between operations.
+    """
     today = datetime.utcnow().strftime("%Y-%m-%d")
     key = YOUTUBE_QUOTA_USED_KEY.format(date=today)
     
-    # Increment and get new total
-    total = await redis_client.incrby(key, units)
-    
-    # Set expiry to end of day + 1 hour buffer
-    await redis_client.expire(key, 60 * 60 * 25)
-    
-    return total
+    # Use pre-loaded Lua script for atomic increment + expire
+    # Expiry is set to 25 hours (end of day + 1 hour buffer)
+    try:
+        script_sha = await _redis_manager.get_quota_script_sha()
+        total = await redis_client.evalsha(script_sha, 1, key, units, 60 * 60 * 25)
+        return int(total)
+    except redis.exceptions.NoScriptError:
+        # Script was flushed from Redis, reload it
+        logger.warning("Quota script was flushed, reloading...")
+        _redis_manager._quota_script_sha = None
+        script_sha = await _redis_manager.get_quota_script_sha()
+        total = await redis_client.evalsha(script_sha, 1, key, units, 60 * 60 * 25)
+        return int(total)
 
 
-async def _get_quota_used_today(redis_client: redis.Redis) -> int:
+async def _get_quota_used_today(redis_client: Optional[redis.Redis] = None) -> int:
     """Get quota units used today."""
+    client = redis_client or await get_redis_client()
     today = datetime.utcnow().strftime("%Y-%m-%d")
     key = YOUTUBE_QUOTA_USED_KEY.format(date=today)
-    used = await redis_client.get(key)
+    used = await client.get(key)
     return int(used) if used else 0
 
 
@@ -255,33 +353,49 @@ async def fetch_all_trending() -> dict:
     
     Called every 30 minutes by scheduler.
     Quota cost: 4 units (1 per category).
+    
+    Uses distributed locking to prevent duplicate runs across multiple instances.
     """
     logger.info("Starting scheduled trending fetch for all categories")
     
     collector = get_youtube_collector()
-    redis_client = _get_redis_client()
+    redis_client = await get_redis_client()
     
     total_units = 0
     results = {}
     
     try:
-        for category in CATEGORIES:
-            units = await fetch_trending_category(collector, redis_client, category)
-            total_units += units
-            results[category] = "success" if units > 0 else "failed"
-        
-        quota_today = await _get_quota_used_today(redis_client)
-        logger.info(f"Trending fetch complete. Units used: {total_units}. Total today: {quota_today}")
-        
-        return {
-            "status": "complete",
-            "categories": results,
-            "units_used": total_units,
-            "quota_today": quota_today,
-        }
+        # Acquire distributed lock to prevent duplicate runs
+        async with worker_lock(
+            "youtube_worker",
+            "fetch_trending",
+            timeout=FETCH_LOCK_TIMEOUT,
+            raise_on_failure=False,
+        ) as acquired:
+            if not acquired:
+                logger.info("Trending fetch already running on another instance, skipping")
+                return {
+                    "status": "skipped",
+                    "reason": "lock_held",
+                    "message": "Another instance is already running this task",
+                }
+            
+            for category in CATEGORIES:
+                units = await fetch_trending_category(collector, redis_client, category)
+                total_units += units
+                results[category] = "success" if units > 0 else "failed"
+            
+            quota_today = await _get_quota_used_today(redis_client)
+            logger.info(f"Trending fetch complete. Units used: {total_units}. Total today: {quota_today}")
+            
+            return {
+                "status": "complete",
+                "categories": results,
+                "units_used": total_units,
+                "quota_today": quota_today,
+            }
         
     finally:
-        await redis_client.aclose()
         await collector.close()
 
 
@@ -294,19 +408,20 @@ async def fetch_all_games(force: bool = False) -> dict:
     
     With cache-aware fetching, restarts with fresh cache cost 0 units.
     
+    Uses distributed locking to prevent duplicate runs across multiple instances.
+    
     Args:
         force: If True, bypass cache freshness check and fetch all games.
     """
     logger.info(f"Starting daily game videos fetch (force={force})")
     
     collector = get_youtube_collector()
-    redis_client = _get_redis_client()
+    redis_client = await get_redis_client()
     
     # Check quota before proceeding
     quota_today = await _get_quota_used_today(redis_client)
     if quota_today > 8500:
         logger.warning(f"Quota usage high ({quota_today}/10000). Skipping game fetch.")
-        await redis_client.aclose()
         return {
             "status": "skipped",
             "reason": "quota_limit",
@@ -318,32 +433,46 @@ async def fetch_all_games(force: bool = False) -> dict:
     skipped = 0
     
     try:
-        for game in GAMES_TO_FETCH:
-            units = await fetch_game_videos(collector, redis_client, game, force=force)
-            total_units += units
+        # Acquire distributed lock to prevent duplicate runs
+        async with worker_lock(
+            "youtube_worker",
+            "fetch_games",
+            timeout=FETCH_LOCK_TIMEOUT,
+            raise_on_failure=False,
+        ) as acquired:
+            if not acquired:
+                logger.info("Game fetch already running on another instance, skipping")
+                return {
+                    "status": "skipped",
+                    "reason": "lock_held",
+                    "message": "Another instance is already running this task",
+                }
             
-            if units > 0:
-                results[game["key"]] = "success"
-            else:
-                results[game["key"]] = "skipped_fresh_cache"
-                skipped += 1
+            for game in GAMES_TO_FETCH:
+                units = await fetch_game_videos(collector, redis_client, game, force=force)
+                total_units += units
+                
+                if units > 0:
+                    results[game["key"]] = "success"
+                else:
+                    results[game["key"]] = "skipped_fresh_cache"
+                    skipped += 1
+                
+                # Small delay between requests
+                await asyncio.sleep(1)
             
-            # Small delay between requests
-            await asyncio.sleep(1)
-        
-        quota_today = await _get_quota_used_today(redis_client)
-        logger.info(f"Game fetch complete. Units used: {total_units}. Skipped: {skipped}. Total today: {quota_today}")
-        
-        return {
-            "status": "complete",
-            "games": results,
-            "units_used": total_units,
-            "games_skipped": skipped,
-            "quota_today": quota_today,
-        }
+            quota_today = await _get_quota_used_today(redis_client)
+            logger.info(f"Game fetch complete. Units used: {total_units}. Skipped: {skipped}. Total today: {quota_today}")
+            
+            return {
+                "status": "complete",
+                "games": results,
+                "units_used": total_units,
+                "games_skipped": skipped,
+                "quota_today": quota_today,
+            }
         
     finally:
-        await redis_client.aclose()
         await collector.close()
 
 
@@ -353,18 +482,14 @@ async def get_cached_trending(category: TrendCategory) -> Optional[dict]:
     
     This is what the API routes should call - never hit YouTube directly!
     """
-    redis_client = _get_redis_client()
+    redis_client = await get_redis_client()
     
-    try:
-        cache_key = YOUTUBE_TRENDING_KEY.format(category=category)
-        cached = await redis_client.get(cache_key)
-        
-        if cached:
-            return json.loads(cached)
-        return None
-        
-    finally:
-        await redis_client.aclose()
+    cache_key = YOUTUBE_TRENDING_KEY.format(category=category)
+    cached = await redis_client.get(cache_key)
+    
+    if cached:
+        return json.loads(cached)
+    return None
 
 
 async def get_cached_game_videos(game_key: str) -> Optional[dict]:
@@ -374,36 +499,27 @@ async def get_cached_game_videos(game_key: str) -> Optional[dict]:
     This is what the API routes should call - never hit YouTube directly!
     Videos are extracted from trending by keyword matching (no extra API calls).
     """
-    redis_client = _get_redis_client()
+    redis_client = await get_redis_client()
     
-    try:
-        cache_key = YOUTUBE_GAMES_KEY.format(game=game_key)
-        cached = await redis_client.get(cache_key)
-        
-        if cached:
-            return json.loads(cached)
-        return None
-        
-    finally:
-        await redis_client.aclose()
+    cache_key = YOUTUBE_GAMES_KEY.format(game=game_key)
+    cached = await redis_client.get(cache_key)
+    
+    if cached:
+        return json.loads(cached)
+    return None
 
 
 async def get_quota_status() -> dict:
     """Get current quota usage status."""
-    redis_client = _get_redis_client()
+    redis_client = await get_redis_client()
+    quota_today = await _get_quota_used_today(redis_client)
     
-    try:
-        quota_today = await _get_quota_used_today(redis_client)
-        
-        return {
-            "quota_used_today": quota_today,
-            "quota_limit": 10000,
-            "quota_remaining": 10000 - quota_today,
-            "percentage_used": round((quota_today / 10000) * 100, 1),
-        }
-        
-    finally:
-        await redis_client.aclose()
+    return {
+        "quota_used_today": quota_today,
+        "quota_limit": 10000,
+        "quota_remaining": 10000 - quota_today,
+        "percentage_used": round((quota_today / 10000) * 100, 1),
+    }
 
 
 # ============================================================================
@@ -418,24 +534,92 @@ async def run_scheduler():
     Game-specific videos are extracted from trending (no extra API calls).
     
     Daily quota: ~192 units (well under 10,000 limit)
+    
+    Uses distributed locking to prevent duplicate scheduler runs across instances.
     """
     logger.info("Starting YouTube worker scheduler")
     
     last_trending_fetch = datetime.min
     
-    while True:
-        now = datetime.utcnow()
-        
-        # Check if trending fetch is due
-        if (now - last_trending_fetch).total_seconds() >= TRENDING_FETCH_INTERVAL:
-            try:
-                await fetch_all_trending()
-                last_trending_fetch = now
-            except Exception as e:
-                logger.error(f"Trending fetch failed: {e}")
-        
-        # Sleep for 1 minute before checking again
-        await asyncio.sleep(60)
+    # Send initial idle heartbeat
+    send_idle_heartbeat(WORKER_NAME, schedule_interval_seconds=TRENDING_FETCH_INTERVAL)
+    
+    try:
+        while True:
+            now = datetime.utcnow()
+            
+            # Calculate next scheduled run
+            next_run = last_trending_fetch + timedelta(seconds=TRENDING_FETCH_INTERVAL)
+            if last_trending_fetch == datetime.min:
+                next_run = now  # Run immediately on first iteration
+            
+            # Send idle heartbeat every loop (indicates we're alive and waiting)
+            send_idle_heartbeat(
+                WORKER_NAME,
+                next_scheduled_run=next_run.replace(tzinfo=timezone.utc) if next_run != datetime.min else None,
+                schedule_interval_seconds=TRENDING_FETCH_INTERVAL,
+            )
+            
+            # Check if trending fetch is due
+            if (now - last_trending_fetch).total_seconds() >= TRENDING_FETCH_INTERVAL:
+                # Create enhanced execution report
+                report = create_report(WORKER_NAME)
+                
+                try:
+                    send_heartbeat(WORKER_NAME, is_running=True)
+                    start_time = datetime.utcnow()
+                    result = await fetch_all_trending()
+                    duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+                    
+                    # Only update last fetch time if we actually ran (not skipped due to lock)
+                    if result.get("status") != "skipped":
+                        last_trending_fetch = now
+                        report_execution(WORKER_NAME, success=True, duration_ms=duration_ms)
+                        
+                        # Enhanced reporting with data verification
+                        report.outcome = ExecutionOutcome.SUCCESS
+                        report.duration_ms = duration_ms
+                        
+                        # Data verification metrics
+                        categories_success = sum(1 for v in result.get("categories", {}).values() if v == "success")
+                        report.data_verification.records_fetched = len(CATEGORIES)
+                        report.data_verification.records_processed = categories_success
+                        report.data_verification.records_failed = len(CATEGORIES) - categories_success
+                        report.data_verification.api_calls_made = len(CATEGORIES)
+                        report.data_verification.api_calls_succeeded = categories_success
+                        report.data_verification.cache_writes = categories_success
+                        report.data_verification.cache_ttl_seconds = TRENDING_CACHE_TTL
+                        
+                        # Custom metrics specific to YouTube worker
+                        report.custom_metrics = {
+                            "categories": result.get("categories", {}),
+                            "quota_units_used": result.get("units_used", 0),
+                            "quota_used_today": result.get("quota_today", 0),
+                            "quota_remaining": 10000 - result.get("quota_today", 0),
+                        }
+                        
+                        submit_execution_report(report)
+                    else:
+                        # Skipped due to lock
+                        report.outcome = ExecutionOutcome.SKIPPED
+                        report.custom_metrics = {"reason": result.get("reason", "unknown")}
+                        submit_execution_report(report)
+                        
+                except Exception as e:
+                    logger.error(f"Trending fetch failed: {e}")
+                    report_execution(WORKER_NAME, success=False, duration_ms=0, error=str(e))
+                    
+                    # Enhanced error reporting
+                    report.outcome = ExecutionOutcome.FAILED
+                    report.error_message = str(e)
+                    report.error_type = type(e).__name__
+                    submit_execution_report(report)
+            
+            # Sleep for 1 minute before checking again
+            await asyncio.sleep(60)
+    finally:
+        # Clean up Redis connection on shutdown
+        await close_redis_client()
 
 
 def run_worker():
@@ -450,19 +634,29 @@ def run_worker():
     logger.info(f"Redis URL: {REDIS_URL}")
     logger.info(f"Trending interval: {TRENDING_FETCH_INTERVAL}s")
     logger.info("Game videos: Cache-aware fetching (skips if < 12h old)")
+    logger.info("Using singleton Redis client with connection pooling")
+    logger.info("Using atomic Lua script for quota tracking")
+    logger.info("Using distributed locks to prevent duplicate runs")
     
     # Check for force flag
     force = "--force" in sys.argv
     if force:
         logger.info("⚠️  Force mode enabled - will bypass cache freshness checks")
     
-    # Do initial fetch immediately
-    logger.info("Running initial data fetch...")
-    asyncio.run(fetch_all_trending())
-    asyncio.run(fetch_all_games(force=force))
+    async def _run():
+        try:
+            # Do initial fetch immediately
+            logger.info("Running initial data fetch...")
+            await fetch_all_trending()
+            await fetch_all_games(force=force)
+            
+            # Then start the scheduler
+            await run_scheduler()
+        finally:
+            # Ensure cleanup on exit
+            await close_redis_client()
     
-    # Then start the scheduler
-    asyncio.run(run_scheduler())
+    asyncio.run(_run())
 
 
 if __name__ == "__main__":

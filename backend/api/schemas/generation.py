@@ -278,6 +278,15 @@ class GenerateRequest(BaseModel):
             "opacity": 100
         }]]
     )
+    canvas_snapshot_url: Optional[str] = Field(
+        default=None,
+        description="URL of canvas snapshot image. When provided, uses single-image mode instead of media_asset_placements. More cost-effective for multiple assets.",
+    )
+    canvas_snapshot_description: Optional[str] = Field(
+        default=None,
+        max_length=2000,
+        description="Description of canvas snapshot contents for AI context (asset names, positions, annotations).",
+    )
 
     model_config = {
         "json_schema_extra": {

@@ -40,6 +40,8 @@ import type {
   SortBy,
   SortOrder,
   DurationType,
+  MarketOpportunityData,
+  DailyAssetsData,
 } from '../types/trends';
 
 // ============================================================================
@@ -296,6 +298,26 @@ export function transformThumbnailPatterns(data: any): ThumbnailPatterns {
   };
 }
 
+// NEW: Transform functions for Intel redesign header badges
+export function transformMarketOpportunity(data: any): MarketOpportunityData | null {
+  if (!data) return null;
+  return {
+    level: data.level,
+    reason: data.reason,
+    activeStreams: data.active_streams,
+    changePercent: data.change_percent,
+    primaryCategory: data.primary_category,
+  };
+}
+
+export function transformDailyAssets(data: any): DailyAssetsData | null {
+  if (!data) return null;
+  return {
+    createdToday: data.created_today,
+    pendingReview: data.pending_review,
+  };
+}
+
 export function transformDailyBrief(data: any): DailyBrief {
   return {
     date: data.brief_date,
@@ -318,6 +340,10 @@ export function transformDailyBrief(data: any): DailyBrief {
     thumbnailPatterns: data.thumbnail_patterns
       ? transformThumbnailPatterns(data.thumbnail_patterns)
       : null,
+    generatedAt: data.generated_at,
+    // NEW: Intel redesign header badge data
+    marketOpportunity: transformMarketOpportunity(data.market_opportunity),
+    dailyAssets: transformDailyAssets(data.daily_assets),
   };
 }
 

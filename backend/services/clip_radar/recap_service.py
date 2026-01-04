@@ -174,38 +174,23 @@ class ClipRadarRecapService:
         category_stats: Dict[str, Any],
         hour: int
     ):
-        """Track clips for a specific category."""
+        """
+        Track clips for a specific category using atomic Redis operations.
+        
+        Uses a Lua script to perform atomic read-modify-write to prevent
+        race conditions when multiple poll workers update the same category.
+        """
         cat_key = f"{REDIS_DAILY_CATEGORY_KEY}:{date_key}:{game_id}"
-        current = self.redis.get(cat_key)
         
-        if current:
-            data = json.loads(current)
-        else:
-            data = {
-                "game_id": game_id,
-                "game_name": category_stats.get("game_name", TRACKED_CATEGORIES.get(game_id, "Unknown")),
-                "total_clips": 0,
-                "total_views": 0,
-                "viral_clips_count": 0,
-                "velocities": [],
-                "hourly_activity": [{"clips": 0, "views": 0} for _ in range(24)],
-                "top_clips": [],  # Will store top 10 by velocity
-            }
+        # Prepare the update data
+        new_clips = category_stats.get("total_clips", 0)
+        new_views = category_stats.get("total_views", 0)
+        new_viral_count = len(category_stats.get("viral_clips", []))
+        avg_velocity = category_stats.get("avg_velocity")
         
-        # Update stats
-        data["total_clips"] += category_stats.get("total_clips", 0)
-        data["total_views"] += category_stats.get("total_views", 0)
-        data["viral_clips_count"] += len(category_stats.get("viral_clips", []))
-        
-        if category_stats.get("avg_velocity"):
-            data["velocities"].append(category_stats["avg_velocity"])
-        
-        # Update hourly activity
-        data["hourly_activity"][hour]["clips"] += category_stats.get("total_clips", 0)
-        data["hourly_activity"][hour]["views"] += category_stats.get("total_views", 0)
-        
-        # Track top clip if present
+        # Prepare top clip data if present
         top_clip = category_stats.get("top_clip")
+        top_clip_json = None
         if top_clip:
             clip_data = {
                 "clip_id": top_clip.get("clip_id") or top_clip.clip_id if hasattr(top_clip, "clip_id") else None,
@@ -216,16 +201,98 @@ class ClipRadarRecapService:
                 "view_count": top_clip.get("view_count") or getattr(top_clip, "view_count", 0),
                 "velocity": top_clip.get("velocity") or getattr(top_clip, "velocity", 0),
             }
-            
             if clip_data["clip_id"]:
-                # Add to top clips, keeping top 10 by velocity
-                existing_ids = {c["clip_id"] for c in data["top_clips"]}
-                if clip_data["clip_id"] not in existing_ids:
-                    data["top_clips"].append(clip_data)
-                    data["top_clips"].sort(key=lambda x: x["velocity"], reverse=True)
-                    data["top_clips"] = data["top_clips"][:10]
+                top_clip_json = json.dumps(clip_data)
         
-        self.redis.setex(cat_key, 48 * 3600, json.dumps(data))
+        # Default data structure for new categories
+        default_data = {
+            "game_id": game_id,
+            "game_name": category_stats.get("game_name", TRACKED_CATEGORIES.get(game_id, "Unknown")),
+            "total_clips": 0,
+            "total_views": 0,
+            "viral_clips_count": 0,
+            "velocities": [],
+            "hourly_activity": [{"clips": 0, "views": 0} for _ in range(24)],
+            "top_clips": [],
+        }
+        
+        # Lua script for atomic read-modify-write
+        # This ensures no race conditions when multiple workers update simultaneously
+        lua_script = """
+        local key = KEYS[1]
+        local default_data = ARGV[1]
+        local new_clips = tonumber(ARGV[2])
+        local new_views = tonumber(ARGV[3])
+        local new_viral_count = tonumber(ARGV[4])
+        local hour = tonumber(ARGV[5])
+        local avg_velocity = ARGV[6]
+        local top_clip_json = ARGV[7]
+        local ttl = tonumber(ARGV[8])
+        
+        -- Get current data or use default
+        local current = redis.call('GET', key)
+        local data
+        if current then
+            data = cjson.decode(current)
+        else
+            data = cjson.decode(default_data)
+        end
+        
+        -- Update stats atomically
+        data.total_clips = data.total_clips + new_clips
+        data.total_views = data.total_views + new_views
+        data.viral_clips_count = data.viral_clips_count + new_viral_count
+        
+        -- Add velocity if present
+        if avg_velocity ~= '' then
+            table.insert(data.velocities, tonumber(avg_velocity))
+        end
+        
+        -- Update hourly activity
+        if data.hourly_activity[hour + 1] then
+            data.hourly_activity[hour + 1].clips = data.hourly_activity[hour + 1].clips + new_clips
+            data.hourly_activity[hour + 1].views = data.hourly_activity[hour + 1].views + new_views
+        end
+        
+        -- Add top clip if present and not duplicate
+        if top_clip_json ~= '' then
+            local top_clip = cjson.decode(top_clip_json)
+            local exists = false
+            for _, c in ipairs(data.top_clips) do
+                if c.clip_id == top_clip.clip_id then
+                    exists = true
+                    break
+                end
+            end
+            if not exists then
+                table.insert(data.top_clips, top_clip)
+                -- Sort by velocity descending and keep top 10
+                table.sort(data.top_clips, function(a, b) return a.velocity > b.velocity end)
+                while #data.top_clips > 10 do
+                    table.remove(data.top_clips)
+                end
+            end
+        end
+        
+        -- Store with TTL
+        redis.call('SETEX', key, ttl, cjson.encode(data))
+        return 'OK'
+        """
+        
+        # Execute the Lua script atomically
+        self.redis.eval(
+            lua_script,
+            1,  # Number of keys
+            cat_key,  # KEYS[1]
+            json.dumps(default_data),  # ARGV[1]
+            str(new_clips),  # ARGV[2]
+            str(new_views),  # ARGV[3]
+            str(new_viral_count),  # ARGV[4]
+            str(hour),  # ARGV[5]
+            str(avg_velocity) if avg_velocity else '',  # ARGV[6]
+            top_clip_json or '',  # ARGV[7]
+            str(48 * 3600),  # ARGV[8] - TTL
+        )
     
     async def _track_viral_clips(self, date_key: str, viral_clips: List[Dict[str, Any]]):
         """Track viral clips for the day."""

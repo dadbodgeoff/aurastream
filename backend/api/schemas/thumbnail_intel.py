@@ -12,17 +12,17 @@ class ThumbnailAnalysisResponse(BaseModel):
     video_id: str = Field(..., description="YouTube video ID")
     title: str = Field(..., description="Video title")
     thumbnail_url: str = Field(..., description="Thumbnail image URL")
-    view_count: int = Field(..., description="Video view count")
+    view_count: int = Field(default=0, description="Video view count")
     
     # Layout Analysis
     layout_type: str = Field(..., description="Layout pattern type")
-    text_placement: str = Field(..., description="Where text is positioned")
-    focal_point: str = Field(..., description="Main visual focus")
+    text_placement: str = Field(default="center", description="Where text is positioned")
+    focal_point: str = Field(default="center", description="Main visual focus")
     
     # Color Analysis
     dominant_colors: List[str] = Field(default_factory=list, description="Hex color codes")
-    color_mood: str = Field(..., description="Overall color mood")
-    background_style: str = Field(..., description="Background type")
+    color_mood: str = Field(default="vibrant", description="Overall color mood")
+    background_style: str = Field(default="solid", description="Background type")
     
     # Design Elements
     has_face: bool = Field(default=False)
@@ -50,11 +50,33 @@ class ThumbnailAnalysisResponse(BaseModel):
         description="Where face is looking: camera, left, right, up, down"
     )
     
-    # Recommendations
-    layout_recipe: str = Field(..., description="How to recreate this layout")
-    color_recipe: str = Field(..., description="How to recreate colors")
-    why_it_works: str = Field(..., description="Why this thumbnail is effective")
-    difficulty: str = Field(..., description="Difficulty to recreate")
+    # Recommendations - now optional with defaults for recreation flow
+    layout_recipe: str = Field(default="", description="How to recreate this layout")
+    color_recipe: str = Field(default="", description="How to recreate colors")
+    why_it_works: str = Field(default="", description="Why this thumbnail is effective")
+    difficulty: str = Field(default="medium", description="Difficulty to recreate")
+    
+    # NEW: Enhanced metadata for Intel redesign
+    aspect_ratio: Optional[str] = Field(
+        default=None,
+        description="Aspect ratio string: '16:9', '4:3', '1:1', '9:16'"
+    )
+    hashtags: List[str] = Field(
+        default_factory=list,
+        description="Extracted hashtags from title/description"
+    )
+    format_type: Optional[str] = Field(
+        default=None,
+        description="Format classification: 'split-screen', 'reaction', 'gameplay', 'tutorial', 'vlog'"
+    )
+    channel_name: Optional[str] = Field(
+        default=None,
+        description="YouTube channel name for display"
+    )
+    published_at: Optional[str] = Field(
+        default=None,
+        description="Video publish date ISO string"
+    )
 
 
 class CategoryInsightResponse(BaseModel):

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 YOUTUBE_GAMES_KEY = "youtube:games:{game}"
 VIRAL_ANALYSIS_CACHE_KEY = "viral:analysis:{category}"
-ANALYSIS_CACHE_TTL = 1800  # 30 minutes
+ANALYSIS_CACHE_TTL = 72 * 60 * 60  # 72 hours - stale data better than no data
 DATA_STALENESS_THRESHOLD_HOURS = 6  # Data older than this = low confidence
 
 # Default baseline velocities (views per hour for "normal" performance)

@@ -136,6 +136,16 @@ def get_usage_limit_service_dep():
     return get_usage_limit_service()
 
 
+def get_rate_limit_service_dep():
+    """
+    Dependency for RateLimitService (unified rate limiting).
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.rate_limit import get_rate_limit_service
+    return get_rate_limit_service()
+
+
 def get_subscription_service_dep():
     """
     Dependency for SubscriptionService.
@@ -228,6 +238,16 @@ def get_tips_service_dep():
     """
     from backend.services.coach.tips_service import get_tips_service
     return get_tips_service()
+
+
+def get_coach_analytics_service_dep():
+    """
+    Dependency for CoachAnalyticsService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.coach.analytics_service import get_analytics_service
+    return get_analytics_service()
 
 
 # =============================================================================
@@ -432,6 +452,16 @@ def get_community_admin_service_dep():
     return get_community_admin_service()
 
 
+def get_community_feed_service_dep():
+    """
+    Dependency for CommunityFeedService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.community_feed_service import get_community_feed_service
+    return get_community_feed_service()
+
+
 # =============================================================================
 # Other Services
 # =============================================================================
@@ -486,6 +516,146 @@ def get_gemini_vision_client_dep():
     return get_gemini_vision_client()
 
 
+# =============================================================================
+# Social & Messaging Services
+# =============================================================================
+
+def get_social_service_dep():
+    """
+    Dependency for SocialService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.social_service import get_social_service
+    return get_social_service()
+
+
+def get_message_service_dep():
+    """
+    Dependency for MessageService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.message_service import get_message_service
+    return get_message_service()
+
+
+def get_promo_service_dep():
+    """
+    Dependency for PromoService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.promo_service import get_promo_service
+    return get_promo_service()
+
+
+# =============================================================================
+# Analytics Services
+# =============================================================================
+
+def get_enterprise_analytics_service_dep():
+    """
+    Dependency for EnterpriseAnalyticsService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.enterprise_analytics_service import get_enterprise_analytics_service
+    return get_enterprise_analytics_service()
+
+
+def get_simple_analytics_service_dep():
+    """
+    Dependency for SimpleAnalyticsService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.simple_analytics_service import get_simple_analytics_service
+    return get_simple_analytics_service()
+
+
+def get_site_analytics_service_dep():
+    """
+    Dependency for SiteAnalyticsService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.site_analytics_service import get_site_analytics_service
+    return get_site_analytics_service()
+
+
+# =============================================================================
+# Asset & Generation Services
+# =============================================================================
+
+def get_streamer_asset_service_dep():
+    """
+    Dependency for StreamerAssetService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.streamer_asset_service import get_streamer_asset_service
+    return get_streamer_asset_service()
+
+
+def get_logo_generation_service_dep():
+    """
+    Dependency for LogoGenerationService.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.logo_generation_service import get_logo_generation_service
+    return get_logo_generation_service()
+
+
+# =============================================================================
+# Intel Services
+# =============================================================================
+
+def get_intel_preferences_repository_dep():
+    """
+    Dependency for IntelPreferencesRepository.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.intel.preferences_repository import get_intel_preferences_repository
+    return get_intel_preferences_repository()
+
+
+def get_activity_tracker_dep():
+    """
+    Dependency for ActivityTracker.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.intel.activity_tracker import get_activity_tracker
+    return get_activity_tracker()
+
+
+def get_title_intel_analyzer_dep():
+    """
+    Dependency for TitleIntelAnalyzer.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.title_intel import get_title_intel_analyzer
+    return get_title_intel_analyzer()
+
+
+# =============================================================================
+# Webhook Services
+# =============================================================================
+
+def get_webhook_queue_dep():
+    """
+    Dependency for WebhookQueue.
+    
+    Enables FastAPI dependency injection and clean test mocking.
+    """
+    from backend.services.webhook_queue import get_webhook_queue
+    return get_webhook_queue()
+
+
 
 # =============================================================================
 # Type Aliases for Clean Dependency Injection
@@ -518,6 +688,7 @@ if TYPE_CHECKING:
     from backend.services.audit_service import AuditService
     from backend.services.auth_token_service import AuthTokenService
     from backend.services.usage_limit_service import UsageLimitService
+    from backend.services.rate_limit import RateLimitService
     from backend.services.subscription_service import SubscriptionService
     from backend.services.stripe_service import StripeService
     from backend.services.oauth_service import OAuthService
@@ -527,20 +698,37 @@ if TYPE_CHECKING:
     from backend.services.coach.coach_service import CoachService
     from backend.services.coach.session_manager import SessionManager
     from backend.services.coach.tips_service import TipsService
+    from backend.services.coach.analytics_service import CoachAnalyticsService
     from backend.services.twitch.context_engine import TwitchContextEngine
     from backend.services.twitch.pack_service import PackService
     from backend.services.twitch.game_meta import GameMetaService
+    from backend.services.trends import YouTubeCollector, TwitchCollector
     from backend.services.creator_media.service import CreatorMediaService
     from backend.services.clip_radar.service import ClipRadarService
     from backend.services.clip_radar.recap_service import RecapService
     from backend.services.community_post_service import CommunityPostService
     from backend.services.community_engagement_service import CommunityEngagementService
     from backend.services.community_admin_service import CommunityAdminService
+    from backend.services.community_feed_service import CommunityFeedService
     from backend.services.vibe_branding_service import VibeBrandingService
     from backend.services.profile_creator_service import ProfileCreatorService
     from backend.services.thumbnail_recreate_service import ThumbnailRecreateService
     from backend.services.nano_banana_client import NanoBananaClient
     from backend.services.gemini_vision_client import GeminiVisionClient
+    from backend.services.playbook import PlaybookService
+    from backend.services.thumbnail_intel import ThumbnailIntelService
+    from backend.services.social_service import SocialService
+    from backend.services.message_service import MessageService
+    from backend.services.promo_service import PromoService
+    from backend.services.enterprise_analytics_service import EnterpriseAnalyticsService
+    from backend.services.simple_analytics_service import SimpleAnalyticsService
+    from backend.services.site_analytics_service import SiteAnalyticsService
+    from backend.services.streamer_asset_service import StreamerAssetService
+    from backend.services.logo_generation_service import LogoGenerationService
+    from backend.services.intel.preferences_repository import IntelPreferencesRepository
+    from backend.services.intel.activity_tracker import ActivityTracker
+    from backend.services.title_intel import TitleIntelAnalyzer
+    from backend.services.webhook_queue import WebhookQueue
 
 # Core Services
 AuthServiceDep = Annotated["AuthService", Depends(get_auth_service_dep)]
@@ -552,6 +740,7 @@ AnalyticsServiceDep = Annotated["AnalyticsService", Depends(get_analytics_servic
 AuditServiceDep = Annotated["AuditService", Depends(get_audit_service_dep)]
 AuthTokenServiceDep = Annotated["AuthTokenService", Depends(get_auth_token_service_dep)]
 UsageLimitServiceDep = Annotated["UsageLimitService", Depends(get_usage_limit_service_dep)]
+RateLimitServiceDep = Annotated["RateLimitService", Depends(get_rate_limit_service_dep)]
 SubscriptionServiceDep = Annotated["SubscriptionService", Depends(get_subscription_service_dep)]
 StripeServiceDep = Annotated["StripeService", Depends(get_stripe_service_dep)]
 OAuthServiceDep = Annotated["OAuthService", Depends(get_oauth_service_dep)]
@@ -563,11 +752,16 @@ QuickCreateServiceDep = Annotated["QuickCreateService", Depends(get_quick_create
 CoachServiceDep = Annotated["CoachService", Depends(get_coach_service_dep)]
 SessionManagerDep = Annotated["SessionManager", Depends(get_session_manager_dep)]
 TipsServiceDep = Annotated["TipsService", Depends(get_tips_service_dep)]
+CoachAnalyticsServiceDep = Annotated["CoachAnalyticsService", Depends(get_coach_analytics_service_dep)]
 
 # Twitch Module
 ContextEngineDep = Annotated["TwitchContextEngine", Depends(get_context_engine_dep)]
 PackServiceDep = Annotated["PackService", Depends(get_pack_service_dep)]
 GameMetaServiceDep = Annotated["GameMetaService", Depends(get_game_meta_service_dep)]
+
+# Trends Module
+YouTubeCollectorDep = Annotated["YouTubeCollector", Depends(get_youtube_collector_dep)]
+TwitchCollectorDep = Annotated["TwitchCollector", Depends(get_twitch_collector_dep)]
 
 # Creator Media Module
 CreatorMediaServiceDep = Annotated["CreatorMediaService", Depends(get_creator_media_service_dep)]
@@ -580,6 +774,7 @@ RecapServiceDep = Annotated["RecapService", Depends(get_recap_service_dep)]
 CommunityPostServiceDep = Annotated["CommunityPostService", Depends(get_community_post_service_dep)]
 CommunityEngagementServiceDep = Annotated["CommunityEngagementService", Depends(get_community_engagement_service_dep)]
 CommunityAdminServiceDep = Annotated["CommunityAdminService", Depends(get_community_admin_service_dep)]
+CommunityFeedServiceDep = Annotated["CommunityFeedService", Depends(get_community_feed_service_dep)]
 
 # Other Services
 VibeBrandingServiceDep = Annotated["VibeBrandingService", Depends(get_vibe_branding_service_dep)]
@@ -587,6 +782,30 @@ ProfileCreatorServiceDep = Annotated["ProfileCreatorService", Depends(get_profil
 ThumbnailRecreateServiceDep = Annotated["ThumbnailRecreateService", Depends(get_thumbnail_recreate_service_dep)]
 NanoBananaClientDep = Annotated["NanoBananaClient", Depends(get_nano_banana_client_dep)]
 GeminiVisionClientDep = Annotated["GeminiVisionClient", Depends(get_gemini_vision_client_dep)]
+PlaybookServiceDep = Annotated["PlaybookService", Depends(get_playbook_service_dep)]
+ThumbnailIntelServiceDep = Annotated["ThumbnailIntelService", Depends(get_thumbnail_intel_service_dep)]
+
+# Social & Messaging
+SocialServiceDep = Annotated["SocialService", Depends(get_social_service_dep)]
+MessageServiceDep = Annotated["MessageService", Depends(get_message_service_dep)]
+PromoServiceDep = Annotated["PromoService", Depends(get_promo_service_dep)]
+
+# Analytics
+EnterpriseAnalyticsServiceDep = Annotated["EnterpriseAnalyticsService", Depends(get_enterprise_analytics_service_dep)]
+SimpleAnalyticsServiceDep = Annotated["SimpleAnalyticsService", Depends(get_simple_analytics_service_dep)]
+SiteAnalyticsServiceDep = Annotated["SiteAnalyticsService", Depends(get_site_analytics_service_dep)]
+
+# Asset & Generation
+StreamerAssetServiceDep = Annotated["StreamerAssetService", Depends(get_streamer_asset_service_dep)]
+LogoGenerationServiceDep = Annotated["LogoGenerationService", Depends(get_logo_generation_service_dep)]
+
+# Intel
+IntelPreferencesRepositoryDep = Annotated["IntelPreferencesRepository", Depends(get_intel_preferences_repository_dep)]
+ActivityTrackerDep = Annotated["ActivityTracker", Depends(get_activity_tracker_dep)]
+TitleIntelAnalyzerDep = Annotated["TitleIntelAnalyzer", Depends(get_title_intel_analyzer_dep)]
+
+# Webhooks
+WebhookQueueDep = Annotated["WebhookQueue", Depends(get_webhook_queue_dep)]
 
 
 # =============================================================================

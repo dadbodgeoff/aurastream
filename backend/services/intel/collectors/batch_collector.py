@@ -139,7 +139,7 @@ class BatchCollector:
     # Configuration
     MAX_CONCURRENT_TRENDING = 4  # Don't hammer API
     BATCH_SIZE = 50  # YouTube max per request
-    CACHE_TTL = 18000  # 5 hours
+    CACHE_TTL = 72 * 60 * 60  # 72 hours - stale data better than no data
     MAX_RETRIES = 3  # Retry failed requests
     RETRY_BASE_DELAY = 2  # Base delay in seconds
     

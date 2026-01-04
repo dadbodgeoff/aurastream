@@ -60,6 +60,12 @@ function ThumbnailCard({ thumb }: { thumb: ThumbnailAnalysis }) {
               colorRecipe: thumb.colorRecipe,
               whyItWorks: thumb.whyItWorks,
               difficulty: thumb.difficulty,
+              // New fields
+              channelName: thumb.channelName,
+              publishedAt: thumb.publishedAt,
+              hashtags: thumb.hashtags,
+              formatType: thumb.formatType,
+              aspectRatio: thumb.aspectRatio,
             }))}`}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
@@ -76,13 +82,28 @@ function ThumbnailCard({ thumb }: { thumb: ThumbnailAnalysis }) {
 
       {/* Title + Basic Info */}
       <div className="p-4">
-        <p className="text-sm text-text-primary font-medium line-clamp-2 mb-3">{thumb.title}</p>
+        <p className="text-sm text-text-primary font-medium line-clamp-2 mb-2">{thumb.title}</p>
+        
+        {/* Channel + Time */}
+        <div className="flex items-center gap-2 mb-3 text-xs text-text-tertiary">
+          {thumb.channelName && (
+            <span>{thumb.channelName}</span>
+          )}
+          {thumb.publishedAt && (
+            <span>• {new Date(thumb.publishedAt).toLocaleDateString()}</span>
+          )}
+        </div>
         
         {/* Quick Stats Row */}
         <div className="flex flex-wrap gap-2 mb-3">
           <span className="px-2 py-1 bg-interactive-500/20 text-interactive-400 text-xs rounded">
             {thumb.layoutType}
           </span>
+          {thumb.formatType && thumb.formatType !== 'standard' && (
+            <span className="px-2 py-1 bg-cyan-500/20 text-cyan-400 text-xs rounded">
+              {thumb.formatType}
+            </span>
+          )}
           {thumb.hasFace && (
             <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">
               👤 Face
@@ -106,6 +127,15 @@ function ThumbnailCard({ thumb }: { thumb: ThumbnailAnalysis }) {
             </span>
           )}
         </div>
+
+        {/* Hashtags */}
+        {thumb.hashtags && thumb.hashtags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {thumb.hashtags.slice(0, 5).map((tag, i) => (
+              <span key={i} className="text-xs text-interactive-400">#{tag}</span>
+            ))}
+          </div>
+        )}
 
         {/* Color Palette */}
         {thumb.dominantColors && thumb.dominantColors.length > 0 && (
@@ -312,6 +342,107 @@ export default function ThumbnailStudioPage() {
               <p className="text-sm text-text-secondary">{categoryInsight.categoryStyleSummary}</p>
             </div>
           )}
+
+          {/* Category Patterns Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+            {/* Common Layout */}
+            {categoryInsight.commonLayout && (
+              <div className="bg-background-secondary border border-border-primary rounded-xl p-4">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Common Layout</p>
+                <p className="text-sm text-text-primary">{categoryInsight.commonLayout}</p>
+              </div>
+            )}
+
+            {/* Ideal Layout */}
+            {categoryInsight.idealLayout && (
+              <div className="bg-background-secondary border border-border-primary rounded-xl p-4">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Ideal Layout</p>
+                <p className="text-sm text-text-primary">{categoryInsight.idealLayout}</p>
+              </div>
+            )}
+
+            {/* Common Colors */}
+            {categoryInsight.commonColors && categoryInsight.commonColors.length > 0 && (
+              <div className="bg-background-secondary border border-border-primary rounded-xl p-4">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Common Colors</p>
+                <div className="flex gap-1">
+                  {categoryInsight.commonColors.slice(0, 6).map((color, i) => (
+                    <div 
+                      key={i}
+                      className="w-6 h-6 rounded border border-white/20"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ideal Color Palette */}
+            {categoryInsight.idealColorPalette && categoryInsight.idealColorPalette.length > 0 && (
+              <div className="bg-background-secondary border border-border-primary rounded-xl p-4">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Ideal Palette</p>
+                <div className="flex gap-1">
+                  {categoryInsight.idealColorPalette.slice(0, 6).map((color, i) => (
+                    <div 
+                      key={i}
+                      className="w-6 h-6 rounded border border-white/20"
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Common Elements */}
+            {categoryInsight.commonElements && categoryInsight.commonElements.length > 0 && (
+              <div className="bg-background-secondary border border-border-primary rounded-xl p-4">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Common Elements</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {categoryInsight.commonElements.map((el, i) => (
+                    <span key={i} className="px-2 py-1 bg-white/5 text-text-secondary text-xs rounded">{el}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Must Have Elements */}
+            {categoryInsight.mustHaveElements && categoryInsight.mustHaveElements.length > 0 && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                <p className="text-xs text-green-400 uppercase tracking-wide mb-2">Must Have ✓</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {categoryInsight.mustHaveElements.map((el, i) => (
+                    <span key={i} className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">{el}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Avoid Elements */}
+            {categoryInsight.avoidElements && categoryInsight.avoidElements.length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                <p className="text-xs text-red-400 uppercase tracking-wide mb-2">Avoid ✗</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {categoryInsight.avoidElements.map((el, i) => (
+                    <span key={i} className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded">{el}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pro Tips */}
+            {categoryInsight.proTips && categoryInsight.proTips.length > 0 && (
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 md:col-span-2 lg:col-span-3">
+                <p className="text-xs text-purple-400 uppercase tracking-wide mb-2">💡 Pro Tips</p>
+                <ul className="space-y-1.5">
+                  {categoryInsight.proTips.map((tip, i) => (
+                    <li key={i} className="text-sm text-text-secondary">• {tip}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

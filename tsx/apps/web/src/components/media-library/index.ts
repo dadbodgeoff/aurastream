@@ -10,6 +10,22 @@ export { MediaUploadModal } from './MediaUploadModal';
 export { MediaDetailModal } from './MediaDetailModal';
 export { MediaLibrarySummary } from './MediaLibrarySummary';
 export { MediaAssetPicker } from './MediaAssetPicker';
+export { CanvasStudio } from './CanvasStudio';
+// Legacy exports (deprecated - use CanvasStudio instead)
+export { CanvasStudioModal } from './CanvasStudioModal';
+export { CanvasComposer } from './CanvasComposer';
 
 export * from './constants';
 export * from './types';
+
+// Canvas Export module
+export * from './canvas-export';
+
+// Sketch Editor module
+export * from './sketch';
+
+// Templates module
+export * from './templates';
+
+// Stickers module
+export * from './stickers';

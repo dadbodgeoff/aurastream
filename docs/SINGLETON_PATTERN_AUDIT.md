@@ -2,7 +2,7 @@
 
 **Date:** January 2, 2026  
 **Priority:** HIGH  
-**Status:** Audit Complete - Ready for Implementation
+**Status:** ✅ Route Migration Complete - All route files now use FastAPI DI
 
 ---
 
@@ -393,23 +393,42 @@ def client_with_mocks(mock_auth_service):
 
 ## Implementation Priority
 
-### High Priority (Week 1)
-1. Create `service_dependencies.py` with core services
-2. Update `auth.py` routes (most tested, highest risk)
-3. Update `brand_kits.py` routes
-4. Update `generation.py` routes
-5. Update test fixtures for these routes
+### High Priority (Week 1) - ✅ COMPLETED
+1. ✅ Create `service_dependencies.py` with core services
+2. ✅ Update `auth.py` routes (most tested, highest risk)
+3. ✅ Update `brand_kits.py` routes
+4. ✅ Update `generation.py` routes
+5. ✅ Update `coach.py` routes
+6. ✅ Update `twitch.py` routes
+7. ✅ Update `assets.py` routes
+8. ✅ Update `avatars.py` routes
+9. ✅ Update `logos.py` routes
 
-### Medium Priority (Week 2)
-6. Update `coach.py` routes
-7. Update `twitch.py` routes
-8. Update `trends.py` routes
-9. Update remaining route files
+### Medium Priority (Week 2) - ✅ COMPLETED
+10. ✅ Update `analytics.py` routes
+11. ✅ Update `enterprise_analytics.py` routes
+12. ✅ Update `site_analytics.py` routes
+13. ✅ Update `webhooks.py` routes
+14. ✅ Update `aura_lab.py` routes
+15. ✅ Update `community.py` routes
+16. ✅ Update `community_engagement.py` routes
+17. ✅ Update `community_admin.py` routes
+18. ✅ Update `friends.py` routes
+19. ✅ Update `promo.py` routes
+20. ✅ Update `messages.py` routes
+21. ✅ Update `thumbnail_intel.py` routes
+22. ✅ Update `streamer_assets.py` routes
+23. ✅ Update `logo_generation.py` routes
+24. ✅ Update `oauth.py` routes (helper function updated)
+
+### Remaining (TODO items only)
+- `trends.py` - Has commented-out TODO service calls (not active code)
 
 ### Low Priority (Week 3+)
-10. Refactor service constructors for true DI
-11. Remove manual singleton resets from conftest.py
-12. Add dependency validation at startup
+17. Refactor service constructors for true DI
+18. Remove manual singleton resets from conftest.py
+19. Add dependency validation at startup
+20. Update test fixtures for these routes
 
 ---
 

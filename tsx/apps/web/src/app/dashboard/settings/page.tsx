@@ -107,7 +107,7 @@ function ProfileTab({ user }: { user: any }) {
 
 function BillingTab({ user }: { user: any }) {
   const [isLoading, setIsLoading] = useState(false);
-  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+  const isPremium = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio' || user?.subscriptionTier === 'unlimited';
 
   const handleUpgrade = async (planId: string) => {
     setIsLoading(true);

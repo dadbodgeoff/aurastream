@@ -11,6 +11,8 @@ This module implements all generation job endpoints:
 
 import asyncio
 import json
+import logging
+import uuid
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
@@ -24,9 +26,14 @@ from backend.api.schemas.generation import (
     RefineJobResponse,
 )
 from backend.api.schemas.asset import AssetResponse
+from backend.api.service_dependencies import (
+    GenerationServiceDep,
+    AuditServiceDep,
+    UsageLimitServiceDep,
+    get_audit_service_dep,
+)
 from backend.services.jwt_service import TokenPayload
-from backend.services.audit_service import get_audit_service
-from backend.services.generation_service import get_generation_service, JobStatus
+from backend.services.generation_service import JobStatus, get_generation_service
 from backend.services.exceptions import (
     JobNotFoundError,
     BrandKitNotFoundError,
@@ -35,6 +42,8 @@ from backend.services.exceptions import (
 )
 from backend.workers.generation_worker import enqueue_generation_job
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -82,6 +91,9 @@ async def create_generation_job(
     request: Request,
     data: GenerateRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
+    audit: AuditServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
 ) -> JobResponse:
     """
     Create a new asset generation job.
@@ -90,10 +102,7 @@ async def create_generation_job(
     - Free: 3 creations/month
     - Pro: 50 creations/month
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
     # Check usage limits
-    usage_service = get_usage_limit_service()
     usage = await usage_service.check_limit(current_user.sub, "creations")
     if not usage.can_use:
         raise HTTPException(
@@ -106,8 +115,6 @@ async def create_generation_job(
                 "resets_at": usage.resets_at.isoformat() if usage.resets_at else None,
             },
         )
-    
-    service = get_generation_service()
     
     try:
         # Build parameters dict from brand_customization
@@ -142,6 +149,11 @@ async def create_generation_job(
                     "use_catchphrase": bc.voice.use_catchphrase,
                 }
         
+        # DEBUG: Log canvas snapshot presence
+        logger.info(f"[CANVAS DEBUG] /generate request: canvas_snapshot_url={data.canvas_snapshot_url is not None}, canvas_snapshot_description={data.canvas_snapshot_description is not None}")
+        if data.canvas_snapshot_url:
+            logger.info(f"[CANVAS DEBUG] /generate request: canvas_snapshot_url value: {data.canvas_snapshot_url[:100]}...")
+        
         job = await service.create_job(
             user_id=current_user.sub,
             brand_kit_id=data.brand_kit_id,
@@ -150,6 +162,8 @@ async def create_generation_job(
             parameters=parameters if parameters else None,
             media_asset_ids=data.media_asset_ids,
             media_asset_placements=[p.model_dump() for p in data.media_asset_placements] if data.media_asset_placements else None,
+            canvas_snapshot_url=data.canvas_snapshot_url,
+            canvas_snapshot_description=data.canvas_snapshot_description,
             user_tier=getattr(current_user, "tier", "free"),
         )
         
@@ -160,7 +174,6 @@ async def create_generation_job(
         enqueue_generation_job(job.id, current_user.sub)
         
         # Audit log
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="generation.create",
@@ -172,6 +185,7 @@ async def create_generation_job(
                 "include_logo": parameters.get("include_logo", False),
                 "media_asset_ids": data.media_asset_ids,
                 "has_placements": data.media_asset_placements is not None,
+                "has_canvas_snapshot": data.canvas_snapshot_url is not None,
             },
             ip_address=request.client.host if request.client else None,
         )
@@ -192,10 +206,9 @@ async def create_generation_job(
 async def get_job(
     job_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
 ) -> JobResponse:
     """Get a generation job by ID."""
-    service = get_generation_service()
-    
     try:
         job = await service.get_job(current_user.sub, job_id)
         return _job_to_response(job)
@@ -213,10 +226,9 @@ async def get_job(
 async def get_job_assets(
     job_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
 ) -> List[AssetResponse]:
     """Get all assets from a generation job."""
-    service = get_generation_service()
-    
     try:
         assets = await service.get_job_assets(current_user.sub, job_id)
         return [_asset_to_response(asset) for asset in assets]
@@ -236,10 +248,9 @@ async def list_jobs(
     limit: int = Query(20, ge=1, le=100, description="Maximum number of jobs to return"),
     offset: int = Query(0, ge=0, description="Number of jobs to skip"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
 ) -> JobListResponse:
     """List all generation jobs for the current user."""
-    service = get_generation_service()
-    
     # Convert status string to enum if provided
     status_enum = None
     if status_filter:
@@ -285,17 +296,15 @@ async def refine_job(
     job_id: str,
     data: RefineJobRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> RefineJobResponse:
     """
     Refine a completed generation job.
     
     Creates a new job with the original parameters + refinement instruction.
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
-    service = get_generation_service()
-    usage_service = get_usage_limit_service()
-    
     # Get the original job
     try:
         original_job = await service.get_job(current_user.sub, job_id)
@@ -358,18 +367,70 @@ async def refine_job(
     original_prompt = original_job.prompt or ""
     original_parameters = original_job.parameters or {}
     
-    # Build refined prompt - append refinement instruction
-    refined_prompt = f"{original_prompt}\n\n[USER REFINEMENT REQUEST]: {data.refinement}"
+    # Build conversation history from the original job's generated asset
+    # This enables multi-turn refinement with Gemini (cheaper than re-generating)
+    conversation_history = []
+    try:
+        import base64
+        import httpx
+        
+        # Get the asset from the original job
+        assets = await service.get_job_assets(current_user.sub, job_id)
+        if assets:
+            original_asset = assets[0]
+            
+            # Download the image to build conversation history
+            async with httpx.AsyncClient() as client:
+                response = await client.get(original_asset.url, timeout=30.0)
+                if response.status_code == 200:
+                    image_data = response.content
+                    image_b64 = base64.b64encode(image_data).decode()
+                    
+                    # Build conversation history in the format expected by nano_banana_client
+                    model_turn = {
+                        "role": "model",
+                        "image_data": image_b64,
+                        "image_mime_type": "image/png",
+                    }
+                    
+                    # Include thought_signature if stored on the asset
+                    # This is required by Gemini for multi-turn image refinements
+                    if hasattr(original_asset, 'thought_signature') and original_asset.thought_signature:
+                        model_turn["thought_signature"] = original_asset.thought_signature
+                    
+                    conversation_history = [
+                        {
+                            "role": "user",
+                            "text": original_prompt,
+                        },
+                        model_turn,
+                    ]
+                    logger.info(f"Built conversation history for refinement: job_id={job_id}, history_turns=2, has_signature={model_turn.get('thought_signature') is not None}")
+    except Exception as e:
+        logger.warning(f"Failed to build conversation history, falling back to prompt-only: {e}")
+        conversation_history = []
+    
+    # Build parameters for refinement job
+    refined_parameters = {
+        **original_parameters,
+        "is_refinement": True,
+        "refinement_text": data.refinement,
+        "original_job_id": job_id,
+    }
+    
+    # Add conversation history if we successfully built it
+    if conversation_history:
+        refined_parameters["conversation_history"] = conversation_history
     
     try:
-        # Create new job with refined prompt
-        # Note: media_asset_ids and media_asset_placements are stored in parameters
+        # Create new job with refinement parameters
+        # The refinement text becomes the prompt, conversation history provides context
         new_job = await service.create_job(
             user_id=current_user.sub,
             brand_kit_id=original_job.brand_kit_id,
             asset_type=original_job.asset_type,
-            custom_prompt=refined_prompt,
-            parameters=original_parameters,
+            custom_prompt=data.refinement,  # Just the refinement, not the full prompt
+            parameters=refined_parameters,
         )
         
         # Increment appropriate counter
@@ -382,7 +443,6 @@ async def refine_job(
         enqueue_generation_job(new_job.id, current_user.sub)
         
         # Audit log
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="generation.refine",
@@ -437,14 +497,22 @@ async def refine_job(
 async def stream_job_progress(
     job_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
 ):
     """
     Stream real-time job progress updates via SSE.
     
     Polls the job status and streams updates to the client.
     Includes heartbeat events to keep the connection alive.
+    Integrates with SSE Stream Guardian for reliability.
     """
-    service = get_generation_service()
+    # Import SSE services
+    from backend.services.sse import (
+        get_stream_registry,
+        get_completion_store,
+        StreamType,
+        is_terminal_event,
+    )
     
     # Verify job exists and user owns it
     try:
@@ -454,87 +522,134 @@ async def stream_job_progress(
     except AuthorizationError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.to_dict())
     
+    # Use canonical stream ID format (matches worker's format for consistency)
+    # This allows the frontend to recover progress from either source
+    stream_id = f"gen:{job_id}"
+    registry = get_stream_registry()
+    completion_store = get_completion_store()
+    
     async def event_generator():
         """Generate SSE events for job progress."""
+        event_counter = 0
         last_progress = -1
         last_status = None
         heartbeat_counter = 0
         max_iterations = 300  # 5 minutes max (1 second intervals)
         
-        for _ in range(max_iterations):
-            try:
-                job = await service.get_job(current_user.sub, job_id)
-                job_status = job.status.value if hasattr(job.status, 'value') else job.status
-                
-                # Send progress update if progress OR status changed
-                if job.progress != last_progress or job_status != last_status:
-                    last_progress = job.progress
-                    last_status = job_status
-                    event_data = json.dumps({
-                        "type": "progress",
-                        "status": job_status,
-                        "progress": job.progress,
-                        "message": _get_progress_message(job.progress, job_status),
-                    })
-                    yield f"data: {event_data}\n\n"
-                
-                # Check for completion
-                if job_status == "completed":
-                    # Get the generated asset
-                    assets = await service.get_job_assets(current_user.sub, job_id)
-                    asset = assets[0] if assets else None
-                    
-                    event_data = json.dumps({
-                        "type": "completed",
-                        "status": "completed",
-                        "progress": 100,
-                        "asset": {
-                            "id": asset.id,
-                            "url": asset.url,
-                            "asset_type": asset.asset_type,
-                            "width": asset.width,
-                            "height": asset.height,
-                            "file_size": asset.file_size,
-                        } if asset else None,
-                    })
-                    yield f"data: {event_data}\n\n"
-                    return
-                
-                # Check for failure
-                if job_status == "failed":
-                    event_data = json.dumps({
-                        "type": "failed",
-                        "status": "failed",
-                        "progress": 0,
-                        "error": job.error_message or "Generation failed",
-                    })
-                    yield f"data: {event_data}\n\n"
-                    return
-                
-                # Send heartbeat every 5 iterations (5 seconds)
-                heartbeat_counter += 1
-                if heartbeat_counter >= 5:
-                    heartbeat_counter = 0
-                    event_data = json.dumps({"type": "heartbeat"})
-                    yield f"data: {event_data}\n\n"
-                
-                # Wait before next poll
-                await asyncio.sleep(1)
-                
-            except Exception as e:
-                event_data = json.dumps({
-                    "type": "error",
-                    "error": str(e),
-                })
-                yield f"data: {event_data}\n\n"
-                return
+        # Register stream
+        try:
+            await registry.register(
+                stream_id=stream_id,
+                stream_type=StreamType.GENERATION,
+                user_id=current_user.sub,
+                metadata={"job_id": job_id},
+            )
+        except Exception as e:
+            # Log but don't fail - stream tracking is optional
+            pass
         
-        # Timeout after max iterations
-        event_data = json.dumps({
-            "type": "timeout",
-            "error": "Job timed out waiting for completion",
-        })
-        yield f"data: {event_data}\n\n"
+        try:
+            for _ in range(max_iterations):
+                try:
+                    job = await service.get_job(current_user.sub, job_id)
+                    job_status = job.status.value if hasattr(job.status, 'value') else job.status
+                    
+                    # Send progress update if progress OR status changed
+                    if job.progress != last_progress or job_status != last_status:
+                        last_progress = job.progress
+                        last_status = job_status
+                        event_counter += 1
+                        event_data = json.dumps({
+                            "id": f"{stream_id}:{event_counter}",
+                            "type": "progress",
+                            "status": job_status,
+                            "progress": job.progress,
+                            "message": _get_progress_message(job.progress, job_status),
+                        })
+                        yield f"data: {event_data}\n\n"
+                        await registry.heartbeat(stream_id)
+                    
+                    # Check for completion
+                    if job_status == "completed":
+                        # Get the generated asset
+                        assets = await service.get_job_assets(current_user.sub, job_id)
+                        asset = assets[0] if assets else None
+                        
+                        event_counter += 1
+                        completion_data = {
+                            "id": f"{stream_id}:{event_counter}",
+                            "type": "completed",
+                            "status": "completed",
+                            "progress": 100,
+                            "asset": {
+                                "id": asset.id,
+                                "url": asset.url,
+                                "asset_type": asset.asset_type,
+                                "width": asset.width,
+                                "height": asset.height,
+                                "file_size": asset.file_size,
+                            } if asset else None,
+                        }
+                        yield f"data: {json.dumps(completion_data)}\n\n"
+                        
+                        # Store completion for recovery
+                        await completion_store.store_completion(stream_id, "completed", completion_data)
+                        return
+                    
+                    # Check for failure
+                    if job_status == "failed":
+                        event_counter += 1
+                        failure_data = {
+                            "id": f"{stream_id}:{event_counter}",
+                            "type": "failed",
+                            "status": "failed",
+                            "progress": 0,
+                            "error": job.error_message or "Generation failed",
+                        }
+                        yield f"data: {json.dumps(failure_data)}\n\n"
+                        
+                        # Store completion for recovery
+                        await completion_store.store_completion(stream_id, "failed", failure_data)
+                        return
+                    
+                    # Send heartbeat every 5 iterations (5 seconds)
+                    heartbeat_counter += 1
+                    if heartbeat_counter >= 5:
+                        heartbeat_counter = 0
+                        event_data = json.dumps({"type": "heartbeat"})
+                        yield f"data: {event_data}\n\n"
+                        await registry.heartbeat(stream_id)
+                    
+                    # Wait before next poll
+                    await asyncio.sleep(1)
+                    
+                except Exception as e:
+                    event_counter += 1
+                    error_data = {
+                        "id": f"{stream_id}:{event_counter}",
+                        "type": "error",
+                        "error": str(e),
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    await completion_store.store_completion(stream_id, "error", error_data)
+                    return
+            
+            # Timeout after max iterations
+            event_counter += 1
+            timeout_data = {
+                "id": f"{stream_id}:{event_counter}",
+                "type": "timeout",
+                "error": "Job timed out waiting for completion",
+            }
+            yield f"data: {json.dumps(timeout_data)}\n\n"
+            await completion_store.store_completion(stream_id, "timeout", timeout_data)
+            
+        finally:
+            # Unregister stream on close
+            try:
+                await registry.unregister(stream_id)
+            except Exception:
+                pass
     
     return StreamingResponse(
         event_generator(),
@@ -543,6 +658,7 @@ async def stream_job_progress(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Stream-ID": stream_id,
         },
     )
 
@@ -564,6 +680,46 @@ def _get_progress_message(progress: int, status: str) -> str:
     if progress < 100:
         return "Almost done..."
     return "Complete!"
+
+
+# DEBUG ENDPOINT - Remove after debugging canvas snapshot issue
+@router.get(
+    "/jobs/{job_id}/debug-params",
+    summary="[DEBUG] Get job parameters",
+    include_in_schema=False,  # Hide from OpenAPI docs
+)
+async def debug_job_params(
+    job_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict:
+    """
+    DEBUG: Get raw job parameters to verify canvas_snapshot_url is stored.
+    Remove this endpoint after debugging.
+    """
+    from backend.database.supabase_client import get_supabase_client
+    
+    db = get_supabase_client()
+    result = db.table("generation_jobs") \
+        .select("id, parameters, prompt, status") \
+        .eq("id", job_id) \
+        .eq("user_id", current_user.sub) \
+        .execute()
+    
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    job = result.data[0]
+    params = job.get("parameters") or {}
+    
+    return {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "has_canvas_snapshot_url": "canvas_snapshot_url" in params,
+        "canvas_snapshot_url": params.get("canvas_snapshot_url"),
+        "canvas_snapshot_description": params.get("canvas_snapshot_description"),
+        "all_param_keys": list(params.keys()),
+        "prompt_preview": (job.get("prompt") or "")[:200] + "...",
+    }
 
 
 __all__ = ["router"]

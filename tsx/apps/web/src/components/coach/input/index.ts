@@ -23,3 +23,7 @@ export type { SuggestionChipsProps } from './SuggestionChips';
 // CoachInput - Enhanced input area with suggestions
 export { CoachInput } from './CoachInput';
 export type { CoachInputProps } from './CoachInput';
+
+// AssetLibraryPicker - Reference asset picker from media library
+export { AssetLibraryPicker } from './AssetLibraryPicker';
+export type { AssetLibraryPickerProps, SelectedReferenceAsset } from './AssetLibraryPicker';

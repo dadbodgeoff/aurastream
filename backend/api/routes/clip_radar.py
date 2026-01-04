@@ -9,14 +9,17 @@ import logging
 from datetime import datetime, date, timedelta
 from typing import Optional, List
 
-from fastapi import APIRouter, Query, HTTPException, Path
+from fastapi import APIRouter, Query, HTTPException, Path, Depends
 from pydantic import BaseModel, Field
 
-from backend.services.clip_radar import get_clip_radar_service, TRACKED_CATEGORIES
+from backend.api.service_dependencies import ClipRadarServiceDep, RecapServiceDep
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/clip-radar", tags=["Clip Radar"])
+
+# Import tracked categories from service
+from backend.services.clip_radar import TRACKED_CATEGORIES
 
 
 # =============================================================================
@@ -141,6 +144,7 @@ class PollResultResponse(BaseModel):
 async def get_viral_clips(
     limit: int = Query(20, ge=1, le=50, description="Maximum clips to return"),
     game_id: Optional[str] = Query(None, description="Filter by game ID"),
+    service: ClipRadarServiceDep = None,
 ):
     """
     Get currently viral clips sorted by velocity.
@@ -148,7 +152,6 @@ async def get_viral_clips(
     Returns clips that are gaining views rapidly (5+ views/minute).
     If no cached data exists, fetches fresh clips from Twitch API.
     """
-    service = get_clip_radar_service()
     
     try:
         clips = await service.get_viral_clips(limit=limit, game_id=game_id)
@@ -206,6 +209,7 @@ async def get_fresh_clips(
     limit: int = Query(20, ge=1, le=50, description="Maximum clips to return"),
     game_id: Optional[str] = Query(None, description="Filter by game ID"),
     max_age: int = Query(60, ge=5, le=120, description="Maximum clip age in minutes"),
+    service: ClipRadarServiceDep = None,
 ):
     """
     Get fresh clips from the last N minutes, sorted by velocity.
@@ -213,7 +217,6 @@ async def get_fresh_clips(
     Unlike /viral, this returns ALL fresh clips, not just viral ones.
     Fetches directly from Twitch API - no background worker needed.
     """
-    service = get_clip_radar_service()
     
     try:
         logger.info(f"Fetching fresh clips: game_id={game_id}, max_age={max_age}, limit={limit}")
@@ -257,13 +260,14 @@ async def get_fresh_clips(
 
 
 @router.get("/status", response_model=RadarStatusResponse)
-async def get_radar_status():
+async def get_radar_status(
+    service: ClipRadarServiceDep = None,
+):
     """
     Get clip radar status and configuration.
     
     Shows last poll time and tracked categories.
     """
-    service = get_clip_radar_service()
     last_poll = service.get_last_poll_time()
     
     return RadarStatusResponse(
@@ -278,7 +282,9 @@ async def get_radar_status():
 
 
 @router.post("/poll", response_model=PollResultResponse)
-async def trigger_poll():
+async def trigger_poll(
+    service: ClipRadarServiceDep = None,
+):
     """
     Manually trigger a clip radar poll.
     
@@ -287,7 +293,6 @@ async def trigger_poll():
     
     Returns detailed results including any failed categories.
     """
-    service = get_clip_radar_service()
     
     try:
         results = await service.poll_clips()
@@ -328,7 +333,9 @@ async def trigger_poll():
 
 
 @router.get("/health", response_model=RadarHealthResponse)
-async def get_radar_health():
+async def get_radar_health(
+    service: ClipRadarServiceDep = None,
+):
     """
     Get clip radar health status.
     
@@ -346,7 +353,6 @@ async def get_radar_health():
     - no_data: No poll data available
     - error: Error retrieving health status
     """
-    service = get_clip_radar_service()
     health = service.get_poll_health()
     return RadarHealthResponse(**health)
 
@@ -368,6 +374,7 @@ async def get_tracked_categories():
 @router.post("/cleanup")
 async def trigger_cleanup(
     max_age_hours: int = Query(24, ge=1, le=168, description="Maximum age in hours for data to keep"),
+    service: ClipRadarServiceDep = None,
 ):
     """
     Manually trigger cleanup of old clip data from Redis.
@@ -375,7 +382,6 @@ async def trigger_cleanup(
     Removes clip tracking data older than the specified age.
     This helps prevent Redis memory from growing unbounded.
     """
-    service = get_clip_radar_service()
     
     try:
         await service.cleanup_old_data(max_age_hours=max_age_hours)
@@ -448,6 +454,7 @@ class RecapListResponse(BaseModel):
 @router.get("/recaps", response_model=RecapListResponse)
 async def get_recent_recaps(
     days: int = Query(7, ge=1, le=30, description="Number of days to fetch"),
+    service: RecapServiceDep = None,
 ):
     """
     Get recent daily recaps.
@@ -455,10 +462,7 @@ async def get_recent_recaps(
     Returns compressed summaries of clip radar data for previous days.
     Each recap includes top clips and category breakdowns.
     """
-    from backend.services.clip_radar.recap_service import get_recap_service
-    
     try:
-        service = get_recap_service()
         recaps = await service.get_recent_recaps(days=days)
         
         return RecapListResponse(
@@ -489,20 +493,18 @@ async def get_recent_recaps(
 @router.get("/recaps/{recap_date}", response_model=DailyRecapResponse)
 async def get_recap_by_date(
     recap_date: str = Path(..., description="Date in YYYY-MM-DD format"),
+    service: RecapServiceDep = None,
 ):
     """
     Get a specific daily recap by date.
     
     Returns the compressed summary for a specific day.
     """
-    from backend.services.clip_radar.recap_service import get_recap_service
-    
     try:
         parsed_date = date.fromisoformat(recap_date)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
-    service = get_recap_service()
     recap = await service.get_recap(parsed_date)
     
     if not recap:
@@ -528,6 +530,7 @@ async def get_recap_by_date(
 async def get_category_recap(
     recap_date: str = Path(..., description="Date in YYYY-MM-DD format"),
     game_id: str = Path(..., description="Twitch game ID"),
+    service: RecapServiceDep = None,
 ):
     """
     Get category-specific recap for a date.
@@ -535,14 +538,11 @@ async def get_category_recap(
     Returns detailed stats for a specific game/category including
     hourly activity breakdown and top clips.
     """
-    from backend.services.clip_radar.recap_service import get_recap_service
-    
     try:
         parsed_date = date.fromisoformat(recap_date)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
-    service = get_recap_service()
     recap = await service.get_category_recap(parsed_date, game_id)
     
     if not recap:
@@ -569,6 +569,7 @@ async def get_category_recap(
 @router.post("/recaps/create")
 async def trigger_recap_creation(
     recap_date: Optional[str] = Query(None, description="Date to create recap for (YYYY-MM-DD)"),
+    service: RecapServiceDep = None,
 ):
     """
     Manually trigger recap creation.
@@ -576,10 +577,6 @@ async def trigger_recap_creation(
     Normally runs automatically at 6am UTC daily.
     Use this for testing or to force creation of a specific date's recap.
     """
-    from backend.services.clip_radar.recap_service import get_recap_service
-    
-    service = get_recap_service()
-    
     if recap_date:
         try:
             parsed_date = date.fromisoformat(recap_date)

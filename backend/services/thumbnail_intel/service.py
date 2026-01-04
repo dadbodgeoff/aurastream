@@ -5,10 +5,12 @@ Main orchestrator that coordinates thumbnail collection,
 vision analysis, and storage.
 """
 
+import gc
 import logging
 import asyncio
 import time
-from typing import List, Dict, Optional
+from contextlib import contextmanager
+from typing import List, Dict, Optional, Generator
 
 from backend.services.thumbnail_intel.collector import (
     ThumbnailCollector,
@@ -27,6 +29,35 @@ from backend.services.thumbnail_intel.repository import (
 from backend.services.thumbnail_intel.constants import GAMING_CATEGORIES
 
 logger = logging.getLogger(__name__)
+
+# Memory management constants
+BATCH_SIZE = 10  # Process 10 thumbnails at a time to limit memory usage
+
+
+@contextmanager
+def managed_image_buffer(initial_data: Optional[List[Optional[bytes]]] = None) -> Generator[List[Optional[bytes]], None, None]:
+    """
+    Context manager for image data to ensure cleanup.
+    
+    Ensures all image bytes are cleared from memory when exiting the context,
+    even if an exception occurs.
+    
+    Args:
+        initial_data: Optional initial list of image bytes
+        
+    Yields:
+        List to store image bytes
+    """
+    buffer: List[Optional[bytes]] = initial_data if initial_data is not None else []
+    try:
+        yield buffer
+    finally:
+        # Clear all image data from memory
+        for i in range(len(buffer)):
+            buffer[i] = None
+        buffer.clear()
+        del buffer
+        gc.collect()
 
 
 class ThumbnailIntelService:
@@ -113,6 +144,10 @@ class ThumbnailIntelService:
         """
         Analyze thumbnails for a single category.
         
+        Downloads and processes images in batches to prevent memory buildup.
+        Uses context manager pattern to ensure cleanup even on errors.
+        Forces garbage collection after each batch.
+        
         Args:
             category_key: Category identifier
             thumbnails: List of ThumbnailData to analyze
@@ -123,23 +158,58 @@ class ThumbnailIntelService:
         category_config = GAMING_CATEGORIES.get(category_key, {})
         category_name = category_config.get("name", category_key)
         
-        # Download thumbnail images
-        logger.info(f"Downloading {len(thumbnails)} thumbnails for {category_key}...")
-        thumbnail_images = []
+        # Process thumbnails in batches to limit memory usage
+        logger.info(f"Processing {len(thumbnails)} thumbnails for {category_key} in batches of {BATCH_SIZE}...")
         
-        for thumb in thumbnails:
-            img_bytes = await self.collector.download_thumbnail(thumb.thumbnail_url_hq)
-            thumbnail_images.append(img_bytes)
-            await asyncio.sleep(0.2)  # Rate limit downloads
+        with managed_image_buffer() as all_thumbnail_images:
+            for batch_start in range(0, len(thumbnails), BATCH_SIZE):
+                batch_end = min(batch_start + BATCH_SIZE, len(thumbnails))
+                batch = thumbnails[batch_start:batch_end]
+                batch_num = (batch_start // BATCH_SIZE) + 1
+                total_batches = (len(thumbnails) + BATCH_SIZE - 1) // BATCH_SIZE
+                
+                logger.debug(f"Processing batch {batch_num}/{total_batches} for {category_key}")
+                
+                # Process batch with its own managed buffer
+                with managed_image_buffer() as batch_images:
+                    for i, thumb in enumerate(batch):
+                        try:
+                            # Download single thumbnail
+                            img_bytes = await self.collector.download_thumbnail(thumb.thumbnail_url_hq)
+                            batch_images.append(img_bytes)
+                            
+                            logger.debug(
+                                f"Downloaded thumbnail {batch_start + i + 1}/{len(thumbnails)} "
+                                f"for {category_key}"
+                            )
+                            
+                            await asyncio.sleep(0.2)  # Rate limit downloads
+                            
+                        except Exception as e:
+                            logger.warning(
+                                f"Failed to download thumbnail {batch_start + i + 1} "
+                                f"for {category_key}: {e}"
+                            )
+                            batch_images.append(None)
+                    
+                    # Copy batch results to main list before batch buffer is cleared
+                    all_thumbnail_images.extend(batch_images[:])
+                
+                # Force garbage collection after each batch to free memory
+                gc.collect()
+                logger.debug(f"Completed batch {batch_num}/{total_batches}, memory cleaned up")
+            
+            # Analyze with Gemini Vision
+            logger.info(f"Analyzing thumbnails for {category_key} with Gemini Vision...")
+            insight = await self.analyzer.analyze_category_thumbnails(
+                category_key=category_key,
+                category_name=category_name,
+                thumbnails=thumbnails,
+                thumbnail_images=all_thumbnail_images,
+            )
         
-        # Analyze with Gemini Vision
-        logger.info(f"Analyzing thumbnails for {category_key} with Gemini Vision...")
-        insight = await self.analyzer.analyze_category_thumbnails(
-            category_key=category_key,
-            category_name=category_name,
-            thumbnails=thumbnails,
-            thumbnail_images=thumbnail_images,
-        )
+        # Final garbage collection after analysis complete
+        gc.collect()
         
         return insight
     

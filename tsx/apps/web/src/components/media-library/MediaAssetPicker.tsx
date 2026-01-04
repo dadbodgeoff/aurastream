@@ -10,7 +10,9 @@ import {
   type MediaAssetType,
 } from '@aurastream/api-client';
 import { ASSET_TYPE_ICONS, ASSET_TYPE_COLORS } from './constants';
-import { PlacementModal, createDefaultPlacement, getCanvasDimensions, type AssetPlacement } from './placement';
+import { PlacementModal, type AssetPlacement } from './placement';
+import { CanvasStudioModal } from './CanvasStudioModal';
+import type { AnySketchElement } from './canvas-export/types';
 
 interface MediaAssetPickerProps {
   selectedAssets: MediaAsset[];
@@ -19,6 +21,10 @@ interface MediaAssetPickerProps {
   placements?: AssetPlacement[];
   /** Callback when placements change */
   onPlacementsChange?: (placements: AssetPlacement[]) => void;
+  /** Sketch elements for annotations */
+  sketchElements?: AnySketchElement[];
+  /** Callback when sketch elements change */
+  onSketchElementsChange?: (elements: AnySketchElement[]) => void;
   /** Asset type being created (for canvas dimensions) */
   assetType?: string;
   maxAssets?: number;
@@ -54,9 +60,18 @@ function LockIcon() {
 
 function LayoutIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="3" width="18" height="18" rx="2" />
       <path d="M3 9h18M9 21V9" />
+    </svg>
+  );
+}
+
+function PenIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 19l7-7 3 3-7 7-3-3z" />
+      <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
     </svg>
   );
 }
@@ -74,17 +89,17 @@ function ImageIcon() {
 /**
  * Asset picker for injecting media into prompts.
  * 
- * Used in Create, Quick Create, Coach, and Thumbnail Recreation flows.
- * Limited to MAX_PROMPT_INJECTION_ASSETS (2) per prompt.
- * Pro/Studio only.
- * 
- * Now includes optional placement canvas for precise positioning.
+ * After selecting assets, users can choose between:
+ * 1. Simple Mode - Just position and resize assets
+ * 2. Canvas Studio - Full editor with sketch/annotation tools
  */
 export function MediaAssetPicker({
   selectedAssets,
   onSelectionChange,
   placements,
   onPlacementsChange,
+  sketchElements,
+  onSketchElementsChange,
   assetType = 'thumbnail',
   maxAssets = MAX_PROMPT_INJECTION_ASSETS,
   allowedTypes,
@@ -92,6 +107,7 @@ export function MediaAssetPicker({
 }: MediaAssetPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPlacementOpen, setIsPlacementOpen] = useState(false);
+  const [isCanvasStudioOpen, setIsCanvasStudioOpen] = useState(false);
   const [filterType, setFilterType] = useState<MediaAssetType | undefined>();
   
   const { data: access, isLoading: accessLoading } = useMediaAccess();
@@ -104,17 +120,14 @@ export function MediaAssetPicker({
 
   const handleSelect = useCallback((asset: MediaAsset) => {
     if (selectedAssets.find(a => a.id === asset.id)) {
-      // Deselect
       onSelectionChange(selectedAssets.filter(a => a.id !== asset.id));
     } else if (selectedAssets.length < maxAssets) {
-      // Select
       onSelectionChange([...selectedAssets, asset]);
     }
   }, [selectedAssets, maxAssets, onSelectionChange]);
 
   const handleRemove = useCallback((assetId: string) => {
     onSelectionChange(selectedAssets.filter(a => a.id !== assetId));
-    // Also remove from placements if present
     if (onPlacementsChange && placements) {
       onPlacementsChange(placements.filter(p => p.assetId !== assetId));
     }
@@ -126,12 +139,19 @@ export function MediaAssetPicker({
     }
   }, [onPlacementsChange]);
 
-  // Check if placement is configured for an asset
+  const handleCanvasStudioSave = useCallback((newPlacements: AssetPlacement[], newSketchElements: AnySketchElement[]) => {
+    if (onPlacementsChange) {
+      onPlacementsChange(newPlacements);
+    }
+    if (onSketchElementsChange) {
+      onSketchElementsChange(newSketchElements);
+    }
+  }, [onPlacementsChange, onSketchElementsChange]);
+
   const hasPlacement = useCallback((assetId: string) => {
     return placements?.some(p => p.assetId === assetId) ?? false;
   }, [placements]);
 
-  // Filter types if specified
   const availableTypes = allowedTypes || [
     'face', 'logo', 'character', 'background', 'reference', 'object', 'game_skin'
   ];
@@ -155,6 +175,8 @@ export function MediaAssetPicker({
       </div>
     );
   }
+
+  const hasContent = (placements && placements.length > 0) || (sketchElements && sketchElements.length > 0);
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -182,7 +204,7 @@ export function MediaAssetPicker({
               </span>
               {placed && (
                 <span className="text-micro text-emerald-400 flex items-center gap-0.5">
-                  <LayoutIcon />
+                  ✓
                 </span>
               )}
               <button
@@ -207,25 +229,50 @@ export function MediaAssetPicker({
         )}
       </div>
 
-      {/* Set Placement Button - Only show when assets are selected and placement is supported */}
+      {/* TWO MODE BUTTONS - Only show when assets are selected */}
       {selectedAssets.length > 0 && onPlacementsChange && (
-        <button
-          onClick={() => setIsPlacementOpen(true)}
-          className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all w-full justify-center',
-            placements && placements.length > 0
-              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
-              : 'bg-background-elevated border border-border-subtle text-text-secondary hover:bg-background-surface hover:text-text-primary'
-          )}
-        >
-          <LayoutIcon />
-          <span>
-            {placements && placements.length > 0
-              ? `Placement Set (${placements.length} asset${placements.length > 1 ? 's' : ''})`
-              : 'Set Precise Placement'
-            }
-          </span>
-        </button>
+        <div className="flex gap-2">
+          {/* Simple Mode - Position Only */}
+          <button
+            onClick={() => setIsPlacementOpen(true)}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all',
+              placements && placements.length > 0 && !sketchElements?.length
+                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                : 'border-border-subtle bg-background-surface text-text-secondary hover:border-interactive-500 hover:text-text-primary'
+            )}
+          >
+            <LayoutIcon />
+            <div className="text-left">
+              <p className="font-medium text-sm">Simple</p>
+              <p className="text-xs opacity-70">Position & resize</p>
+            </div>
+          </button>
+
+          {/* Canvas Studio - Full Editor */}
+          <button
+            onClick={() => setIsCanvasStudioOpen(true)}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all',
+              sketchElements && sketchElements.length > 0
+                ? 'border-interactive-500 bg-interactive-500/10 text-interactive-400'
+                : 'border-border-subtle bg-background-surface text-text-secondary hover:border-interactive-500 hover:text-text-primary'
+            )}
+          >
+            <PenIcon />
+            <div className="text-left">
+              <p className="font-medium text-sm">Canvas Studio</p>
+              <p className="text-xs opacity-70">Full editor + sketch</p>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Status indicator */}
+      {hasContent && (
+        <p className="text-xs text-text-muted text-center">
+          {placements?.length || 0} positioned • {sketchElements?.length || 0} sketches
+        </p>
       )}
 
       {/* Picker Modal */}
@@ -368,17 +415,26 @@ export function MediaAssetPicker({
         </div>
       )}
 
-      {/* Placement Modal */}
-      {onPlacementsChange && (
-        <PlacementModal
-          isOpen={isPlacementOpen}
-          onClose={() => setIsPlacementOpen(false)}
-          assetType={assetType}
-          assets={selectedAssets}
-          initialPlacements={placements}
-          onSave={handleSavePlacements}
-        />
-      )}
+      {/* Simple Placement Modal */}
+      <PlacementModal
+        isOpen={isPlacementOpen}
+        onClose={() => setIsPlacementOpen(false)}
+        assetType={assetType}
+        assets={selectedAssets}
+        initialPlacements={placements}
+        onSave={handleSavePlacements}
+      />
+
+      {/* Full Canvas Studio Modal */}
+      <CanvasStudioModal
+        isOpen={isCanvasStudioOpen}
+        onClose={() => setIsCanvasStudioOpen(false)}
+        assetType={assetType}
+        assets={selectedAssets}
+        initialPlacements={placements}
+        initialSketchElements={sketchElements}
+        onSave={handleCanvasStudioSave}
+      />
     </div>
   );
 }

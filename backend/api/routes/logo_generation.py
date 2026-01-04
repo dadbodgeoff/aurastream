@@ -9,10 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from backend.api.middleware.auth import get_current_user, TokenPayload
+from backend.api.service_dependencies import LogoGenerationServiceDep
 from backend.services.logo_generation_service import (
-    get_logo_generation_service,
     LogoGenerationRequest,
-    LogoVibe,
     VALID_ICONS,
 )
 from backend.services.exceptions import ValidationError
@@ -89,9 +88,10 @@ class LogoPreviewResponse(BaseModel):
     summary="Get available logo styles",
     description="Returns all available logo vibes/styles with descriptions."
 )
-async def get_logo_vibes():
+async def get_logo_vibes(
+    service: LogoGenerationServiceDep,
+):
     """Get all available logo generation styles."""
-    service = get_logo_generation_service()
     vibes = service.get_available_vibes()
     
     return LogoVibesResponse(
@@ -116,9 +116,10 @@ async def get_logo_icons():
     summary="Get logo form schema",
     description="Returns the form configuration for logo generation UI."
 )
-async def get_logo_form_schema():
+async def get_logo_form_schema(
+    service: LogoGenerationServiceDep,
+):
     """Get the form schema for dynamic UI generation."""
-    service = get_logo_generation_service()
     placeholders = service.get_form_schema()
     
     return LogoFormSchemaResponse(placeholders=placeholders)
@@ -133,14 +134,13 @@ async def get_logo_form_schema():
 async def preview_logo_prompt(
     request: LogoPreviewRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: LogoGenerationServiceDep = None,
 ):
     """
     Preview the generated prompt without starting generation.
     
     Useful for users to see what prompt will be sent to AI.
     """
-    service = get_logo_generation_service()
-    
     try:
         gen_request = LogoGenerationRequest(
             name=request.name,
@@ -177,14 +177,13 @@ async def preview_logo_prompt(
 async def generate_logo(
     request: GenerateLogoRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: LogoGenerationServiceDep = None,
 ):
     """
     Generate a logo/PFP asset.
     
     Creates a generation job and returns the job ID for tracking.
     """
-    service = get_logo_generation_service()
-    
     try:
         gen_request = LogoGenerationRequest(
             name=request.name,

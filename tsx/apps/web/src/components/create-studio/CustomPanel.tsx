@@ -2,14 +2,14 @@
  * CustomPanel Component
  * 
  * Wrapper for CreatePageContent in the Create Studio.
- * Provides the "Build Your Own" prompt experience.
+ * Provides the "Build Your Own" prompt experience with integrated AI Coach.
  * 
  * @module create-studio/CustomPanel
  */
 
 'use client';
 
-import { Suspense, lazy, useCallback } from 'react';
+import { Suspense, lazy } from 'react';
 import { cn } from '@/lib/utils';
 import type { CustomPanelProps } from './types';
 
@@ -79,13 +79,12 @@ function CustomPanelSkeleton() {
  * Wraps the existing CreatePageContent component with:
  * - Lazy loading for performance
  * - Loading skeleton
- * - Coach navigation callback
+ * - Integrated AI Coach (no longer separate tab)
  * 
  * @example
  * ```tsx
  * <CustomPanel
  *   onGenerationStart={(jobId) => console.log('Started:', jobId)}
- *   onSwitchToCoach={() => setMode('coach')}
  * />
  * ```
  */
@@ -94,10 +93,8 @@ export function CustomPanel({
   onSwitchToCoach,
   className,
 }: CustomPanelProps) {
-  // Handle navigation to coach from within CreatePageContent
-  const handleNavigateToCoach = useCallback(() => {
-    onSwitchToCoach?.();
-  }, [onSwitchToCoach]);
+  // Note: onSwitchToCoach is no longer used since Coach is integrated into CreatePageContent
+  // Keeping the prop for backwards compatibility but it's a no-op now
 
   return (
     <div 
@@ -108,7 +105,6 @@ export function CustomPanel({
     >
       <Suspense fallback={<CustomPanelSkeleton />}>
         <CreatePageContent
-          onNavigateToCoach={handleNavigateToCoach}
           testId="create-studio-custom-panel"
         />
       </Suspense>

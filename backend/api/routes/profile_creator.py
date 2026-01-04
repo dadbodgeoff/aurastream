@@ -16,6 +16,7 @@ Rate Limits:
 """
 
 import json
+import uuid
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import StreamingResponse
@@ -32,9 +33,15 @@ from backend.api.schemas.profile_creator import (
     GalleryItemResponse,
 )
 from backend.services.jwt_service import TokenPayload
-from backend.services.profile_creator_service import get_profile_creator_service
-from backend.services.usage_limit_service import get_usage_limit_service
-from backend.services.audit_service import get_audit_service
+from backend.api.service_dependencies import (
+    ProfileCreatorServiceDep,
+    UsageLimitServiceDep,
+    AuditServiceDep,
+    GenerationServiceDep,
+    get_usage_limit_service_dep,
+    get_audit_service_dep,
+    get_profile_creator_service_dep,
+)
 
 
 router = APIRouter()
@@ -46,7 +53,7 @@ router = APIRouter()
 
 async def check_profile_creator_access(user_id: str) -> dict:
     """Check if user can use profile creator."""
-    service = get_usage_limit_service()
+    service = get_usage_limit_service_dep()
     check = await service.check_limit(user_id, "profile_creator")
     
     return {
@@ -61,7 +68,7 @@ async def check_profile_creator_access(user_id: str) -> dict:
 
 async def increment_profile_creator_usage(user_id: str) -> None:
     """Increment profile creator usage counter."""
-    service = get_usage_limit_service()
+    service = get_usage_limit_service_dep()
     await service.increment(user_id, "profile_creator")
 
 
@@ -128,6 +135,8 @@ async def start_session(
     request: Request,
     data: StartProfileCreatorRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: ProfileCreatorServiceDep = None,
+    audit_service: AuditServiceDep = None,
 ):
     """Start a profile creator session with SSE streaming."""
     # Check usage limit
@@ -148,7 +157,6 @@ async def start_session(
     await increment_profile_creator_usage(current_user.sub)
     
     # Audit log
-    audit_service = get_audit_service()
     await audit_service.log(
         user_id=current_user.sub,
         action="profile_creator.session_start",
@@ -162,16 +170,38 @@ async def start_session(
         ip_address=request.client.host if request.client else None,
     )
     
-    # Get service
-    service = get_profile_creator_service()
-    
     # Convert brand context to dict
     brand_context = None
     if data.brand_context:
         brand_context = data.brand_context.model_dump()
     
+    # Generate stream ID for tracking
+    stream_id = f"profile:start:{uuid.uuid4().hex[:8]}"
+    
+    # Import SSE services
+    from backend.services.sse import (
+        get_stream_registry,
+        get_completion_store,
+        StreamType,
+    )
+    registry = get_stream_registry()
+    completion_store = get_completion_store()
+    
     async def generate_sse():
         """Generate SSE events from the service."""
+        event_counter = 0
+        
+        # Register stream
+        try:
+            await registry.register(
+                stream_id=stream_id,
+                stream_type=StreamType.PROFILE_START,
+                user_id=current_user.sub,
+                metadata={"creation_type": data.creation_type, "style_preset": data.style_preset},
+            )
+        except Exception:
+            pass
+        
         try:
             async for chunk in service.start_session(
                 user_id=current_user.sub,
@@ -180,7 +210,9 @@ async def start_session(
                 initial_description=data.initial_description,
                 style_preset=data.style_preset,
             ):
+                event_counter += 1
                 event_data = {
+                    "id": f"{stream_id}:{event_counter}",
                     "type": chunk.type,
                     "content": chunk.content,
                 }
@@ -188,8 +220,27 @@ async def start_session(
                     event_data["metadata"] = chunk.metadata
                 
                 yield f"data: {json.dumps(event_data)}\n\n"
+                await registry.heartbeat(stream_id)
+                
+                # Store completion on done event
+                if chunk.type == "done":
+                    await completion_store.store_completion(stream_id, "done", event_data)
+                    
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            event_counter += 1
+            error_data = {
+                "id": f"{stream_id}:{event_counter}",
+                "type": "error",
+                "content": str(e),
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            await completion_store.store_completion(stream_id, "error", error_data)
+            
+        finally:
+            try:
+                await registry.unregister(stream_id)
+            except Exception:
+                pass
     
     return StreamingResponse(
         generate_sse(),
@@ -198,6 +249,7 @@ async def start_session(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Stream-ID": stream_id,
         },
     )
 
@@ -223,19 +275,46 @@ async def continue_session(
     session_id: str,
     data: ContinueSessionRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: ProfileCreatorServiceDep = None,
 ):
     """Continue a profile creator session with SSE streaming."""
-    service = get_profile_creator_service()
+    
+    # Generate stream ID for tracking
+    stream_id = f"profile:{session_id}:{uuid.uuid4().hex[:8]}"
+    
+    # Import SSE services
+    from backend.services.sse import (
+        get_stream_registry,
+        get_completion_store,
+        StreamType,
+    )
+    registry = get_stream_registry()
+    completion_store = get_completion_store()
     
     async def generate_sse():
         """Generate SSE events."""
+        event_counter = 0
+        
+        # Register stream
+        try:
+            await registry.register(
+                stream_id=stream_id,
+                stream_type=StreamType.PROFILE_CONTINUE,
+                user_id=current_user.sub,
+                metadata={"session_id": session_id},
+            )
+        except Exception:
+            pass
+        
         try:
             async for chunk in service.continue_session(
                 session_id=session_id,
                 user_id=current_user.sub,
                 message=data.message,
             ):
+                event_counter += 1
                 event_data = {
+                    "id": f"{stream_id}:{event_counter}",
                     "type": chunk.type,
                     "content": chunk.content,
                 }
@@ -243,8 +322,27 @@ async def continue_session(
                     event_data["metadata"] = chunk.metadata
                 
                 yield f"data: {json.dumps(event_data)}\n\n"
+                await registry.heartbeat(stream_id)
+                
+                # Store completion on done event
+                if chunk.type == "done":
+                    await completion_store.store_completion(stream_id, "done", event_data)
+                    
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            event_counter += 1
+            error_data = {
+                "id": f"{stream_id}:{event_counter}",
+                "type": "error",
+                "content": str(e),
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+            await completion_store.store_completion(stream_id, "error", error_data)
+            
+        finally:
+            try:
+                await registry.unregister(stream_id)
+            except Exception:
+                pass
     
     return StreamingResponse(
         generate_sse(),
@@ -253,6 +351,7 @@ async def continue_session(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Stream-ID": stream_id,
         },
     )
 
@@ -269,9 +368,9 @@ async def continue_session(
 async def get_session(
     session_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: ProfileCreatorServiceDep = None,
 ) -> SessionStateResponse:
     """Get the current state of a profile creator session."""
-    service = get_profile_creator_service()
     session = await service.get_session(session_id, current_user.sub)
     
     if not session:
@@ -321,14 +420,15 @@ async def generate_from_session(
     session_id: str,
     data: GenerateFromSessionRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: ProfileCreatorServiceDep = None,
+    audit_service: AuditServiceDep = None,
+    generation_service: GenerationServiceDep = None,
 ) -> GenerationResultResponse:
     """Generate asset from a profile creator session."""
-    from backend.services.generation_service import get_generation_service
     from backend.workers.generation_worker import enqueue_generation_job
     from datetime import datetime
     
     # Get session
-    service = get_profile_creator_service()
     session = await service.get_session(session_id, current_user.sub)
     
     if not session:
@@ -350,9 +450,6 @@ async def generate_from_session(
         "large": 1024,
     }
     size_px = size_map.get(data.output_size, 512)
-    
-    # Create generation job
-    generation_service = get_generation_service()
     
     # Build parameters
     parameters = {
@@ -384,7 +481,6 @@ async def generate_from_session(
     enqueue_generation_job(job.id, current_user.sub)
     
     # Audit log
-    audit_service = get_audit_service()
     await audit_service.log(
         user_id=current_user.sub,
         action="profile_creator.generate",

@@ -157,9 +157,16 @@ class TestCreativeDirectorService:
         assert service._check_intent_ready(response) is True
     
     def test_check_intent_ready_detects_ready_phrase(self, service):
-        """Test detecting 'Ready to create' phrase."""
-        response = "Got it! So we're going for a hype celebration. Ready to create?"
+        """Test detecting 'Ready to create!' statement (not question)."""
+        # Statement with exclamation mark IS ready
+        response = "Got it! So we're going for a hype celebration. Ready to create!"
         assert service._check_intent_ready(response) is True
+    
+    def test_check_intent_ready_question_not_ready(self, service):
+        """Test that 'Ready to create?' question is NOT ready."""
+        # Question mark means the coach is asking, not stating readiness
+        response = "Got it! So we're going for a hype celebration. Ready to create?"
+        assert service._check_intent_ready(response) is False
     
     def test_check_intent_ready_detects_perfect_emoji(self, service):
         """Test detecting ✨ Perfect phrase."""

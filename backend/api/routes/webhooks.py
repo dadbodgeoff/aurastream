@@ -16,11 +16,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request, HTTPException, status, Header
 
-from backend.services.stripe_service import get_stripe_service, StripeWebhookError
-from backend.services.subscription_service import get_subscription_service
-from backend.services.promo_service import get_promo_service
+from backend.api.service_dependencies import (
+    StripeServiceDep,
+    SubscriptionServiceDep,
+    PromoServiceDep,
+    WebhookQueueDep,
+)
+from backend.services.stripe_service import StripeWebhookError
 from backend.services.webhook_queue import (
-    get_webhook_queue,
     WebhookEventTooOldError,
     WebhookEventDuplicateError,
 )
@@ -35,6 +38,10 @@ logger = logging.getLogger(__name__)
 async def handle_stripe_webhook(
     request: Request,
     stripe_signature: str = Header(None, alias="Stripe-Signature"),
+    stripe_service: StripeServiceDep = None,
+    subscription_service: SubscriptionServiceDep = None,
+    promo_service: PromoServiceDep = None,
+    webhook_queue: WebhookQueueDep = None,
 ):
     """
     Handle incoming Stripe webhook events.
@@ -68,12 +75,6 @@ async def handle_stripe_webhook(
     """
     # Get raw request body for signature verification
     payload = await request.body()
-    
-    # Get services
-    stripe_service = get_stripe_service()
-    subscription_service = get_subscription_service()
-    promo_service = get_promo_service()
-    webhook_queue = get_webhook_queue()
     
     # 1. Verify webhook signature
     try:

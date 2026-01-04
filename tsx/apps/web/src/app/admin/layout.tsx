@@ -1,58 +1,37 @@
 'use client';
 
-import { useAuth } from '@aurastream/shared';
+import { ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import Link from 'next/link';
+import { useAuth } from '@aurastream/shared';
 
 const ADMIN_EMAIL = 'dadbodgeoff@gmail.com';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading && (!user || user.email !== ADMIN_EMAIL)) {
-      router.push('/dashboard');
+    if (!isLoading && (!isAuthenticated || user?.email !== ADMIN_EMAIL)) {
+      router.replace('/intel');
     }
-  }, [user, isLoading, router]);
+  }, [isLoading, isAuthenticated, user, router]);
 
+  // Show nothing while checking auth
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background-base flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-interactive-600 border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
       </div>
     );
   }
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  // Don't render if not admin
+  if (!isAuthenticated || user?.email !== ADMIN_EMAIL) {
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-background-base">
-      {/* Admin Nav */}
-      <nav className="bg-background-elevated border-b border-border-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-6">
-              <Link href="/dashboard" className="text-text-secondary hover:text-text-primary transition-colors">
-                ← Back to App
-              </Link>
-              <span className="text-text-muted">|</span>
-              <span className="text-sm font-semibold text-interactive-500">Admin Panel</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/admin/analytics" 
-                className="text-sm text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Analytics
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-900">
       {children}
     </div>
   );

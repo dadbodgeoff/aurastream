@@ -11,7 +11,7 @@ Filters: English-only, long-form content (no Shorts).
 import logging
 import asyncio
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
@@ -23,6 +23,9 @@ from backend.services.thumbnail_intel.constants import (
 from backend.services.trends import get_youtube_collector
 
 logger = logging.getLogger(__name__)
+
+# Memory management constants
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB max per image to prevent memory issues
 
 
 def _is_english_text(text: str) -> bool:
@@ -124,71 +127,89 @@ class ThumbnailCollector:
         """
         Collect thumbnails for a category using search.
         
-        Uses the first search query for the category to get relevant videos.
-        Filters out Shorts (< 60 seconds) since thumbnails don't matter for those.
+        Uses ALL search queries for the category to maximize coverage.
+        Prioritizes long-form content but falls back to Shorts if needed.
         """
-        all_videos: List[ThumbnailData] = []
+        long_form_videos: List[ThumbnailData] = []
+        shorts_videos: List[ThumbnailData] = []
         seen_video_ids = set()
         
-        # Use the first search query for this category
+        # Use all search queries for this category
         search_queries = category_config.get("search_queries", [])
         if not search_queries:
             logger.warning(f"No search queries for {category_key}")
             return []
         
-        # Use first query - most specific
-        query = search_queries[0]
-        
-        try:
-            logger.info(f"Searching for {category_key}: '{query}'")
-            videos = await self.youtube.search_videos(
-                query=query,
-                category="gaming",
-                max_results=20,  # Fetch more to account for Shorts filtering
-                order="viewCount",  # Get highest view count videos
-            )
+        # Try all queries to maximize coverage
+        for query in search_queries:
+            # Stop early if we have enough long-form
+            if len(long_form_videos) >= THUMBNAILS_PER_CATEGORY:
+                break
+                
+            try:
+                logger.info(f"Searching for {category_key}: '{query}'")
+                videos = await self.youtube.search_videos(
+                    query=query,
+                    category="gaming",
+                    max_results=50,  # Fetch more to account for filtering
+                    order="viewCount",  # Get highest view count videos
+                )
+                
+                for video in videos:
+                    if video.video_id in seen_video_ids:
+                        continue
+                    
+                    if video.view_count < MIN_VIEW_COUNT:
+                        continue
+                    
+                    # Skip non-English content
+                    if not _is_english_text(video.title):
+                        logger.debug(f"Skipping non-English: {video.title}")
+                        continue
+                    
+                    seen_video_ids.add(video.video_id)
+                    thumbnail_hq = self._get_hq_thumbnail_url(video.video_id)
+                    
+                    thumbnail_data = ThumbnailData(
+                        video_id=video.video_id,
+                        title=video.title,
+                        thumbnail_url=video.thumbnail,
+                        thumbnail_url_hq=thumbnail_hq,
+                        channel_title=video.channel_title,
+                        view_count=video.view_count,
+                        like_count=video.like_count,
+                        published_at=video.published_at,
+                        category_key=category_key,
+                        category_name=category_config["name"],
+                        tags=video.tags[:10] if video.tags else [],
+                    )
+                    
+                    # Separate long-form from Shorts
+                    is_short = video.is_short or (video.duration_seconds and video.duration_seconds < 60)
+                    if is_short:
+                        shorts_videos.append(thumbnail_data)
+                    else:
+                        long_form_videos.append(thumbnail_data)
+                    
+            except Exception as e:
+                logger.warning(f"Search failed for {category_key} query '{query}': {e}")
             
-            for video in videos:
-                if video.video_id in seen_video_ids:
-                    continue
-                
-                if video.view_count < MIN_VIEW_COUNT:
-                    continue
-                
-                # Skip Shorts - thumbnails don't matter for short-form content
-                # Shorts are typically under 60 seconds
-                if video.is_short or (video.duration_seconds and video.duration_seconds < 60):
-                    logger.debug(f"Skipping Short: {video.title} ({video.duration_seconds}s)")
-                    continue
-                
-                # Skip non-English content
-                if not _is_english_text(video.title):
-                    logger.debug(f"Skipping non-English: {video.title}")
-                    continue
-                
-                seen_video_ids.add(video.video_id)
-                thumbnail_hq = self._get_hq_thumbnail_url(video.video_id)
-                
-                all_videos.append(ThumbnailData(
-                    video_id=video.video_id,
-                    title=video.title,
-                    thumbnail_url=video.thumbnail,
-                    thumbnail_url_hq=thumbnail_hq,
-                    channel_title=video.channel_title,
-                    view_count=video.view_count,
-                    like_count=video.like_count,
-                    published_at=video.published_at,
-                    category_key=category_key,
-                    category_name=category_config["name"],
-                    tags=video.tags[:10] if video.tags else [],
-                ))
-                
-        except Exception as e:
-            logger.warning(f"Search failed for {category_key}: {e}")
+            # Small delay between queries to avoid rate limits
+            await asyncio.sleep(0.3)
         
-        # Sort by view count and take top N
-        all_videos.sort(key=lambda x: x.view_count, reverse=True)
-        return all_videos[:THUMBNAILS_PER_CATEGORY]
+        # Sort both lists by view count
+        long_form_videos.sort(key=lambda x: x.view_count, reverse=True)
+        shorts_videos.sort(key=lambda x: x.view_count, reverse=True)
+        
+        # Prioritize long-form, fill remaining slots with Shorts
+        result = long_form_videos[:THUMBNAILS_PER_CATEGORY]
+        if len(result) < THUMBNAILS_PER_CATEGORY:
+            remaining = THUMBNAILS_PER_CATEGORY - len(result)
+            result.extend(shorts_videos[:remaining])
+            if remaining > 0 and shorts_videos:
+                logger.info(f"Added {min(remaining, len(shorts_videos))} Shorts to fill {category_key} (had {len(long_form_videos)} long-form)")
+        
+        return result
     
     async def collect_category(
         self,
@@ -218,25 +239,48 @@ class ThumbnailCollector:
         """
         Download thumbnail image bytes.
         
+        Includes size limit check to prevent downloading huge images
+        that could cause memory issues.
+        
         Args:
             url: Thumbnail URL
             
         Returns:
-            Image bytes or None if download fails
+            Image bytes or None if download fails or image is too large
         """
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url)
                 
                 if response.status_code == 200:
-                    return response.content
+                    img_bytes = response.content
+                    
+                    # Check image size to prevent memory issues
+                    if len(img_bytes) > MAX_IMAGE_SIZE:
+                        logger.warning(
+                            f"Image too large ({len(img_bytes)} bytes, max {MAX_IMAGE_SIZE}), "
+                            f"skipping: {url}"
+                        )
+                        return None
+                    
+                    return img_bytes
                 
                 # Try fallback to hqdefault if maxres doesn't exist
                 if "maxresdefault" in url:
                     fallback_url = url.replace("maxresdefault", "hqdefault")
                     response = await client.get(fallback_url)
                     if response.status_code == 200:
-                        return response.content
+                        img_bytes = response.content
+                        
+                        # Check image size for fallback too
+                        if len(img_bytes) > MAX_IMAGE_SIZE:
+                            logger.warning(
+                                f"Fallback image too large ({len(img_bytes)} bytes, max {MAX_IMAGE_SIZE}), "
+                                f"skipping: {fallback_url}"
+                            )
+                            return None
+                        
+                        return img_bytes
                 
                 logger.warning(f"Failed to download thumbnail: {url} (status {response.status_code})")
                 return None

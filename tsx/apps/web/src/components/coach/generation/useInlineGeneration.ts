@@ -54,6 +54,10 @@ export interface GenerateOptions {
   mediaAssetIds?: string[];
   /** Media asset placements with precise positioning */
   mediaAssetPlacements?: SerializedPlacement[];
+  /** Canvas snapshot URL for single-image mode (more cost-effective for complex compositions) */
+  canvasSnapshotUrl?: string;
+  /** Canvas snapshot description for AI context */
+  canvasSnapshotDescription?: string;
 }
 
 import type { SerializedPlacement } from '@aurastream/api-client';
@@ -299,6 +303,9 @@ export function useInlineGeneration(
         // Pass media assets if provided
         mediaAssetIds: generateOptions.mediaAssetIds,
         mediaAssetPlacements: generateOptions.mediaAssetPlacements,
+        // Pass canvas snapshot if provided (more cost-effective for complex compositions)
+        canvasSnapshotUrl: generateOptions.canvasSnapshotUrl,
+        canvasSnapshotDescription: generateOptions.canvasSnapshotDescription,
       });
 
       if (!isMountedRef.current) {

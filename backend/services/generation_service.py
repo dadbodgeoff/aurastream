@@ -96,6 +96,7 @@ class Asset:
         is_public: Whether asset is publicly accessible
         viral_score: Optional viral potential score
         created_at: Asset creation timestamp
+        thought_signature: Optional Gemini thought signature for multi-turn refinements
     """
     id: str
     job_id: str
@@ -109,6 +110,7 @@ class Asset:
     is_public: bool
     viral_score: Optional[int]
     created_at: datetime
+    thought_signature: Optional[str] = None  # Base64 encoded
 
 
 # Asset dimensions for different asset types
@@ -205,6 +207,7 @@ class GenerationService:
             is_public=data["is_public"],
             viral_score=data.get("viral_score"),
             created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")) if isinstance(data["created_at"], str) else data["created_at"],
+            thought_signature=data.get("thought_signature"),
         )
     
     def _validate_state_transition(
@@ -240,6 +243,11 @@ class GenerationService:
         asset_type: str,
         custom_prompt: Optional[str] = None,
         parameters: Optional[dict] = None,
+        media_asset_ids: Optional[list[str]] = None,
+        media_asset_placements: Optional[list[dict]] = None,
+        canvas_snapshot_url: Optional[str] = None,
+        canvas_snapshot_description: Optional[str] = None,
+        user_tier: str = "free",
     ) -> GenerationJob:
         """
         Create a new generation job.
@@ -250,6 +258,11 @@ class GenerationService:
             asset_type: Type of asset to generate
             custom_prompt: Optional custom prompt addition
             parameters: Optional additional parameters (logo options, etc.)
+            media_asset_ids: Optional list of media asset IDs to inject
+            media_asset_placements: Optional list of media asset placement configs
+            canvas_snapshot_url: Optional URL of canvas snapshot for single-image mode
+            canvas_snapshot_description: Optional description of canvas contents for AI context
+            user_tier: User's subscription tier
             
         Returns:
             Created GenerationJob with generated ID
@@ -334,12 +347,29 @@ class GenerationService:
             f"Brand Kit Data: {brand_kit if brand_kit else 'None'}\n"
             f"Custom Prompt Input: {custom_prompt[:200] if custom_prompt else 'None'}...\n"
             f"Parameters: {parameters}\n"
+            f"Media Asset IDs: {media_asset_ids}\n"
             f"Final Prompt to Nano Banana:\n"
             f"{'='*50}\n"
             f"{prompt}\n"
             f"{'='*50}\n"
             "=== END GENERATION PROMPT ==="
         )
+        
+        # Include media assets in parameters if provided
+        if parameters is None:
+            parameters = {}
+        if media_asset_ids:
+            parameters["media_asset_ids"] = media_asset_ids
+        if media_asset_placements:
+            parameters["media_asset_placements"] = media_asset_placements
+        
+        # Include canvas snapshot data if provided (single-image mode)
+        if canvas_snapshot_url:
+            parameters["canvas_snapshot_url"] = canvas_snapshot_url
+            logger.info(f"[CANVAS DEBUG] create_job: canvas_snapshot_url set in parameters: {canvas_snapshot_url[:100]}...")
+        if canvas_snapshot_description:
+            parameters["canvas_snapshot_description"] = canvas_snapshot_description
+            logger.info(f"[CANVAS DEBUG] create_job: canvas_snapshot_description set: {canvas_snapshot_description[:100]}...")
         
         # Build job record
         job_data = {
@@ -530,7 +560,8 @@ class GenerationService:
         width: int,
         height: int,
         file_size: int,
-        is_public: bool = False
+        is_public: bool = False,
+        thought_signature: Optional[str] = None,
     ) -> Asset:
         """
         Create a new asset record.
@@ -545,6 +576,7 @@ class GenerationService:
             height: Asset height in pixels
             file_size: File size in bytes
             is_public: Whether asset is publicly accessible
+            thought_signature: Optional Gemini thought signature for multi-turn refinements (base64)
             
         Returns:
             Created Asset with generated ID
@@ -565,6 +597,10 @@ class GenerationService:
             "viral_score": None,
             "created_at": now,
         }
+        
+        # Add thought_signature if provided
+        if thought_signature:
+            asset_data["thought_signature"] = thought_signature
         
         result = self.db.table(self.assets_table).insert(asset_data).execute()
         
@@ -691,6 +727,44 @@ class GenerationService:
             raise AssetNotFoundError(asset_id)
         
         return self._dict_to_asset(result.data[0])
+
+    async def get_daily_asset_stats(self, user_id: str) -> dict:
+        """
+        Get daily asset creation stats for a user.
+        
+        Used by Intel page header badges.
+        
+        Args:
+            user_id: Authenticated user's ID
+            
+        Returns:
+            Dict with created_today and pending_review counts
+        """
+        from datetime import date
+        today = date.today().isoformat()
+        
+        # Count assets created today
+        assets_result = (
+            self.db.table(self.assets_table)
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .gte("created_at", today)
+            .execute()
+        )
+        
+        # Count pending jobs (processing or queued)
+        jobs_result = (
+            self.db.table(self.jobs_table)
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .in_("status", ["processing", "queued"])
+            .execute()
+        )
+        
+        return {
+            "created_today": assets_result.count or 0,
+            "pending_review": jobs_result.count or 0,
+        }
 
 
 # Singleton instance for convenience

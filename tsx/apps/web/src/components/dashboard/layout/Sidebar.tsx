@@ -18,6 +18,8 @@ import {
   AuraLabIcon,
   ProfileCreatorIcon,
   IntelIcon,
+  OrchestratorIcon,
+  RateLimitsIcon,
 } from '../icons';
 
 export interface NavItem {
@@ -58,6 +60,8 @@ const toolsNavItems: NavItem[] = [
 const settingsNavItems: NavItem[] = [
   { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
   { name: 'Analytics', href: '/admin/analytics', icon: AnalyticsIcon, adminOnly: true },
+  { name: 'Orchestrator', href: '/admin/orchestrator', icon: OrchestratorIcon, adminOnly: true },
+  { name: 'Rate Limits', href: '/admin/rate-limits', icon: RateLimitsIcon, adminOnly: true },
 ];
 
 function NavLink({ item, isActive, onClick }: { item: NavItem; isActive: boolean; onClick?: () => void }) {

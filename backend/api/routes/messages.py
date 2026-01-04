@@ -5,7 +5,7 @@ Endpoints for direct messaging between users.
 
 from fastapi import APIRouter, HTTPException, Query, status
 from backend.api.middleware.auth import CurrentUserDep
-from backend.services.message_service import get_message_service
+from backend.api.service_dependencies import MessageServiceDep
 from backend.api.schemas.social import (
     SendMessageRequest, MessageResponse, ConversationListResponse,
     ConversationResponse, MessageHistoryResponse, LastMessage,
@@ -16,9 +16,11 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
 
 
 @router.get("/conversations", response_model=ConversationListResponse)
-async def get_conversations(current_user: CurrentUserDep) -> ConversationListResponse:
+async def get_conversations(
+    current_user: CurrentUserDep,
+    service: MessageServiceDep,
+) -> ConversationListResponse:
     """Get all conversations for the current user."""
-    service = get_message_service()
     data = await service.get_conversations(current_user.sub)
 
     conversations = []
@@ -49,9 +51,11 @@ async def get_conversations(current_user: CurrentUserDep) -> ConversationListRes
 
 
 @router.get("/unread/count", response_model=UnreadCountResponse)
-async def get_unread_count(current_user: CurrentUserDep) -> UnreadCountResponse:
+async def get_unread_count(
+    current_user: CurrentUserDep,
+    service: MessageServiceDep,
+) -> UnreadCountResponse:
     """Get total unread message count."""
-    service = get_message_service()
     count = await service.get_unread_count(current_user.sub)
     return UnreadCountResponse(unread_count=count)
 
@@ -60,11 +64,11 @@ async def get_unread_count(current_user: CurrentUserDep) -> UnreadCountResponse:
 async def get_messages(
     user_id: str,
     current_user: CurrentUserDep,
+    service: MessageServiceDep,
     limit: int = Query(default=50, ge=1, le=100),
     before_id: str | None = Query(default=None),
 ) -> MessageHistoryResponse:
     """Get message history with a specific user."""
-    service = get_message_service()
     try:
         data = await service.get_messages(current_user.sub, user_id, limit, before_id)
         messages = [MessageResponse(**m) for m in data["messages"]]
@@ -79,10 +83,12 @@ async def get_messages(
 
 @router.post("/{user_id}", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
 async def send_message(
-    user_id: str, request: SendMessageRequest, current_user: CurrentUserDep
+    user_id: str,
+    request: SendMessageRequest,
+    current_user: CurrentUserDep,
+    service: MessageServiceDep,
 ) -> MessageResponse:
     """Send a message to another user."""
-    service = get_message_service()
     try:
         message = await service.send_message(current_user.sub, user_id, request.content)
         return MessageResponse(**message)
@@ -91,9 +97,12 @@ async def send_message(
 
 
 @router.post("/{user_id}/read", response_model=MarkReadResponse)
-async def mark_as_read(user_id: str, current_user: CurrentUserDep) -> MarkReadResponse:
+async def mark_as_read(
+    user_id: str,
+    current_user: CurrentUserDep,
+    service: MessageServiceDep,
+) -> MarkReadResponse:
     """Mark all messages from a user as read."""
-    service = get_message_service()
     result = await service.mark_as_read(current_user.sub, user_id)
     return MarkReadResponse(**result)
 

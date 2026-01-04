@@ -19,10 +19,12 @@ from backend.api.schemas.asset import (
     AssetListResponse,
     AssetVisibilityUpdate,
 )
+from backend.api.service_dependencies import (
+    GenerationServiceDep,
+    StorageServiceDep,
+    AuditServiceDep,
+)
 from backend.services.jwt_service import TokenPayload
-from backend.services.audit_service import get_audit_service
-from backend.services.generation_service import get_generation_service
-from backend.services.storage_service import get_storage_service
 from backend.services.exceptions import (
     AssetNotFoundError,
     AuthorizationError,
@@ -59,10 +61,9 @@ async def list_assets(
     limit: int = Query(20, ge=1, le=100, description="Maximum number of assets to return"),
     offset: int = Query(0, ge=0, description="Number of assets to skip"),
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
 ) -> AssetListResponse:
     """List all assets for the current user."""
-    service = get_generation_service()
-    
     assets = await service.list_assets(
         user_id=current_user.sub,
         asset_type=asset_type,
@@ -86,10 +87,9 @@ async def list_assets(
 async def get_asset(
     asset_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
 ) -> AssetResponse:
     """Get an asset by ID."""
-    service = get_generation_service()
-    
     try:
         asset = await service.get_asset(current_user.sub, asset_id)
         return _asset_to_response(asset)
@@ -108,11 +108,11 @@ async def delete_asset(
     asset_id: str,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
+    storage: StorageServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> Response:
     """Delete an asset."""
-    service = get_generation_service()
-    storage = get_storage_service()
-    
     try:
         # Get asset first to get storage path
         asset = await service.get_asset(current_user.sub, asset_id)
@@ -124,7 +124,6 @@ async def delete_asset(
         await service.delete_asset(current_user.sub, asset_id)
         
         # Audit log
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="asset.delete",
@@ -151,11 +150,11 @@ async def update_visibility(
     data: AssetVisibilityUpdate,
     request: Request,
     current_user: TokenPayload = Depends(get_current_user),
+    service: GenerationServiceDep = None,
+    storage: StorageServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> AssetResponse:
     """Update asset visibility."""
-    service = get_generation_service()
-    storage = get_storage_service()
-    
     try:
         # Update visibility in database
         asset = await service.update_asset_visibility(
@@ -168,7 +167,6 @@ async def update_visibility(
         new_url = await storage.set_visibility(asset.storage_path, data.is_public)
         
         # Audit log
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="asset.visibility_update",
@@ -191,10 +189,11 @@ async def update_visibility(
     summary="Public asset access",
     responses={302: {"description": "Redirect to asset URL"}, 404: {"description": "Asset not found or not public"}},
 )
-async def get_public_asset(asset_id: str) -> RedirectResponse:
+async def get_public_asset(
+    asset_id: str,
+    service: GenerationServiceDep = None,
+) -> RedirectResponse:
     """Get a public asset without authentication."""
-    service = get_generation_service()
-    
     try:
         # Use a system-level query that doesn't require user ownership
         result = service.db.table(service.assets_table).select("*").eq("id", asset_id).execute()

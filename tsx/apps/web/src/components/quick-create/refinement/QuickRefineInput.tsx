@@ -247,7 +247,7 @@ export const QuickRefineInput = memo(function QuickRefineInput({
       {/* Big changes hint */}
       <p className="text-xs text-center text-amber-500/80">
         ⚠️ Big changes needed? Better to{' '}
-        <Link href="/dashboard/quick-create" className="underline hover:text-amber-400">
+        <Link href="/intel/create" className="underline hover:text-amber-400">
           start fresh
         </Link>
       </p>

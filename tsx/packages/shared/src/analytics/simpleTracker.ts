@@ -7,6 +7,10 @@
  * - Session duration
  * 
  * No queues, no batching, no complexity. Just fire-and-forget HTTP calls.
+ * 
+ * Excludes:
+ * - localhost traffic
+ * - Test emails (@aurastream.shop, dbg*@gmail.com)
  */
 
 // =============================================================================
@@ -28,6 +32,32 @@ export type EventType =
   | 'generation_failed'
   | 'brand_kit_created'
   | 'asset_downloaded';
+
+// =============================================================================
+// Filtering
+// =============================================================================
+
+/**
+ * Check if we should skip tracking (localhost, test environments)
+ */
+const shouldSkipTracking = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  
+  const hostname = window.location.hostname;
+  
+  // Skip localhost and local IPs
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.endsWith('.local')
+  ) {
+    return true;
+  }
+  
+  return false;
+};
 
 // =============================================================================
 // Utilities
@@ -106,6 +136,12 @@ class SimpleTracker {
   init(config: SimpleTrackerConfig): void {
     if (typeof window === 'undefined') return;
     if (config.disabled) return;
+    
+    // Skip tracking on localhost
+    if (shouldSkipTracking()) {
+      this._log('Skipping tracking - localhost/local environment');
+      return;
+    }
     
     this.config = config;
     this.visitorId = getVisitorId();

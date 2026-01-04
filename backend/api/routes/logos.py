@@ -13,15 +13,17 @@ from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File,
 from pydantic import BaseModel, Field
 
 from backend.api.middleware.auth import get_current_user
+from backend.api.service_dependencies import (
+    LogoServiceDep,
+    BrandKitServiceDep,
+)
 from backend.services.jwt_service import TokenPayload
 from backend.services.logo_service import (
-    get_logo_service,
     LogoType,
     LOGO_TYPES,
     ALLOWED_LOGO_TYPES,
     MAX_LOGO_SIZE,
 )
-from backend.services.brand_kit_service import get_brand_kit_service
 from backend.services.exceptions import (
     BrandKitNotFoundError,
     AuthorizationError,
@@ -85,9 +87,8 @@ class SetDefaultLogoResponse(BaseModel):
 # Helper Functions
 # =============================================================================
 
-async def verify_brand_kit_ownership(user_id: str, brand_kit_id: str) -> None:
+async def verify_brand_kit_ownership(user_id: str, brand_kit_id: str, brand_kit_service) -> None:
     """Verify user owns the brand kit."""
-    brand_kit_service = get_brand_kit_service()
     try:
         await brand_kit_service.get(user_id, brand_kit_id)
     except BrandKitNotFoundError:
@@ -130,6 +131,8 @@ async def upload_logo(
     logo_type: str = Form(..., description="Logo type (primary, secondary, icon, monochrome, watermark)"),
     file: UploadFile = File(..., description="Logo image file"),
     current_user: TokenPayload = Depends(get_current_user),
+    brand_kit_service: BrandKitServiceDep = None,
+    logo_service: LogoServiceDep = None,
 ) -> LogoUploadResponse:
     """Upload a logo for a brand kit."""
     # Validate logo type
@@ -154,7 +157,7 @@ async def upload_logo(
         )
     
     # Verify brand kit ownership
-    await verify_brand_kit_ownership(current_user.sub, brand_kit_id)
+    await verify_brand_kit_ownership(current_user.sub, brand_kit_id, brand_kit_service)
     
     # Read file data
     file_data = await file.read()
@@ -170,7 +173,6 @@ async def upload_logo(
         )
     
     # Upload logo
-    logo_service = get_logo_service()
     try:
         result = await logo_service.upload_logo(
             user_id=current_user.sub,
@@ -197,13 +199,14 @@ async def upload_logo(
 async def list_logos(
     brand_kit_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    brand_kit_service: BrandKitServiceDep = None,
+    logo_service: LogoServiceDep = None,
 ) -> LogoListResponse:
     """List all logos for a brand kit."""
     # Verify brand kit ownership
-    await verify_brand_kit_ownership(current_user.sub, brand_kit_id)
+    await verify_brand_kit_ownership(current_user.sub, brand_kit_id, brand_kit_service)
     
     # Get logos
-    logo_service = get_logo_service()
     logos = await logo_service.list_logos(
         user_id=current_user.sub,
         brand_kit_id=brand_kit_id,
@@ -232,6 +235,8 @@ async def get_logo(
     brand_kit_id: str,
     logo_type: str,
     current_user: TokenPayload = Depends(get_current_user),
+    brand_kit_service: BrandKitServiceDep = None,
+    logo_service: LogoServiceDep = None,
 ) -> LogoUrlResponse:
     """Get URL for a specific logo."""
     # Validate logo type
@@ -245,10 +250,9 @@ async def get_logo(
         )
     
     # Verify brand kit ownership
-    await verify_brand_kit_ownership(current_user.sub, brand_kit_id)
+    await verify_brand_kit_ownership(current_user.sub, brand_kit_id, brand_kit_service)
     
     # Get logo URL
-    logo_service = get_logo_service()
     url = await logo_service.get_logo_url(
         user_id=current_user.sub,
         brand_kit_id=brand_kit_id,
@@ -268,6 +272,8 @@ async def delete_logo(
     brand_kit_id: str,
     logo_type: str,
     current_user: TokenPayload = Depends(get_current_user),
+    brand_kit_service: BrandKitServiceDep = None,
+    logo_service: LogoServiceDep = None,
 ) -> LogoDeleteResponse:
     """Delete a logo from a brand kit."""
     # Validate logo type
@@ -281,10 +287,9 @@ async def delete_logo(
         )
     
     # Verify brand kit ownership
-    await verify_brand_kit_ownership(current_user.sub, brand_kit_id)
+    await verify_brand_kit_ownership(current_user.sub, brand_kit_id, brand_kit_service)
     
     # Delete logo
-    logo_service = get_logo_service()
     deleted = await logo_service.delete_logo(
         user_id=current_user.sub,
         brand_kit_id=brand_kit_id,
@@ -304,6 +309,8 @@ async def set_default_logo(
     brand_kit_id: str,
     data: SetDefaultLogoRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    brand_kit_service: BrandKitServiceDep = None,
+    logo_service: LogoServiceDep = None,
 ) -> SetDefaultLogoResponse:
     """Set the default logo type for a brand kit."""
     # Validate logo type
@@ -317,10 +324,9 @@ async def set_default_logo(
         )
     
     # Verify brand kit ownership
-    await verify_brand_kit_ownership(current_user.sub, brand_kit_id)
+    await verify_brand_kit_ownership(current_user.sub, brand_kit_id, brand_kit_service)
     
     # Set default logo
-    logo_service = get_logo_service()
     await logo_service.set_default_logo_type(
         user_id=current_user.sub,
         brand_kit_id=brand_kit_id,

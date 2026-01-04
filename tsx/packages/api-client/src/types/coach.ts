@@ -56,9 +56,25 @@ export interface StartCoachRequest {
   description: string;  // min 5, max 500 chars
 }
 
+// Reference asset from user's media library for visual context
+export interface CoachReferenceAsset {
+  /** Media asset UUID from user's library */
+  assetId: string;
+  /** Display name of the asset */
+  displayName: string;
+  /** Type of the asset (face, logo, character, etc.) */
+  assetType: string;
+  /** URL of the asset for AI context */
+  url: string;
+  /** Optional description of what this reference shows */
+  description?: string | null;
+}
+
 // Request to continue an existing chat
 export interface ContinueChatRequest {
   message: string;
+  /** Reference assets from user's media library (max 2 per message) */
+  referenceAssets?: CoachReferenceAsset[] | null;
 }
 
 // Validation issue from prompt analysis

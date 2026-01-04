@@ -1,16 +1,23 @@
 'use client';
 
 /**
- * Enterprise Analytics Dashboard
- * Comprehensive analytics for AuraStream
+ * Comprehensive Analytics Dashboard
+ * Full-featured analytics with pagination, sorting, filtering
  * Admin access: dadbodgeoff@gmail.com only
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useAuth } from '@aurastream/shared';
 import { apiClient } from '@aurastream/api-client';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { 
+  ArrowLeft, RefreshCw, Users, Eye, UserPlus, LogIn, Zap, TrendingUp, 
+  Clock, Target, ChevronDown, ChevronUp, Search, Filter, Download,
+  Calendar, ArrowUpDown, ChevronLeft, ChevronRight, Activity, Globe,
+  Smartphone, Monitor, Tablet, ExternalLink, AlertCircle, CheckCircle
+} from 'lucide-react';
 
 // =============================================================================
 // Constants
@@ -18,6 +25,90 @@ import { useQuery } from '@tanstack/react-query';
 
 const ADMIN_EMAIL = 'dadbodgeoff@gmail.com';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+type TabId = 'overview' | 'visits' | 'events' | 'sessions' | 'pages';
+type SortDirection = 'asc' | 'desc';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+interface DashboardSummary {
+  totalVisitors: number;
+  totalPageViews: number;
+  totalSignups: number;
+  totalLogins: number;
+  totalGenerations: number;
+  successRate: number;
+  avgSessionMinutes: number;
+  conversionRate: number;
+  period: string;
+}
+
+interface TrendDataPoint {
+  date: string;
+  visitors: number;
+  signups: number;
+  generations: number;
+}
+
+interface TopPage {
+  page: string;
+  views: number;
+}
+
+interface RecentSignup {
+  userId: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+  source: string | null;
+}
+
+interface GenerationStats {
+  byAssetType: Array<{
+    assetType: string;
+    completed: number;
+    failed: number;
+    successRate: number;
+  }>;
+  totalCompleted: number;
+  totalFailed: number;
+}
+
+interface Visit {
+  id: string;
+  visitor_id: string;
+  user_id: string | null;
+  page_path: string;
+  referrer: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  device_type: string | null;
+  browser: string | null;
+  session_id: string | null;
+  created_at: string;
+}
+
+interface UserEvent {
+  id: string;
+  user_id: string | null;
+  event_type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+interface Session {
+  id: string;
+  session_id: string;
+  visitor_id: string;
+  user_id: string | null;
+  started_at: string;
+  last_activity_at: string;
+  page_count: number;
+  converted: boolean;
+}
 
 // =============================================================================
 // API Helpers
@@ -27,7 +118,7 @@ async function fetchWithAuth(path: string) {
   const token = apiClient.getAccessToken();
   if (!token) throw new Error('Not authenticated');
   
-  const response = await fetch(`${API_BASE}/api/v1/enterprise-analytics${path}`, {
+  const response = await fetch(`${API_BASE}/api/v1/simple-analytics${path}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
@@ -35,7 +126,42 @@ async function fetchWithAuth(path: string) {
   });
   
   if (!response.ok) {
-    if (response.status === 403) throw new Error('Access denied - admin only');
+    throw new Error(`API error: ${response.status}`);
+  }
+  
+  return response.json();
+}
+
+async function fetchSupabaseTable(table: string, params: {
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortDir?: SortDirection;
+  filters?: Record<string, string>;
+}) {
+  const token = apiClient.getAccessToken();
+  if (!token) throw new Error('Not authenticated');
+  
+  // Build query params
+  const queryParams = new URLSearchParams();
+  if (params.page) queryParams.set('page', params.page.toString());
+  if (params.pageSize) queryParams.set('page_size', params.pageSize.toString());
+  if (params.sortBy) queryParams.set('sort_by', params.sortBy);
+  if (params.sortDir) queryParams.set('sort_dir', params.sortDir);
+  if (params.filters) {
+    Object.entries(params.filters).forEach(([key, value]) => {
+      if (value) queryParams.set(`filter_${key}`, value);
+    });
+  }
+  
+  const response = await fetch(`${API_BASE}/api/v1/simple-analytics/table/${table}?${queryParams}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  
+  if (!response.ok) {
     throw new Error(`API error: ${response.status}`);
   }
   
@@ -46,94 +172,66 @@ async function fetchWithAuth(path: string) {
 // Hooks
 // =============================================================================
 
-function useDashboardSummary(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'summary', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/summary?start_date=${startDate}&end_date=${endDate}`),
+function useDashboardSummary(days: number) {
+  return useQuery<DashboardSummary>({
+    queryKey: ['simple-analytics', 'summary', days],
+    queryFn: () => fetchWithAuth(`/dashboard/summary?days=${days}`),
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
   });
 }
 
-function useRealtimeActive() {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'realtime'],
-    queryFn: () => fetchWithAuth('/dashboard/realtime'),
-    staleTime: 10 * 1000,
-    refetchInterval: 10 * 1000,
-  });
-}
-
-function useDailyVisitors(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'daily-visitors', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/daily-visitors?start_date=${startDate}&end_date=${endDate}`),
+function useTrendData(days: number) {
+  return useQuery<TrendDataPoint[]>({
+    queryKey: ['simple-analytics', 'trend', days],
+    queryFn: () => fetchWithAuth(`/dashboard/trend?days=${days}`),
     staleTime: 60 * 1000,
   });
 }
 
-function useFunnelData(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'funnel', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/funnel?start_date=${startDate}&end_date=${endDate}`),
+function useTopPages(days: number, limit: number = 20) {
+  return useQuery<{ pages: TopPage[] }>({
+    queryKey: ['simple-analytics', 'top-pages', days, limit],
+    queryFn: () => fetchWithAuth(`/dashboard/top-pages?days=${days}&limit=${limit}`),
     staleTime: 60 * 1000,
   });
 }
 
-function useTopJourneys(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'journeys', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/journeys?start_date=${startDate}&end_date=${endDate}&limit=10`),
-    staleTime: 60 * 1000,
-  });
-}
-
-function useAbandonmentData(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'abandonment', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/abandonment?start_date=${startDate}&end_date=${endDate}`),
-    staleTime: 60 * 1000,
-  });
-}
-
-function useGeoBreakdown(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'geo', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/geo?start_date=${startDate}&end_date=${endDate}`),
-    staleTime: 60 * 1000,
-  });
-}
-
-function useDeviceBreakdown(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'devices', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/devices?start_date=${startDate}&end_date=${endDate}`),
-    staleTime: 60 * 1000,
-  });
-}
-
-function usePageFlow(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'flow', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/flow?start_date=${startDate}&end_date=${endDate}&limit=20`),
-    staleTime: 60 * 1000,
-  });
-}
-
-function useTopPages(startDate: string, endDate: string) {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'pages', startDate, endDate],
-    queryFn: () => fetchWithAuth(`/dashboard/pages?start_date=${startDate}&end_date=${endDate}`),
-    staleTime: 60 * 1000,
-  });
-}
-
-function useRecentSessions() {
-  return useQuery({
-    queryKey: ['enterprise-analytics', 'sessions'],
-    queryFn: () => fetchWithAuth('/dashboard/sessions?limit=30'),
+function useRecentSignups(limit: number = 20) {
+  return useQuery<{ signups: RecentSignup[] }>({
+    queryKey: ['simple-analytics', 'recent-signups', limit],
+    queryFn: () => fetchWithAuth(`/dashboard/recent-signups?limit=${limit}`),
     staleTime: 30 * 1000,
     refetchInterval: 30 * 1000,
+  });
+}
+
+function useGenerationStats(days: number) {
+  return useQuery<GenerationStats>({
+    queryKey: ['simple-analytics', 'generations', days],
+    queryFn: () => fetchWithAuth(`/dashboard/generations?days=${days}`),
+    staleTime: 60 * 1000,
+  });
+}
+
+interface RealUsersStats {
+  totalRealUsers: number;
+  byTier: { free: number; pro: number; studio: number };
+  recentSignups: number;
+  users: Array<{
+    email: string;
+    displayName: string;
+    tier: string;
+    createdAt: string;
+  }>;
+}
+
+function useRealUsersStats() {
+  return useQuery<RealUsersStats>({
+    queryKey: ['simple-analytics', 'real-users'],
+    queryFn: () => fetchWithAuth('/dashboard/real-users'),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
   });
 }
 
@@ -141,44 +239,38 @@ function useRecentSessions() {
 // Main Component
 // =============================================================================
 
-export default function EnterpriseAnalyticsDashboard() {
+export default function AnalyticsDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d');
-  const [activeTab, setActiveTab] = useState<'overview' | 'behavior' | 'acquisition' | 'sessions'>('overview');
+  const queryClient = useQueryClient();
+  
+  const [days, setDays] = useState(30);
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   // Redirect non-admins
-  useEffect(() => {
-    if (!authLoading && (!user || user.email !== ADMIN_EMAIL)) {
-      router.push('/dashboard');
-    }
-  }, [user, authLoading, router]);
+  if (!authLoading && (!user || user.email !== ADMIN_EMAIL)) {
+    router.push('/intel');
+    return null;
+  }
 
-  // Calculate date range
-  const { startDate, endDate } = useMemo(() => {
-    const end = new Date().toISOString().split('T')[0];
-    const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
-    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    return { startDate: start, endDate: end };
-  }, [dateRange]);
+  const { data: summary, isLoading: summaryLoading, refetch: refetchSummary } = useDashboardSummary(days);
+  const { data: trend } = useTrendData(days);
+  const { data: topPagesData } = useTopPages(days, 50);
+  const { data: signupsData } = useRecentSignups(50);
+  const { data: generationStats } = useGenerationStats(days);
+  const { data: realUsersStats } = useRealUsersStats();
 
-  // Fetch all data
-  const { data: summary, isLoading: summaryLoading } = useDashboardSummary(startDate, endDate);
-  const { data: realtime } = useRealtimeActive();
-  const { data: dailyVisitors } = useDailyVisitors(startDate, endDate);
-  const { data: funnel } = useFunnelData(startDate, endDate);
-  const { data: journeys } = useTopJourneys(startDate, endDate);
-  const { data: abandonment } = useAbandonmentData(startDate, endDate);
-  const { data: geo } = useGeoBreakdown(startDate, endDate);
-  const { data: devices } = useDeviceBreakdown(startDate, endDate);
-  const { data: flow } = usePageFlow(startDate, endDate);
-  const { data: topPages } = useTopPages(startDate, endDate);
-  const { data: sessions } = useRecentSessions();
+  const refreshMutation = useMutation({
+    mutationFn: () => fetchWithAuth('/refresh-stats'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['simple-analytics'] });
+    },
+  });
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background-base flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-interactive-600 border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -187,92 +279,94 @@ export default function EnterpriseAnalyticsDashboard() {
     return null;
   }
 
+  const topPages = topPagesData?.pages || [];
+  const recentSignups = signupsData?.signups || [];
+  const trendData = trend || [];
+
   return (
-    <div className="min-h-screen bg-background-base">
+    <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
-      <header className="border-b border-border-subtle bg-background-surface/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              <Link href="/intel" className="p-2 hover:bg-gray-800 rounded-lg transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
               <div>
-                <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-                  <span className="text-interactive-500">📊</span> Enterprise Analytics
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  📊 Analytics Dashboard
                 </h1>
-                <p className="text-sm text-text-secondary mt-1">Real-time insights for AuraStream</p>
-              </div>
-              
-              {/* Real-time indicator */}
-              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-success-main/10 border border-success-main/30 rounded-full">
-                <span className="w-2 h-2 bg-success-main rounded-full animate-pulse" />
-                <span className="text-sm text-success-light font-medium">
-                  {realtime?.total_active || 0} active now
-                </span>
+                <p className="text-sm text-gray-400 mt-1">Site traffic & user tracking</p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
               <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value as '7d' | '30d' | '90d')}
-                className="px-3 py-2 bg-background-elevated border border-border-default rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-interactive-600"
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+                className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
+                <option value={7}>Last 7 days</option>
+                <option value={30}>Last 30 days</option>
+                <option value={90}>Last 90 days</option>
+                <option value={365}>Last year</option>
               </select>
+              <button
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg text-sm flex items-center gap-2 transition-colors"
+                title="Refresh daily stats"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
+                Refresh Stats
+              </button>
             </div>
           </div>
           
           {/* Tabs */}
           <div className="flex gap-1 mt-4 -mb-px">
-            {(['overview', 'behavior', 'acquisition', 'sessions'] as const).map((tab) => (
+            {[
+              { id: 'overview' as TabId, label: 'Overview', icon: Activity },
+              { id: 'visits' as TabId, label: 'Visits', icon: Eye },
+              { id: 'events' as TabId, label: 'Events', icon: Zap },
+              { id: 'sessions' as TabId, label: 'Sessions', icon: Clock },
+              { id: 'pages' as TabId, label: 'Pages', icon: Globe },
+            ].map(tab => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                  activeTab === tab
-                    ? 'bg-background-surface text-text-primary border-t border-x border-border-subtle'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-background-elevated/50'
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg flex items-center gap-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-gray-800 text-white border-b-2 border-blue-500'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
               </button>
             ))}
           </div>
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'overview' && (
           <OverviewTab
             summary={summary}
             summaryLoading={summaryLoading}
-            realtime={realtime}
-            dailyVisitors={dailyVisitors?.daily || []}
-            funnel={funnel?.funnel || []}
-            topPages={topPages?.pages || []}
+            trendData={trendData}
+            topPages={topPages}
+            recentSignups={recentSignups}
+            generationStats={generationStats}
+            realUsersStats={realUsersStats}
+            days={days}
           />
         )}
-        
-        {activeTab === 'behavior' && (
-          <BehaviorTab
-            journeys={journeys?.journeys || []}
-            abandonment={abandonment?.abandonment || []}
-            flow={flow?.flows || []}
-          />
-        )}
-        
-        {activeTab === 'acquisition' && (
-          <AcquisitionTab
-            geo={geo?.geo || []}
-            devices={devices?.devices || []}
-            summary={summary}
-          />
-        )}
-        
-        {activeTab === 'sessions' && (
-          <SessionsTab sessions={sessions?.sessions || []} />
-        )}
+        {activeTab === 'visits' && <VisitsTab days={days} />}
+        {activeTab === 'events' && <EventsTab days={days} />}
+        {activeTab === 'sessions' && <SessionsTab days={days} />}
+        {activeTab === 'pages' && <PagesTab topPages={topPages} days={days} />}
       </main>
     </div>
   );
@@ -286,286 +380,922 @@ export default function EnterpriseAnalyticsDashboard() {
 function OverviewTab({
   summary,
   summaryLoading,
-  realtime,
-  dailyVisitors,
-  funnel,
+  trendData,
   topPages,
+  recentSignups,
+  generationStats,
+  realUsersStats,
+  days,
 }: {
-  summary: any;
+  summary?: DashboardSummary;
   summaryLoading: boolean;
-  realtime: any;
-  dailyVisitors: any[];
-  funnel: any[];
-  topPages: any[];
+  trendData: TrendDataPoint[];
+  topPages: TopPage[];
+  recentSignups: RecentSignup[];
+  generationStats?: GenerationStats;
+  realUsersStats?: RealUsersStats;
+  days: number;
 }) {
   return (
     <div className="space-y-8">
-      {/* Real-time Stats */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <RealtimeCard
-          label="Active Now"
-          value={realtime?.total_active || 0}
-          icon="👥"
-          pulse
-        />
-        <RealtimeCard
-          label="Authenticated"
-          value={realtime?.authenticated_count || 0}
-          icon="🔐"
-        />
-        <RealtimeCard
-          label="Anonymous"
-          value={realtime?.anonymous_count || 0}
-          icon="👤"
-        />
-        <RealtimeCard
-          label="Top Page"
-          value={realtime?.pages?.[0]?.page || '-'}
-          icon="📄"
-          isText
-        />
+      {/* Real Users (excluding test emails) */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+          🎯 Real Users
+          <span className="text-sm font-normal text-gray-400">(excluding test emails)</span>
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500/20 to-emerald-600/10 border border-emerald-500/30 rounded-xl p-4">
+            <div className="text-sm text-emerald-400 mb-1">Total Real Users</div>
+            <div className="text-3xl font-bold text-white">{realUsersStats?.totalRealUsers ?? 0}</div>
+          </div>
+          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-4">
+            <div className="text-sm text-gray-400 mb-1">Free Tier</div>
+            <div className="text-2xl font-bold">{realUsersStats?.byTier?.free ?? 0}</div>
+          </div>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+            <div className="text-sm text-blue-400 mb-1">Pro Tier</div>
+            <div className="text-2xl font-bold">{realUsersStats?.byTier?.pro ?? 0}</div>
+          </div>
+          <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4">
+            <div className="text-sm text-purple-400 mb-1">Studio Tier</div>
+            <div className="text-2xl font-bold">{realUsersStats?.byTier?.studio ?? 0}</div>
+          </div>
+          <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+            <div className="text-sm text-green-400 mb-1">Last 7 Days</div>
+            <div className="text-2xl font-bold">{realUsersStats?.recentSignups ?? 0}</div>
+          </div>
+        </div>
+        
+        {/* Recent Real Users Table */}
+        {realUsersStats?.users && realUsersStats.users.length > 0 && (
+          <div className="mt-4 bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-700 text-sm font-medium text-gray-400">
+              Recent Real Signups
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="w-full">
+                <thead className="bg-gray-800 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Email</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Name</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase">Tier</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-400 uppercase">Joined</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {realUsersStats.users.map((user, i) => (
+                    <tr key={i} className="hover:bg-gray-800/50">
+                      <td className="px-4 py-2 text-sm">{user.email}</td>
+                      <td className="px-4 py-2 text-sm text-gray-400">{user.displayName || '-'}</td>
+                      <td className="px-4 py-2">
+                        <span className={`px-2 py-0.5 rounded text-xs ${
+                          user.tier === 'studio' ? 'bg-purple-500/20 text-purple-400' :
+                          user.tier === 'pro' ? 'bg-blue-500/20 text-blue-400' :
+                          'bg-gray-500/20 text-gray-400'
+                        }`}>
+                          {user.tier}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-400 text-right">
+                        {formatTimeAgo(user.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Key Metrics */}
       <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Key Metrics</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <h2 className="text-lg font-semibold mb-4">Key Metrics</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard
             label="Unique Visitors"
-            value={summary?.totals?.unique_visitors ?? 0}
+            value={summary?.totalVisitors ?? 0}
+            icon={<Users className="w-5 h-5" />}
             loading={summaryLoading}
-            icon="👁️"
-          />
-          <MetricCard
-            label="Total Sessions"
-            value={summary?.totals?.total_sessions ?? 0}
-            loading={summaryLoading}
-            icon="🔄"
+            color="blue"
           />
           <MetricCard
             label="Page Views"
-            value={summary?.totals?.total_page_views ?? 0}
+            value={summary?.totalPageViews ?? 0}
+            icon={<Eye className="w-5 h-5" />}
             loading={summaryLoading}
-            icon="📊"
+            color="purple"
           />
           <MetricCard
             label="Signups"
-            value={summary?.totals?.total_signups ?? 0}
+            value={summary?.totalSignups ?? 0}
+            icon={<UserPlus className="w-5 h-5" />}
             loading={summaryLoading}
-            icon="✨"
-            highlight="positive"
+            color="green"
           />
           <MetricCard
-            label="Bounce Rate"
-            value={`${summary?.bounce_rate ?? 0}%`}
+            label="Logins"
+            value={summary?.totalLogins ?? 0}
+            icon={<LogIn className="w-5 h-5" />}
             loading={summaryLoading}
-            icon="↩️"
-            highlight={summary?.bounce_rate > 60 ? 'negative' : 'neutral'}
-          />
-          <MetricCard
-            label="Return Rate"
-            value={`${summary?.return_rate ?? 0}%`}
-            loading={summaryLoading}
-            icon="🔁"
-            highlight={summary?.return_rate > 20 ? 'positive' : 'neutral'}
+            color="cyan"
           />
         </div>
       </section>
 
-      {/* Visitors Chart */}
+      {/* Generation & Conversion Metrics */}
       <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Visitors Over Time</h2>
-        <VisitorsChart data={dailyVisitors} />
+        <h2 className="text-lg font-semibold mb-4">Generation & Conversion</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <MetricCard
+            label="Generations"
+            value={summary?.totalGenerations ?? 0}
+            icon={<Zap className="w-5 h-5" />}
+            loading={summaryLoading}
+            color="yellow"
+          />
+          <MetricCard
+            label="Success Rate"
+            value={`${summary?.successRate ?? 0}%`}
+            icon={<TrendingUp className="w-5 h-5" />}
+            loading={summaryLoading}
+            color={summary?.successRate && summary.successRate >= 80 ? 'green' : 'orange'}
+          />
+          <MetricCard
+            label="Avg Session"
+            value={`${summary?.avgSessionMinutes?.toFixed(1) ?? 0} min`}
+            icon={<Clock className="w-5 h-5" />}
+            loading={summaryLoading}
+            color="indigo"
+          />
+          <MetricCard
+            label="Conversion Rate"
+            value={`${summary?.conversionRate ?? 0}%`}
+            icon={<Target className="w-5 h-5" />}
+            loading={summaryLoading}
+            color={summary?.conversionRate && summary.conversionRate >= 5 ? 'green' : 'orange'}
+          />
+        </div>
+      </section>
+
+      {/* Trend Chart */}
+      <section>
+        <h2 className="text-lg font-semibold mb-4">Visitors Over Time</h2>
+        <TrendChart data={trendData} />
       </section>
 
       {/* Two Column Layout */}
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Conversion Funnel */}
-        <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Conversion Funnel</h2>
-          <FunnelChart data={funnel} />
-        </section>
-
         {/* Top Pages */}
         <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Top Pages</h2>
-          <TopPagesTable data={topPages} />
+          <h2 className="text-lg font-semibold mb-4">Top Pages</h2>
+          <TopPagesTable data={topPages.slice(0, 10)} />
+        </section>
+
+        {/* Recent Signups */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Recent Signups</h2>
+          <RecentSignupsTable data={recentSignups.slice(0, 10)} />
         </section>
       </div>
+
+      {/* Generation Stats by Asset Type */}
+      {generationStats && generationStats.byAssetType.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Generations by Asset Type</h2>
+          <GenerationStatsTable data={generationStats} />
+        </section>
+      )}
     </div>
   );
 }
 
 // =============================================================================
-// Behavior Tab
+// Visits Tab with Pagination, Sorting, Filtering
 // =============================================================================
 
-function BehaviorTab({
-  journeys,
-  abandonment,
-  flow,
-}: {
-  journeys: any[];
-  abandonment: any[];
-  flow: any[];
-}) {
+function VisitsTab({ days }: { days: number }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['analytics-visits', page, pageSize, sortBy, sortDir, filters, days],
+    queryFn: async () => {
+      const token = apiClient.getAccessToken();
+      if (!token) throw new Error('Not authenticated');
+      
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      
+      // Direct Supabase query via API
+      const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: pageSize.toString(),
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        days: days.toString(),
+      });
+      
+      if (searchTerm) params.set('search', searchTerm);
+      Object.entries(filters).forEach(([k, v]) => {
+        if (v) params.set(`filter_${k}`, v);
+      });
+      
+      const response = await fetch(`${API_BASE}/api/v1/simple-analytics/visits?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch visits');
+      return response.json();
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const visits: Visit[] = data?.visits || [];
+  const totalCount = data?.total || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('desc');
+    }
+    setPage(1);
+  };
+
   return (
-    <div className="space-y-8">
-      {/* User Journeys */}
-      <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Top User Journeys</h2>
-        <JourneysTable data={journeys} />
-      </section>
-
-      {/* Two Column Layout */}
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Abandonment Analysis */}
-        <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Abandonment Analysis</h2>
-          <AbandonmentTable data={abandonment} />
-        </section>
-
-        {/* Page Flow */}
-        <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Page Flow</h2>
-          <PageFlowList data={flow} />
-        </section>
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
-// Acquisition Tab
-// =============================================================================
-
-function AcquisitionTab({
-  geo,
-  devices,
-  summary,
-}: {
-  geo: any[];
-  devices: any[];
-  summary: any;
-}) {
-  return (
-    <div className="space-y-8">
-      {/* Device Breakdown Summary */}
-      <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Device Distribution</h2>
-        <div className="grid grid-cols-3 gap-4">
-          <DeviceCard
-            type="Desktop"
-            count={summary?.totals?.desktop_sessions || 0}
-            total={summary?.totals?.total_sessions || 1}
-            icon="🖥️"
-          />
-          <DeviceCard
-            type="Mobile"
-            count={summary?.totals?.mobile_sessions || 0}
-            total={summary?.totals?.total_sessions || 1}
-            icon="📱"
-          />
-          <DeviceCard
-            type="Tablet"
-            count={summary?.totals?.tablet_sessions || 0}
-            total={summary?.totals?.total_sessions || 1}
-            icon="📲"
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search pages, referrers..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-      </section>
+        
+        <select
+          value={filters.device_type || ''}
+          onChange={(e) => { setFilters({ ...filters, device_type: e.target.value }); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value="">All Devices</option>
+          <option value="desktop">Desktop</option>
+          <option value="mobile">Mobile</option>
+          <option value="tablet">Tablet</option>
+        </select>
+        
+        <select
+          value={filters.browser || ''}
+          onChange={(e) => { setFilters({ ...filters, browser: e.target.value }); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value="">All Browsers</option>
+          <option value="Chrome">Chrome</option>
+          <option value="Firefox">Firefox</option>
+          <option value="Safari">Safari</option>
+          <option value="Edge">Edge</option>
+        </select>
+        
+        <select
+          value={pageSize}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value={25}>25 per page</option>
+          <option value={50}>50 per page</option>
+          <option value={100}>100 per page</option>
+        </select>
+      </div>
 
-      {/* Two Column Layout */}
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Geographic Breakdown */}
-        <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Geographic Breakdown</h2>
-          <GeoTable data={geo} />
-        </section>
+      {/* Table */}
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto" />
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-400">
+            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+            Failed to load visits
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <SortableHeader column="created_at" label="Time" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHeader column="page_path" label="Page" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Device</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Browser</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Referrer</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">UTM</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {visits.map((visit) => (
+                    <tr key={visit.id} className="hover:bg-gray-800/50">
+                      <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
+                        {formatDateTime(visit.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono truncate max-w-[200px]" title={visit.page_path}>
+                        {visit.page_path}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        <DeviceIcon type={visit.device_type} />
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400">
+                        {visit.browser || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400 truncate max-w-[150px]" title={visit.referrer || ''}>
+                        {visit.referrer ? new URL(visit.referrer).hostname : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm">
+                        {visit.utm_source && (
+                          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
+                            {visit.utm_source}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination */}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
-        {/* Browser/Device Details */}
-        <section>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Browser & Device Details</h2>
-          <DevicesTable data={devices} />
-        </section>
+
+// =============================================================================
+// Events Tab with Pagination, Sorting, Filtering
+// =============================================================================
+
+function EventsTab({ days }: { days: number }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [eventTypeFilter, setEventTypeFilter] = useState('');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['analytics-events', page, pageSize, sortBy, sortDir, eventTypeFilter, days],
+    queryFn: async () => {
+      const token = apiClient.getAccessToken();
+      if (!token) throw new Error('Not authenticated');
+      
+      const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: pageSize.toString(),
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        days: days.toString(),
+      });
+      
+      if (eventTypeFilter) params.set('event_type', eventTypeFilter);
+      
+      const response = await fetch(`${API_BASE}/api/v1/simple-analytics/events?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch events');
+      return response.json();
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const events: UserEvent[] = data?.events || [];
+  const totalCount = data?.total || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const eventTypes = data?.event_types || [];
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('desc');
+    }
+    setPage(1);
+  };
+
+  const getEventColor = (type: string) => {
+    const colors: Record<string, string> = {
+      signup: 'bg-green-500/20 text-green-400',
+      login: 'bg-blue-500/20 text-blue-400',
+      logout: 'bg-gray-500/20 text-gray-400',
+      generation_started: 'bg-yellow-500/20 text-yellow-400',
+      generation_completed: 'bg-emerald-500/20 text-emerald-400',
+      generation_failed: 'bg-red-500/20 text-red-400',
+      brand_kit_created: 'bg-purple-500/20 text-purple-400',
+      asset_downloaded: 'bg-cyan-500/20 text-cyan-400',
+    };
+    return colors[type] || 'bg-gray-500/20 text-gray-400';
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <select
+          value={eventTypeFilter}
+          onChange={(e) => { setEventTypeFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value="">All Event Types</option>
+          <option value="signup">Signup</option>
+          <option value="login">Login</option>
+          <option value="logout">Logout</option>
+          <option value="generation_started">Generation Started</option>
+          <option value="generation_completed">Generation Completed</option>
+          <option value="generation_failed">Generation Failed</option>
+          <option value="brand_kit_created">Brand Kit Created</option>
+          <option value="asset_downloaded">Asset Downloaded</option>
+        </select>
+        
+        <select
+          value={pageSize}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value={25}>25 per page</option>
+          <option value={50}>50 per page</option>
+          <option value={100}>100 per page</option>
+        </select>
+        
+        {/* Event type summary */}
+        <div className="flex-1 flex justify-end gap-2 flex-wrap">
+          {eventTypes.slice(0, 5).map((et: { type: string; count: number }) => (
+            <button
+              key={et.type}
+              onClick={() => { setEventTypeFilter(et.type); setPage(1); }}
+              className={`px-2 py-1 rounded text-xs ${getEventColor(et.type)} hover:opacity-80`}
+            >
+              {et.type}: {et.count}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto" />
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-400">
+            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+            Failed to load events
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <SortableHeader column="created_at" label="Time" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <SortableHeader column="event_type" label="Event Type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">User ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Metadata</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {events.map((event) => (
+                    <tr key={event.id} className="hover:bg-gray-800/50">
+                      <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
+                        {formatDateTime(event.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getEventColor(event.event_type)}`}>
+                          {event.event_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-400">
+                        {event.user_id ? event.user_id.slice(0, 8) + '...' : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400">
+                        {event.metadata && Object.keys(event.metadata).length > 0 ? (
+                          <MetadataDisplay data={event.metadata} />
+                        ) : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
+          </>
+        )}
       </div>
     </div>
   );
 }
 
 // =============================================================================
-// Sessions Tab
+// Sessions Tab with Pagination, Sorting, Filtering
 // =============================================================================
 
-function SessionsTab({ sessions }: { sessions: any[] }) {
+function SessionsTab({ days }: { days: number }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [sortBy, setSortBy] = useState('started_at');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [convertedFilter, setConvertedFilter] = useState<string>('');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['analytics-sessions', page, pageSize, sortBy, sortDir, convertedFilter, days],
+    queryFn: async () => {
+      const token = apiClient.getAccessToken();
+      if (!token) throw new Error('Not authenticated');
+      
+      const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: pageSize.toString(),
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        days: days.toString(),
+      });
+      
+      if (convertedFilter) params.set('converted', convertedFilter);
+      
+      const response = await fetch(`${API_BASE}/api/v1/simple-analytics/sessions?${params}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch sessions');
+      return response.json();
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const sessions: Session[] = data?.sessions || [];
+  const totalCount = data?.total || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  const stats = data?.stats || { total: 0, converted: 0, avgPages: 0, avgDuration: 0 };
+
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir('desc');
+    }
+    setPage(1);
+  };
+
+  const calculateDuration = (start: string, end: string) => {
+    const diff = new Date(end).getTime() - new Date(start).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return '< 1 min';
+    if (minutes < 60) return `${minutes} min`;
+    return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  };
+
   return (
-    <div className="space-y-8">
-      <section>
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Recent Sessions</h2>
-        <SessionsTable data={sessions} />
-      </section>
-    </div>
-  );
-}
-
-// =============================================================================
-// Components
-// =============================================================================
-
-function RealtimeCard({
-  label,
-  value,
-  icon,
-  pulse,
-  isText,
-}: {
-  label: string;
-  value: string | number;
-  icon: string;
-  pulse?: boolean;
-  isText?: boolean;
-}) {
-  return (
-    <div className="bg-interactive-600/15 border border-interactive-500/30 rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{icon}</span>
-        <span className="text-sm text-text-secondary">{label}</span>
-        {pulse && <span className="w-2 h-2 bg-success-main rounded-full animate-pulse" />}
+    <div className="space-y-4">
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Total Sessions</div>
+          <div className="text-2xl font-bold">{stats.total.toLocaleString()}</div>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Converted</div>
+          <div className="text-2xl font-bold text-green-400">{stats.converted.toLocaleString()}</div>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Avg Pages/Session</div>
+          <div className="text-2xl font-bold">{stats.avgPages?.toFixed(1) || 0}</div>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Avg Duration</div>
+          <div className="text-2xl font-bold">{stats.avgDuration?.toFixed(1) || 0} min</div>
+        </div>
       </div>
-      <p className={`font-bold text-text-primary ${isText ? 'text-sm truncate' : 'text-2xl'}`}>
-        {typeof value === 'number' ? value.toLocaleString() : value}
-      </p>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <select
+          value={convertedFilter}
+          onChange={(e) => { setConvertedFilter(e.target.value); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value="">All Sessions</option>
+          <option value="true">Converted Only</option>
+          <option value="false">Not Converted</option>
+        </select>
+        
+        <select
+          value={pageSize}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm"
+        >
+          <option value={25}>25 per page</option>
+          <option value={50}>50 per page</option>
+          <option value={100}>100 per page</option>
+        </select>
+      </div>
+
+      {/* Table */}
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto" />
+          </div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-400">
+            <AlertCircle className="w-8 h-8 mx-auto mb-2" />
+            Failed to load sessions
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-800">
+                  <tr>
+                    <SortableHeader column="started_at" label="Started" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Session ID</th>
+                    <SortableHeader column="page_count" label="Pages" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Duration</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">User</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Converted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-700">
+                  {sessions.map((session) => (
+                    <tr key={session.id} className="hover:bg-gray-800/50">
+                      <td className="px-4 py-3 text-sm text-gray-400 whitespace-nowrap">
+                        {formatDateTime(session.started_at)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-400">
+                        {session.session_id.slice(0, 12)}...
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center">
+                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                          {session.page_count}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-400">
+                        {calculateDuration(session.started_at, session.last_activity_at)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-mono text-gray-400">
+                        {session.user_id ? session.user_id.slice(0, 8) + '...' : '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {session.converted ? (
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }
+
+
+// =============================================================================
+// Pages Tab with Sorting and Filtering
+// =============================================================================
+
+function PagesTab({ topPages, days }: { topPages: TopPage[]; days: number }) {
+  const [sortBy, setSortBy] = useState<'page' | 'views'>('views');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+
+  const filteredAndSorted = useMemo(() => {
+    let result = [...topPages];
+    
+    // Filter
+    if (searchTerm) {
+      result = result.filter(p => p.page.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    
+    // Sort
+    result.sort((a, b) => {
+      const aVal = sortBy === 'page' ? a.page : a.views;
+      const bVal = sortBy === 'page' ? b.page : b.views;
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }
+      return sortDir === 'asc' ? (aVal as number) - (bVal as number) : (bVal as number) - (aVal as number);
+    });
+    
+    return result;
+  }, [topPages, searchTerm, sortBy, sortDir]);
+
+  const paginatedPages = filteredAndSorted.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.ceil(filteredAndSorted.length / pageSize);
+  const totalViews = topPages.reduce((sum, p) => sum + p.views, 0);
+
+  const handleSort = (column: 'page' | 'views') => {
+    if (sortBy === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir(column === 'views' ? 'desc' : 'asc');
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Total Pages</div>
+          <div className="text-2xl font-bold">{topPages.length.toLocaleString()}</div>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Total Views</div>
+          <div className="text-2xl font-bold">{totalViews.toLocaleString()}</div>
+        </div>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+          <div className="text-sm text-gray-400">Avg Views/Page</div>
+          <div className="text-2xl font-bold">
+            {topPages.length > 0 ? Math.round(totalViews / topPages.length).toLocaleString() : 0}
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="flex gap-4 items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search pages..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+            className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <span className="text-sm text-gray-400">
+          {filteredAndSorted.length} pages
+        </span>
+      </div>
+
+      {/* Table */}
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-800">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase w-12">#</th>
+                <th 
+                  className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase cursor-pointer hover:text-white"
+                  onClick={() => handleSort('page')}
+                >
+                  <div className="flex items-center gap-1">
+                    Page
+                    {sortBy === 'page' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </div>
+                </th>
+                <th 
+                  className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase cursor-pointer hover:text-white"
+                  onClick={() => handleSort('views')}
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    Views
+                    {sortBy === 'views' && (sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">% of Total</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase w-48">Distribution</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {paginatedPages.map((pageData, i) => {
+                const percentage = totalViews > 0 ? (pageData.views / totalViews) * 100 : 0;
+                const rank = (page - 1) * pageSize + i + 1;
+                
+                return (
+                  <tr key={pageData.page} className="hover:bg-gray-800/50">
+                    <td className="px-4 py-3 text-sm text-gray-500">{rank}</td>
+                    <td className="px-4 py-3 text-sm font-mono truncate max-w-[300px]" title={pageData.page}>
+                      {pageData.page}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right font-medium">
+                      {pageData.views.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-400">
+                      {percentage.toFixed(1)}%
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="bg-blue-500 h-2 rounded-full transition-all"
+                          style={{ width: `${Math.min(percentage * 2, 100)}%` }}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        
+        {totalPages > 1 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalCount={filteredAndSorted.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Shared Components
+// =============================================================================
 
 function MetricCard({
   label,
   value,
-  loading,
   icon,
-  highlight,
+  loading,
+  color,
 }: {
   label: string;
   value: string | number;
+  icon: React.ReactNode;
   loading: boolean;
-  icon: string;
-  highlight?: 'positive' | 'negative' | 'neutral';
+  color: 'blue' | 'purple' | 'green' | 'cyan' | 'yellow' | 'orange' | 'indigo';
 }) {
+  const colorClasses = {
+    blue: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+    purple: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+    green: 'bg-green-500/10 border-green-500/30 text-green-400',
+    cyan: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400',
+    yellow: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+    orange: 'bg-orange-500/10 border-orange-500/30 text-orange-400',
+    indigo: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400',
+  };
+
   return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl p-4">
+    <div className={`rounded-xl p-4 border ${colorClasses[color]}`}>
       <div className="flex items-center gap-2 mb-2">
-        <span>{icon}</span>
-        <span className="text-sm text-text-secondary">{label}</span>
+        {icon}
+        <span className="text-sm text-gray-400">{label}</span>
       </div>
       {loading ? (
-        <div className="h-8 w-20 bg-background-elevated animate-pulse rounded" />
+        <div className="h-8 w-20 bg-gray-700 animate-pulse rounded" />
       ) : (
-        <p className={`text-2xl font-bold ${
-          highlight === 'positive' ? 'text-success-main' :
-          highlight === 'negative' ? 'text-error-main' :
-          'text-text-primary'
-        }`}>
+        <p className="text-2xl font-bold text-white">
           {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
       )}
@@ -573,71 +1303,39 @@ function MetricCard({
   );
 }
 
-function DeviceCard({
-  type,
-  count,
-  total,
-  icon,
-}: {
-  type: string;
-  count: number;
-  total: number;
-  icon: string;
-}) {
-  const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
-  
-  return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-2xl">{icon}</span>
-        <span className="text-sm text-text-secondary">{percentage}%</span>
-      </div>
-      <p className="text-lg font-bold text-text-primary">{count.toLocaleString()}</p>
-      <p className="text-sm text-text-secondary">{type}</p>
-      <div className="mt-2 h-1.5 bg-background-elevated rounded-full overflow-hidden">
-        <div
-          className="h-full bg-interactive-500 rounded-full transition-all duration-500"
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function VisitorsChart({ data }: { data: any[] }) {
+function TrendChart({ data }: { data: TrendDataPoint[] }) {
   if (!data.length) {
     return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-8 text-center text-text-secondary">
-        No visitor data yet. Data will appear as visitors are tracked.
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-8 text-center text-gray-400">
+        No trend data yet. Data will appear as visitors are tracked.
       </div>
     );
   }
 
-  const maxVisitors = Math.max(...data.map(d => d.unique_visitors || 0), 1);
-  
+  const maxVisitors = Math.max(...data.map(d => d.visitors), 1);
+
   return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl p-6">
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
       <div className="flex items-end gap-1 h-48">
         {data.map((day, i) => {
-          const height = (day.unique_visitors / maxVisitors) * 100;
+          const height = (day.visitors / maxVisitors) * 100;
           return (
-            <div
-              key={i}
-              className="flex-1 group relative"
-            >
+            <div key={i} className="flex-1 group relative">
               <div
-                className="bg-interactive-500/80 hover:bg-interactive-500 rounded-t transition-all duration-200 cursor-pointer"
+                className="bg-blue-500/80 hover:bg-blue-500 rounded-t transition-all duration-200 cursor-pointer"
                 style={{ height: `${Math.max(height, 2)}%` }}
               />
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-background-elevated border border-border-default rounded text-xs text-text-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                <div className="font-medium">{day.unique_visitors} visitors</div>
-                <div className="text-text-secondary">{day.date}</div>
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                <div className="font-medium">{day.visitors} visitors</div>
+                <div className="text-gray-400">{day.signups} signups</div>
+                <div className="text-gray-400">{day.generations} generations</div>
+                <div className="text-gray-500">{day.date}</div>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="flex justify-between mt-2 text-xs text-text-muted">
+      <div className="flex justify-between mt-2 text-xs text-gray-500">
         <span>{data[0]?.date}</span>
         <span>{data[data.length - 1]?.date}</span>
       </div>
@@ -645,80 +1343,32 @@ function VisitorsChart({ data }: { data: any[] }) {
   );
 }
 
-function FunnelChart({ data }: { data: any[] }) {
+function TopPagesTable({ data }: { data: TopPage[] }) {
   if (!data.length) {
     return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No funnel data yet. Track funnel events to see conversion rates.
-      </div>
-    );
-  }
-
-  const maxCount = Math.max(...data.map(d => d.total_count || 0), 1);
-
-  return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl p-6 space-y-3">
-      {data.map((step, index) => (
-        <div key={step.step} className="space-y-1">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-text-primary font-medium capitalize">
-              {step.step?.replace(/_/g, ' ')}
-            </span>
-            <span className="text-text-secondary">
-              {step.total_count?.toLocaleString() ?? 0}
-              {step.conversion_rate && ` (${step.conversion_rate}%)`}
-            </span>
-          </div>
-          <div className="h-8 bg-background-elevated rounded-lg overflow-hidden">
-            <div
-              className="h-full bg-interactive-600 rounded-lg transition-all duration-500"
-              style={{ width: `${(step.total_count / maxCount) * 100}%` }}
-            />
-          </div>
-          {index < data.length - 1 && (
-            <div className="flex justify-center py-1">
-              <svg className="w-4 h-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-
-function TopPagesTable({ data }: { data: any[] }) {
-  if (!data.length) {
-    return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 text-center text-gray-400">
         No page data yet
       </div>
     );
   }
 
   return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl overflow-hidden">
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
       <table className="w-full">
-        <thead className="bg-background-elevated/50">
+        <thead className="bg-gray-800">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Page</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Views</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Visitors</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Page</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Views</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {data.slice(0, 10).map((page, i) => (
-            <tr key={i} className="hover:bg-background-elevated/30">
-              <td className="px-4 py-3 text-sm text-text-primary font-mono truncate max-w-[200px]">
-                {page.page_path}
+        <tbody className="divide-y divide-gray-700">
+          {data.map((page, i) => (
+            <tr key={i} className="hover:bg-gray-800/50">
+              <td className="px-4 py-3 text-sm font-mono truncate max-w-[250px]">
+                {page.page}
               </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {page.view_count?.toLocaleString()}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {page.unique_visitors?.toLocaleString()}
+              <td className="px-4 py-3 text-sm text-gray-400 text-right">
+                {page.views.toLocaleString()}
               </td>
             </tr>
           ))}
@@ -728,59 +1378,86 @@ function TopPagesTable({ data }: { data: any[] }) {
   );
 }
 
-function JourneysTable({ data }: { data: any[] }) {
+function RecentSignupsTable({ data }: { data: RecentSignup[] }) {
   if (!data.length) {
     return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No journey data yet. Journeys are recorded when sessions end.
+      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 text-center text-gray-400">
+        No signups yet
       </div>
     );
   }
 
   return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl overflow-hidden">
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
       <table className="w-full">
-        <thead className="bg-background-elevated/50">
+        <thead className="bg-gray-800">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Journey Path</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Count</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Avg Duration</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Conv. Rate</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">User</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">When</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {data.map((journey, i) => (
-            <tr key={i} className="hover:bg-background-elevated/30">
+        <tbody className="divide-y divide-gray-700">
+          {data.map((signup, i) => (
+            <tr key={i} className="hover:bg-gray-800/50">
               <td className="px-4 py-3">
-                <div className="flex items-center gap-1 text-sm overflow-x-auto max-w-[400px]">
-                  {journey.page_sequence?.slice(0, 5).map((page: string, j: number) => (
-                    <span key={j} className="flex items-center gap-1">
-                      <span className="px-2 py-0.5 bg-background-elevated rounded text-text-primary font-mono text-xs truncate max-w-[100px]">
-                        {page}
-                      </span>
-                      {j < Math.min(journey.page_sequence.length - 1, 4) && (
-                        <span className="text-text-muted">→</span>
-                      )}
-                    </span>
-                  ))}
-                  {journey.page_sequence?.length > 5 && (
-                    <span className="text-text-muted text-xs">+{journey.page_sequence.length - 5}</span>
-                  )}
-                </div>
+                <div className="text-sm font-medium">{signup.displayName}</div>
+                <div className="text-xs text-gray-500">{signup.email}</div>
               </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {journey.journey_count?.toLocaleString()}
+              <td className="px-4 py-3 text-sm text-gray-400 text-right">
+                {formatTimeAgo(signup.createdAt)}
               </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {journey.avg_duration_ms ? `${Math.round(journey.avg_duration_ms / 1000)}s` : '-'}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function GenerationStatsTable({ data }: { data: GenerationStats }) {
+  return (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+        <span className="text-sm text-gray-400">
+          Total: {data.totalCompleted.toLocaleString()} completed, {data.totalFailed.toLocaleString()} failed
+        </span>
+        <span className={`text-sm font-medium ${
+          data.totalCompleted + data.totalFailed > 0
+            ? (data.totalCompleted / (data.totalCompleted + data.totalFailed) * 100 >= 80 ? 'text-green-400' : 'text-orange-400')
+            : 'text-gray-400'
+        }`}>
+          {data.totalCompleted + data.totalFailed > 0
+            ? `${((data.totalCompleted / (data.totalCompleted + data.totalFailed)) * 100).toFixed(1)}% success`
+            : 'No data'}
+        </span>
+      </div>
+      <table className="w-full">
+        <thead className="bg-gray-800">
+          <tr>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Asset Type</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Completed</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Failed</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Success Rate</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-700">
+          {data.byAssetType.map((row, i) => (
+            <tr key={i} className="hover:bg-gray-800/50">
+              <td className="px-4 py-3 text-sm capitalize">
+                {row.assetType.replace(/_/g, ' ')}
+              </td>
+              <td className="px-4 py-3 text-sm text-green-400 text-right">
+                {row.completed.toLocaleString()}
+              </td>
+              <td className="px-4 py-3 text-sm text-red-400 text-right">
+                {row.failed.toLocaleString()}
               </td>
               <td className="px-4 py-3 text-right">
                 <span className={`text-sm font-medium ${
-                  journey.conversion_rate > 10 ? 'text-success-main' :
-                  journey.conversion_rate > 0 ? 'text-warning-main' :
-                  'text-text-secondary'
+                  row.successRate >= 80 ? 'text-green-400' : 
+                  row.successRate >= 50 ? 'text-yellow-400' : 'text-red-400'
                 }`}>
-                  {journey.conversion_rate || 0}%
+                  {row.successRate}%
                 </span>
               </td>
             </tr>
@@ -791,257 +1468,152 @@ function JourneysTable({ data }: { data: any[] }) {
   );
 }
 
-function AbandonmentTable({ data }: { data: any[] }) {
-  if (!data.length) {
-    return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No abandonment data yet. Track form/flow abandonments to see insights.
+
+function SortableHeader({
+  column,
+  label,
+  sortBy,
+  sortDir,
+  onSort,
+}: {
+  column: string;
+  label: string;
+  sortBy: string;
+  sortDir: SortDirection;
+  onSort: (column: string) => void;
+}) {
+  return (
+    <th
+      className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase cursor-pointer hover:text-white transition-colors"
+      onClick={() => onSort(column)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortBy === column ? (
+          sortDir === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-50" />
+        )}
       </div>
-    );
-  }
+    </th>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  totalCount,
+  pageSize,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalCount);
 
   return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl overflow-hidden max-h-[400px] overflow-y-auto">
-      <table className="w-full">
-        <thead className="bg-background-elevated/50 sticky top-0">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Type</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Page</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Count</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Avg Step</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {data.map((item, i) => (
-            <tr key={i} className="hover:bg-background-elevated/30">
-              <td className="px-4 py-3">
-                <span className={`px-2 py-1 rounded text-xs font-medium ${
-                  item.abandonment_type === 'signup' ? 'bg-error-main/20 text-error-light' :
-                  item.abandonment_type === 'form' ? 'bg-warning-main/20 text-warning-light' :
-                  'bg-background-elevated text-text-secondary'
-                }`}>
-                  {item.abandonment_type}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-sm text-text-primary font-mono truncate max-w-[150px]">
-                {item.page_path}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {item.abandonment_count?.toLocaleString()}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {item.avg_step_reached?.toFixed(1) || '-'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="px-4 py-3 border-t border-gray-700 flex items-center justify-between">
+      <span className="text-sm text-gray-400">
+        Showing {start}-{end} of {totalCount.toLocaleString()}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="p-2 hover:bg-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="p-2 hover:bg-gray-700 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
 
-function PageFlowList({ data }: { data: any[] }) {
-  if (!data.length) {
-    return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No flow data yet
-      </div>
-    );
+function DeviceIcon({ type }: { type: string | null }) {
+  switch (type?.toLowerCase()) {
+    case 'mobile':
+      return (
+        <span title="Mobile">
+          <Smartphone className="w-4 h-4 text-blue-400" />
+        </span>
+      );
+    case 'tablet':
+      return (
+        <span title="Tablet">
+          <Tablet className="w-4 h-4 text-purple-400" />
+        </span>
+      );
+    case 'desktop':
+    default:
+      return (
+        <span title="Desktop">
+          <Monitor className="w-4 h-4 text-gray-400" />
+        </span>
+      );
   }
+}
 
+function MetadataDisplay({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data).slice(0, 3);
+  
   return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl p-4 space-y-2 max-h-[400px] overflow-y-auto">
-      {data.slice(0, 15).map((flow, i) => (
-        <div key={i} className="flex items-center gap-2 text-sm p-2 rounded-lg hover:bg-background-elevated/50">
-          <span className="text-text-primary font-mono truncate flex-1">{flow.from_page}</span>
-          <svg className="w-4 h-4 text-interactive-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-          </svg>
-          <span className="text-text-primary font-mono truncate flex-1">{flow.to_page}</span>
-          <span className="text-text-secondary text-xs bg-background-elevated px-2 py-1 rounded flex-shrink-0">
-            {flow.transition_count}
-          </span>
-        </div>
+    <div className="flex flex-wrap gap-1">
+      {entries.map(([key, value]) => (
+        <span key={key} className="px-1.5 py-0.5 bg-gray-700 rounded text-xs">
+          {key}: {String(value).slice(0, 20)}
+        </span>
       ))}
+      {Object.keys(data).length > 3 && (
+        <span className="text-xs text-gray-500">+{Object.keys(data).length - 3} more</span>
+      )}
     </div>
   );
 }
 
-function GeoTable({ data }: { data: any[] }) {
-  if (!data.length) {
-    return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No geographic data yet. Country data is collected from visitors.
-      </div>
-    );
-  }
+// =============================================================================
+// Utilities
+// =============================================================================
 
-  // Country code to flag emoji
-  const getFlag = (code: string) => {
-    if (!code || code === 'XX') return '🌍';
-    const codePoints = code
-      .toUpperCase()
-      .split('')
-      .map(char => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
-  };
-
-  return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl overflow-hidden max-h-[400px] overflow-y-auto">
-      <table className="w-full">
-        <thead className="bg-background-elevated/50 sticky top-0">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Country</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Visitors</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Sessions</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Conv.</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {data.map((item, i) => (
-            <tr key={i} className="hover:bg-background-elevated/30">
-              <td className="px-4 py-3 text-sm text-text-primary">
-                <span className="mr-2">{getFlag(item.country)}</span>
-                {item.country || 'Unknown'}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {item.visitor_count?.toLocaleString()}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {item.session_count?.toLocaleString()}
-              </td>
-              <td className="px-4 py-3 text-sm text-right">
-                <span className={item.conversion_rate > 0 ? 'text-success-main' : 'text-text-secondary'}>
-                  {item.conversion_rate || 0}%
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function formatTimeAgo(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+  return `${Math.floor(diffMins / 1440)}d ago`;
 }
 
-function DevicesTable({ data }: { data: any[] }) {
-  if (!data.length) {
-    return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No device data yet
-      </div>
-    );
+function formatDateTime(isoString: string): string {
+  const date = new Date(isoString);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  
+  if (isToday) {
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   }
-
-  return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl overflow-hidden max-h-[400px] overflow-y-auto">
-      <table className="w-full">
-        <thead className="bg-background-elevated/50 sticky top-0">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Device</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Browser</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Sessions</th>
-            <th className="px-4 py-3 text-right text-xs font-medium text-text-secondary uppercase">Bounce</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {data.map((item, i) => (
-            <tr key={i} className="hover:bg-background-elevated/30">
-              <td className="px-4 py-3 text-sm text-text-primary capitalize">
-                {item.device_type || 'unknown'}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary">
-                {item.browser || 'unknown'}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-right">
-                {item.session_count?.toLocaleString()}
-              </td>
-              <td className="px-4 py-3 text-sm text-right">
-                <span className={item.bounce_rate > 60 ? 'text-error-main' : 'text-text-secondary'}>
-                  {item.bounce_rate || 0}%
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SessionsTable({ data }: { data: any[] }) {
-  if (!data.length) {
-    return (
-      <div className="bg-background-surface border border-border-subtle rounded-xl p-6 text-center text-text-secondary">
-        No sessions yet
-      </div>
-    );
-  }
-
-  const formatTime = (timestamp: string) => {
-    if (!timestamp) return '-';
-    const date = new Date(timestamp);
-    return date.toLocaleString();
-  };
-
-  return (
-    <div className="bg-background-surface border border-border-subtle rounded-xl overflow-x-auto">
-      <table className="w-full">
-        <thead className="bg-background-elevated/50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Session</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Started</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-text-secondary uppercase">Entry</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">Pages</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">Duration</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">Device</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-text-secondary uppercase">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border-subtle">
-          {data.map((session, i) => (
-            <tr key={i} className="hover:bg-background-elevated/30">
-              <td className="px-4 py-3 text-sm text-text-secondary font-mono">
-                {session.session_id?.slice(0, 12)}...
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary">
-                {formatTime(session.started_at)}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-primary truncate max-w-[150px]">
-                {session.entry_page}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-center">
-                {session.pages_viewed}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-center">
-                {session.duration_ms ? `${Math.round(session.duration_ms / 1000)}s` : '-'}
-              </td>
-              <td className="px-4 py-3 text-sm text-text-secondary text-center capitalize">
-                {session.device_type || '-'}
-              </td>
-              <td className="px-4 py-3 text-center">
-                {session.converted ? (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success-main/20 text-success-light">
-                    ✓ Converted
-                  </span>
-                ) : session.is_bounce ? (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-error-main/20 text-error-light">
-                    ↩ Bounced
-                  </span>
-                ) : session.ended_at ? (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-background-elevated text-text-secondary">
-                    Ended
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-interactive-500/20 text-interactive-400">
-                    <span className="w-1.5 h-1.5 bg-interactive-500 rounded-full mr-1 animate-pulse" />
-                    Active
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 }

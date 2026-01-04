@@ -20,8 +20,13 @@ from backend.api.schemas.twitch import (
     PackResponse,
     DimensionSpecResponse,
 )
+from backend.api.service_dependencies import (
+    GenerationServiceDep,
+    ContextEngineDep,
+    GameMetaServiceDep,
+    AuditServiceDep,
+)
 from backend.services.jwt_service import TokenPayload
-from backend.services.audit_service import get_audit_service
 from backend.services.twitch import (
     ContextEngine,
     PromptConstructor,
@@ -30,8 +35,6 @@ from backend.services.twitch import (
     GameMetaService,
     DIMENSION_SPECS,
     get_dimension_spec,
-    get_context_engine,
-    get_game_meta_service,
 )
 from backend.services.exceptions import (
     BrandKitNotFoundError,
@@ -53,6 +56,9 @@ async def generate_twitch_asset(
     request: Request,
     data: TwitchGenerateRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    context_engine: ContextEngineDep = None,
+    generation_service: GenerationServiceDep = None,
+    audit: AuditServiceDep = None,
 ) -> dict:
     """
     Generate a single Twitch asset.
@@ -60,12 +66,7 @@ async def generate_twitch_asset(
     This endpoint creates a generation job and returns immediately.
     Use the job ID to poll for status.
     """
-    from backend.services.generation_service import get_generation_service
     from backend.workers.twitch_worker import enqueue_twitch_generation_job
-    
-    # Validate brand kit ownership via context engine
-    context_engine = get_context_engine()
-    generation_service = get_generation_service()
     
     try:
         # Build context (validates brand kit ownership)
@@ -100,7 +101,6 @@ async def generate_twitch_asset(
         )
         
         # Audit log
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="twitch.generate",
@@ -143,6 +143,8 @@ async def generate_pack(
     request: Request,
     data: PackGenerateRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    context_engine: ContextEngineDep = None,
+    audit: AuditServiceDep = None,
 ) -> dict:
     """
     Generate an asset pack.
@@ -154,8 +156,6 @@ async def generate_pack(
     """
     import uuid
     from backend.workers.twitch_worker import enqueue_pack_generation_job
-    
-    context_engine = get_context_engine()
     
     try:
         # Validate brand kit ownership
@@ -180,7 +180,6 @@ async def generate_pack(
         )
         
         # Audit log
-        audit = get_audit_service()
         await audit.log(
             user_id=current_user.sub,
             action="twitch.generate_pack",
@@ -267,13 +266,15 @@ async def get_dimensions() -> List[DimensionSpecResponse]:
     summary="Get game metadata",
     description="Get metadata for a game including current season information.",
 )
-async def get_game_meta(game_id: str) -> dict:
+async def get_game_meta(
+    game_id: str,
+    game_meta_service: GameMetaServiceDep = None,
+) -> dict:
     """
     Get game metadata for context.
     
     Returns game name, current season, and genre if available.
     """
-    game_meta_service = get_game_meta_service()
     meta = await game_meta_service.get_game_meta(game_id)
     
     if meta is None:

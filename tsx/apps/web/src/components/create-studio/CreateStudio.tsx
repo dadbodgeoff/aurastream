@@ -77,7 +77,7 @@ export function CreateStudio({
 
   // Check if user has premium access
   const isPremium = useMemo(() => {
-    return user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
+    return user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio' || user?.subscriptionTier === 'unlimited';
   }, [user?.subscriptionTier]);
 
   // Handle mode selection
@@ -108,35 +108,35 @@ export function CreateStudio({
       className={cn('flex flex-col h-full', className)}
       data-testid={testId}
     >
-      {/* Header - More refined */}
-      <header className="flex-shrink-0 mb-8">
-        <div className="flex items-center gap-4">
-          <div className={cn(
-            'w-12 h-12 rounded-2xl',
-            'bg-interactive-600',
-            'flex items-center justify-center',
-            'shadow-lg shadow-interactive-600/30',
-            'ring-1 ring-white/10'
-          )}>
-            <SparklesIcon className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary tracking-tight">Create Studio</h1>
-            <p className="text-sm text-text-secondary mt-0.5">
-              Generate AI-powered assets for your streams
-            </p>
+      {/* Header + Mode Selector - Compact layout */}
+      <header className="flex-shrink-0 mb-4">
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <div className={cn(
+              'w-10 h-10 rounded-xl',
+              'bg-interactive-600',
+              'flex items-center justify-center',
+              'shadow-lg shadow-interactive-600/30',
+              'ring-1 ring-white/10'
+            )}>
+              <SparklesIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-text-primary tracking-tight">Create Studio</h1>
+              <p className="text-xs text-text-secondary">
+                Generate AI-powered assets for your streams
+              </p>
+            </div>
           </div>
         </div>
-      </header>
-
-      {/* Mode Selector */}
-      <nav className="flex-shrink-0 mb-6">
+        
+        {/* Mode Selector - Inline */}
         <ModeSelector
           activeMode={state.activeMode}
           onModeSelect={handleModeSelect}
           isPremium={isPremium}
         />
-      </nav>
+      </header>
 
       {/* Panel Content */}
       <main className="flex-1 min-h-0 overflow-hidden">

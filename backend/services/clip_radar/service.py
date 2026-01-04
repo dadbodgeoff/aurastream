@@ -229,16 +229,27 @@ class ClipRadarService:
         logger.info(f"Clip radar poll complete. {len(all_viral)} viral clips detected. Success rate: {success_rate:.1f}%")
         return results
     
+    # Lua script for atomic view count update (read-modify-write)
+    # Returns the previous view count while setting the new one
+    _VIEW_COUNT_LUA_SCRIPT = """
+    local prev = redis.call('HGET', KEYS[1], ARGV[1])
+    redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+    return prev
+    """
+    _view_count_script = None
+    
+    def _get_view_count_script(self):
+        """Get or register the Lua script for atomic view count updates."""
+        if self._view_count_script is None:
+            self._view_count_script = self.redis.register_script(self._VIEW_COUNT_LUA_SCRIPT)
+        return self._view_count_script
+    
     async def _process_clip(self, clip, game_name: str) -> TrackedClip:
         """Process a clip and calculate its velocity."""
         clip_id = clip.id
         now = datetime.now(timezone.utc)
         
-        # Get previous view count from Redis
-        prev_views_str = self.redis.hget(REDIS_CLIP_VIEWS_KEY, clip_id)
-        prev_views = int(prev_views_str) if prev_views_str else None
-        
-        # Get previous data for first_seen_at
+        # Get previous data for first_seen_at (read-only, no race condition concern)
         prev_data_str = self.redis.hget(REDIS_CLIP_DATA_KEY, clip_id)
         first_seen_at = now
         if prev_data_str:
@@ -247,6 +258,15 @@ class ClipRadarService:
                 first_seen_at = datetime.fromisoformat(prev_data.get("first_seen_at", now.isoformat()))
             except (json.JSONDecodeError, ValueError):
                 pass
+        
+        # Atomic read-modify-write of view count using Lua script
+        # This prevents race conditions where two workers could read the same prev_views
+        script = self._get_view_count_script()
+        prev_views_str = script(
+            keys=[REDIS_CLIP_VIEWS_KEY],
+            args=[clip_id, clip.view_count]
+        )
+        prev_views = int(prev_views_str) if prev_views_str else None
         
         # Calculate velocity (views per minute)
         age_mins = (now - clip.created_at).total_seconds() / 60
@@ -289,8 +309,7 @@ class ClipRadarService:
             total_gained=max(0, total_gained),
         )
         
-        # Store updated data in Redis
-        self.redis.hset(REDIS_CLIP_VIEWS_KEY, clip_id, clip.view_count)
+        # Store clip metadata in Redis (view count already updated atomically above)
         self.redis.hset(REDIS_CLIP_DATA_KEY, clip_id, json.dumps({
             "first_seen_at": first_seen_at.isoformat(),
             "game_id": clip.game_id,
@@ -322,18 +341,22 @@ class ClipRadarService:
             return "📊 Gaining traction"
     
     async def _update_viral_clips(self, viral_clips: List[ViralClip]):
-        """Update the sorted set of viral clips."""
+        """Update the sorted set of viral clips atomically using Redis pipeline."""
+        # Use pipeline for atomic update of viral clips
+        pipe = self.redis.pipeline()
+        
         # Clear old viral clips
-        self.redis.delete(REDIS_VIRAL_CLIPS_KEY)
+        pipe.delete(REDIS_VIRAL_CLIPS_KEY)
+        pipe.delete(f"{REDIS_VIRAL_CLIPS_KEY}:data")
         
         # Add new viral clips sorted by velocity
         for clip in viral_clips:
-            self.redis.zadd(
+            pipe.zadd(
                 REDIS_VIRAL_CLIPS_KEY,
                 {clip.clip_id: clip.velocity},
             )
             # Store full clip data
-            self.redis.hset(
+            pipe.hset(
                 f"{REDIS_VIRAL_CLIPS_KEY}:data",
                 clip.clip_id,
                 json.dumps({
@@ -355,6 +378,9 @@ class ClipRadarService:
                     "language": clip.language,
                 })
             )
+        
+        # Execute all operations atomically
+        pipe.execute()
     
     async def get_viral_clips(self, limit: int = 20, game_id: Optional[str] = None) -> List[ViralClip]:
         """

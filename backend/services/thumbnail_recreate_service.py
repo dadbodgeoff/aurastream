@@ -70,6 +70,10 @@ class ThumbnailRecreateService:
         use_brand_colors: bool = False,
         brand_kit_id: Optional[str] = None,
         additional_instructions: Optional[str] = None,
+        media_asset_ids: Optional[list] = None,
+        media_asset_placements: Optional[list] = None,
+        canvas_snapshot_url: Optional[str] = None,
+        canvas_snapshot_description: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Recreate a thumbnail with user's face.
@@ -85,6 +89,10 @@ class ThumbnailRecreateService:
             use_brand_colors: Use brand kit colors
             brand_kit_id: Brand kit ID if using brand colors
             additional_instructions: Extra generation instructions
+            media_asset_ids: List of media asset IDs to include
+            media_asset_placements: List of placement dicts for precise positioning
+            canvas_snapshot_url: URL of canvas snapshot for single-image mode
+            canvas_snapshot_description: Description of canvas contents for AI context
             
         Returns:
             Dict with recreation_id, job_id, status
@@ -112,6 +120,7 @@ class ThumbnailRecreateService:
                 custom_text=custom_text,
                 brand_colors=brand_colors,
                 additional_instructions=additional_instructions,
+                media_asset_placements=media_asset_placements,
             )
             
             # 4. Create generation job with reference image
@@ -126,6 +135,12 @@ class ThumbnailRecreateService:
                     "reference_video_id": video_id,
                     "face_image_base64": face_data.get("base64") if face_data else None,
                     "recreation_id": recreation_id,
+                    # Media placements for worker to download and attach (legacy mode)
+                    "media_placements": media_asset_placements if not canvas_snapshot_url else None,
+                    "media_asset_ids": media_asset_ids if not canvas_snapshot_url else None,
+                    # Canvas snapshot mode - more cost-effective for complex compositions
+                    "canvas_snapshot_url": canvas_snapshot_url,
+                    "canvas_snapshot_description": canvas_snapshot_description,
                 },
             )
             
@@ -312,6 +327,7 @@ class ThumbnailRecreateService:
         custom_text: Optional[str] = None,
         brand_colors: Optional[list] = None,
         additional_instructions: Optional[str] = None,
+        media_asset_placements: Optional[list] = None,
     ) -> str:
         """
         Build the recreation prompt from analysis data.
@@ -345,6 +361,18 @@ FACE REPLACEMENT INSTRUCTIONS:
 - Blend the face naturally with the background and composition
 """
         
+        # Build media asset instructions if placements provided
+        media_instructions = ""
+        if media_asset_placements:
+            from backend.services.creator_media.placement_formatter import get_placement_formatter
+            formatter = get_placement_formatter()
+            # YouTube thumbnail dimensions
+            media_instructions = formatter.format_placements(
+                placements=media_asset_placements,
+                canvas_width=1280,
+                canvas_height=720,
+            )
+        
         # Build the full prompt
         prompt = f"""THUMBNAIL RECREATION MODE - USE THE ATTACHED REFERENCE IMAGE
 
@@ -376,6 +404,8 @@ TEXT CONTENT: "{text_content}"
 
 WHY THIS WORKS: {analysis.why_it_works}
 
+{media_instructions}
+
 RECREATION INSTRUCTIONS:
 1. LOOK AT THE REFERENCE IMAGE - copy its exact composition and layout
 2. Recreate the same visual style, effects, and mood
@@ -385,6 +415,7 @@ RECREATION INSTRUCTIONS:
 6. Ensure text is prominent and readable
 7. Output dimensions: 1280x720 (YouTube thumbnail)
 8. Make it look professional and click-worthy - MATCH THE REFERENCE QUALITY
+9. If user assets are provided, place them EXACTLY as specified in the placement instructions
 
 {additional_instructions or ""}
 

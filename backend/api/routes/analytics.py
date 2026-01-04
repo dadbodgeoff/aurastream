@@ -12,7 +12,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from pydantic import BaseModel, Field, field_validator
 
-from backend.services.analytics_service import get_analytics_service, AnalyticsService
+from backend.api.service_dependencies import AnalyticsServiceDep
 
 logger = logging.getLogger(__name__)
 
@@ -115,15 +115,6 @@ class AnalyticsSummaryResponse(BaseModel):
 
 
 # =============================================================================
-# Dependencies
-# =============================================================================
-
-def get_service() -> AnalyticsService:
-    """Dependency to get analytics service."""
-    return get_analytics_service()
-
-
-# =============================================================================
 # Routes
 # =============================================================================
 
@@ -146,7 +137,7 @@ async def ingest_events(
     request: Request,
     batch: AnalyticsBatchRequest,
     background_tasks: BackgroundTasks,
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> AnalyticsResponse:
     """
     Ingest a batch of analytics events.
@@ -182,7 +173,7 @@ async def ingest_events(
     description="Check if the analytics ingestion service is healthy.",
 )
 async def analytics_health(
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> dict:
     """Health check for analytics service."""
     try:
@@ -219,7 +210,7 @@ async def analytics_health(
 async def get_analytics_summary(
     request: Request,
     time_range: str = "24h",
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> AnalyticsSummaryResponse:
     """
     Get analytics summary for dashboard.
@@ -242,7 +233,7 @@ async def get_analytics_summary(
     description="Clear all analytics data. Admin only, for testing purposes.",
 )
 async def clear_analytics(
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> dict:
     """Clear all analytics data."""
     service.clear_all()
@@ -270,7 +261,7 @@ async def clear_analytics(
 )
 async def flush_analytics(
     force: bool = False,
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> dict:
     """
     Flush analytics data from Redis to PostgreSQL.
@@ -305,7 +296,7 @@ async def flush_analytics(
 async def get_popular_assets(
     days: int = 30,
     limit: int = 10,
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> dict:
     """
     Get the most popular asset types.
@@ -334,7 +325,7 @@ async def get_popular_assets(
     description="Get the status of the last analytics flush operation.",
 )
 async def get_flush_status(
-    service: AnalyticsService = Depends(get_service),
+    service: AnalyticsServiceDep = None,
 ) -> dict:
     """Get the status of the last flush operation."""
     last_flush = service.get_last_flush_time()

@@ -354,6 +354,21 @@ class ThumbnailOfDay(BaseModel):
     why_it_works: str = Field(..., description="AI explanation of why this thumbnail works")
 
 
+class MarketOpportunityData(BaseModel):
+    """Market opportunity analysis for header badge."""
+    level: Literal["high", "medium", "low"] = Field(..., description="Opportunity level")
+    reason: str = Field(..., description="Why this level")
+    active_streams: int = Field(..., ge=0, description="Active streams count")
+    change_percent: float = Field(..., description="Change vs yesterday")
+    primary_category: str = Field(..., description="Category this is for")
+
+
+class DailyAssetsData(BaseModel):
+    """Daily asset creation stats for header badge."""
+    created_today: int = Field(..., ge=0, description="Assets created today")
+    pending_review: int = Field(..., ge=0, description="Jobs still processing")
+
+
 class DailyBriefResponse(BaseModel):
     """Response for daily brief."""
     brief_date: date = Field(..., description="Date of the brief")
@@ -369,6 +384,16 @@ class DailyBriefResponse(BaseModel):
     thumbnail_patterns: Optional[ThumbnailPatterns] = Field(default=None, description="Thumbnail pattern analysis")
     trending_keywords: Optional[TrendingKeywordsResponse] = Field(default=None, description="Trending keywords for content")
     generated_at: Optional[datetime] = Field(default=None, description="When brief was generated")
+    
+    # NEW: Intel redesign header badge data
+    market_opportunity: Optional[MarketOpportunityData] = Field(
+        default=None,
+        description="Market opportunity indicator for header badge"
+    )
+    daily_assets: Optional[DailyAssetsData] = Field(
+        default=None,
+        description="Daily asset creation stats for header badge"
+    )
 
 
 # ============================================================================

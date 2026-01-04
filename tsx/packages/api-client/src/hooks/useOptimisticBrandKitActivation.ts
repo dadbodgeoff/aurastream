@@ -9,6 +9,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef, useCallback } from 'react';
 import { apiClient } from '../client';
 import { brandKitKeys } from './useBrandKits';
 import type { BrandKit, BrandKitListResponse } from '../types/brandKit';
@@ -49,6 +50,7 @@ export interface UseOptimisticBrandKitActivationOptions {
  * 3. Optimistically updating the cache to show the new active state
  * 4. Rolling back on error and showing an error toast
  * 5. Invalidating queries on settlement to ensure server consistency
+ * 6. Deduplicating rapid clicks to prevent race conditions
  *
  * @example
  * ```tsx
@@ -56,15 +58,15 @@ export interface UseOptimisticBrandKitActivationOptions {
  * import { toast } from '@/components/ui/Toast';
  *
  * function BrandKitCard({ brandKit }) {
- *   const activateMutation = useOptimisticBrandKitActivation({
+ *   const { activate, isPending } = useOptimisticBrandKitActivation({
  *     onError: (error) => toast.error('Failed to activate brand kit'),
  *     onSuccess: (kit) => toast.success(`${kit.name} is now active`),
  *   });
  *
  *   return (
  *     <button
- *       onClick={() => activateMutation.mutate(brandKit.id)}
- *       disabled={activateMutation.isPending}
+ *       onClick={() => activate(brandKit.id)}
+ *       disabled={isPending}
  *     >
  *       {brandKit.is_active ? 'Active' : 'Activate'}
  *     </button>
@@ -73,14 +75,17 @@ export interface UseOptimisticBrandKitActivationOptions {
  * ```
  *
  * @param options - Optional callbacks for error and success handling
- * @returns TanStack Query mutation object with optimistic update behavior
+ * @returns Object with activate function and mutation state
  */
 export function useOptimisticBrandKitActivation(
   options?: UseOptimisticBrandKitActivationOptions
 ) {
   const queryClient = useQueryClient();
+  
+  // Track in-flight activation to prevent race conditions from rapid clicks
+  const pendingActivationRef = useRef<string | null>(null);
 
-  return useMutation<BrandKit, Error, string, OptimisticContext>({
+  const mutation = useMutation<BrandKit, Error, string, OptimisticContext>({
     mutationFn: (brandKitId: string) => apiClient.brandKits.activate(brandKitId),
 
     onMutate: async (brandKitId: string): Promise<OptimisticContext> => {
@@ -157,11 +162,35 @@ export function useOptimisticBrandKitActivation(
       options?.onSuccess?.(data);
     },
 
-    onSettled: () => {
+    onSettled: (_data, _error, brandKitId) => {
+      // Clear pending activation tracking
+      if (pendingActivationRef.current === brandKitId) {
+        pendingActivationRef.current = null;
+      }
       // Always invalidate to ensure server state consistency
       queryClient.invalidateQueries({ queryKey: brandKitKeys.all });
     },
   });
+
+  // Wrapped activate function with deduplication
+  const activate = useCallback((brandKitId: string) => {
+    // Prevent rapid clicks on the same or different brand kits
+    if (pendingActivationRef.current !== null) {
+      return;
+    }
+    pendingActivationRef.current = brandKitId;
+    mutation.mutate(brandKitId);
+  }, [mutation]);
+
+  return {
+    activate,
+    mutate: activate, // Alias for backward compatibility
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error,
+    data: mutation.data,
+    reset: mutation.reset,
+  };
 }
 
 export default useOptimisticBrandKitActivation;

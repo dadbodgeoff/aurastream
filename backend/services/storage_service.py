@@ -485,6 +485,74 @@ class StorageService:
             logger.debug(f"Error checking if asset exists at {path}: {e}")
             return False
     
+    async def upload_raw(
+        self,
+        path: str,
+        data: bytes,
+        content_type: str = "image/png",
+    ) -> UploadResult:
+        """
+        Upload raw data to a specific path in storage.
+        
+        Unlike upload_asset, this method allows specifying the exact path
+        without auto-generating UUIDs. Useful for temporary files like
+        canvas snapshots.
+        
+        Args:
+            path: Full storage path (e.g., "snapshots/user-123/snap_abc.png")
+            data: Raw bytes to upload
+            content_type: MIME type of the data
+            
+        Returns:
+            UploadResult with url, path, and file_size
+            
+        Raises:
+            StorageUploadError: If upload fails
+            
+        Example:
+            ```python
+            result = await storage.upload_raw(
+                path="snapshots/user-123/snap_abc.png",
+                data=image_bytes,
+                content_type="image/png"
+            )
+            ```
+        """
+        try:
+            logger.info(f"Uploading raw data to {self._bucket}/{path}")
+            
+            # Upload to Supabase Storage
+            response = self.storage.from_(self._bucket).upload(
+                path=path,
+                file=data,
+                file_options={
+                    "content-type": content_type,
+                    "upsert": "true"  # Allow overwriting for snapshots
+                }
+            )
+            
+            # Get the public URL
+            public_url = self._get_public_url(path)
+            
+            # Calculate file size
+            file_size = len(data)
+            
+            logger.info(
+                f"Successfully uploaded raw data: path={path}, "
+                f"size={file_size} bytes"
+            )
+            
+            return UploadResult(
+                url=public_url,
+                path=path,
+                file_size=file_size
+            )
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Failed to upload raw data to {path}: {error_msg}")
+            raise StorageUploadError(reason=error_msg, path=path)
+
     async def get_asset_info(self, path: str) -> Optional[dict]:
         """
         Get metadata about an asset.

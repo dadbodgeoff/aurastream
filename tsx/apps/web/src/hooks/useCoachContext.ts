@@ -70,6 +70,9 @@ export interface StartCoachRequest {
   // Creator Media Library integration
   media_asset_ids?: string[] | null;  // Max 2 assets
   media_asset_placements?: SerializedMediaPlacement[] | null;  // Precise placement data
+  // Canvas Studio integration - single-image mode for complex compositions
+  canvas_snapshot_url?: string | null;  // URL of canvas snapshot for single-image mode
+  canvas_snapshot_description?: string | null;  // Description of canvas contents for AI context
 }
 
 /** Serialized media placement for API transmission */

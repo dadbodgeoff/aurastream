@@ -7,7 +7,7 @@ Provides creators with actionable insights from trending content.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 
@@ -15,6 +15,8 @@ from backend.api.middleware.auth import get_current_user, get_current_user_optio
 from backend.services.jwt_service import TokenPayload
 from backend.api.schemas.trends import (
     DailyBriefResponse,
+    MarketOpportunityData,
+    DailyAssetsData,
     YouTubeTrendingResponse,
     YouTubeVideoResponse,
     YouTubeSearchRequest,
@@ -36,6 +38,7 @@ from backend.api.schemas.trends import (
     TrendingKeyword,
 )
 from backend.services.trends import get_youtube_collector, get_twitch_collector
+from backend.api.service_dependencies import YouTubeCollectorDep, TwitchCollectorDep, GenerationServiceDep
 from backend.database.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -46,6 +49,19 @@ router = APIRouter(prefix="/trends", tags=["Trends"])
 YOUTUBE_TRENDING_CACHE_TTL = 60 * 30  # 30 minutes - trending doesn't change that fast
 YOUTUBE_GAMES_CACHE_TTL = 60 * 15     # 15 minutes - game-specific content
 YOUTUBE_SEARCH_CACHE_TTL = 60 * 10    # 10 minutes - search results
+
+# Game ID mapping for Twitch
+TWITCH_GAME_IDS = {
+    "fortnite": "33214",
+    "warzone": "512710",
+    "valorant": "516575",
+    "minecraft": "27471",
+    "league_of_legends": "21779",
+    "apex_legends": "511224",
+    "gta": "32982",
+    "roblox": "23020",
+    "call_of_duty": "512710",
+}
 
 # Tier limits for rate-limited features
 SEARCH_LIMITS = {"free": 0, "pro": 10, "studio": 50, "unlimited": 100}
@@ -90,24 +106,102 @@ def _check_tier_access(tier: str, required_tiers: tuple) -> bool:
 @router.get("/daily-brief", response_model=DailyBriefResponse)
 async def get_daily_brief(
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    twitch_collector: TwitchCollectorDep = None,
+    generation_service: GenerationServiceDep = None,
 ) -> DailyBriefResponse:
     """
     Get today's compiled daily brief with AI insights.
     
     Available to all tiers. Returns curated trending content with
     AI-generated insights, thumbnail of the day, and pattern analysis.
-    """
-    # TODO: Import and use trend service when implemented
-    # service = get_trend_service()
-    # brief = await service.get_daily_brief()
-    # if not brief:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Daily brief not available yet")
-    # return brief
     
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Daily brief feature coming soon"
-    )
+    NEW: Includes market_opportunity and daily_assets for Intel header badges.
+    """
+    try:
+        # Get market opportunity data
+        market_opportunity = None
+        if current_user and twitch_collector:
+            try:
+                # Default to fortnite if no user preferences
+                primary_category = "fortnite"
+                game_id = TWITCH_GAME_IDS.get(primary_category)
+                
+                if game_id:
+                    streams = await twitch_collector.fetch_top_streams(limit=100, game_id=game_id)
+                    active_count = len(streams)
+                    
+                    # Determine opportunity level based on competition
+                    if active_count < 100:
+                        level = "high"
+                        reason = f"Low competition with only {active_count} active streams"
+                    elif active_count < 500:
+                        level = "medium"
+                        reason = f"Moderate competition with {active_count} active streams"
+                    else:
+                        level = "low"
+                        reason = f"High competition with {active_count} active streams"
+                    
+                    market_opportunity = MarketOpportunityData(
+                        level=level,
+                        reason=reason,
+                        active_streams=active_count,
+                        change_percent=0.0,  # TODO: Calculate from historical data
+                        primary_category=primary_category,
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to get market opportunity: {e}")
+        
+        # Get daily assets data
+        daily_assets = None
+        if current_user and generation_service:
+            try:
+                stats = await generation_service.get_daily_asset_stats(current_user.sub)
+                daily_assets = DailyAssetsData(
+                    created_today=stats.get("created_today", 0),
+                    pending_review=stats.get("pending_review", 0),
+                )
+            except Exception as e:
+                logger.warning(f"Failed to get daily asset stats: {e}")
+        
+        # Return basic brief with new fields
+        return DailyBriefResponse(
+            brief_date=date.today(),
+            thumbnail_of_day=None,
+            youtube_highlights=[],
+            twitch_highlights=[],
+            hot_games=[],
+            top_clips=[],
+            insights=[],
+            best_upload_times=None,
+            best_stream_times=None,
+            title_patterns=None,
+            thumbnail_patterns=None,
+            trending_keywords=None,
+            generated_at=datetime.utcnow(),
+            market_opportunity=market_opportunity,
+            daily_assets=daily_assets,
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to generate daily brief: {e}")
+        # Return empty brief on error
+        return DailyBriefResponse(
+            brief_date=date.today(),
+            thumbnail_of_day=None,
+            youtube_highlights=[],
+            twitch_highlights=[],
+            hot_games=[],
+            top_clips=[],
+            insights=[],
+            best_upload_times=None,
+            best_stream_times=None,
+            title_patterns=None,
+            thumbnail_patterns=None,
+            trending_keywords=None,
+            generated_at=datetime.utcnow(),
+            market_opportunity=None,
+            daily_assets=None,
+        )
 
 
 @router.get("/youtube/trending", response_model=YouTubeTrendingResponse)
@@ -164,6 +258,7 @@ async def get_twitch_live(
     limit: int = Query(20, ge=1, le=100),
     game_id: Optional[str] = Query(None, description="Filter by game ID"),
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    collector: TwitchCollectorDep = None,
 ) -> TwitchLiveResponse:
     """
     Get current top Twitch streams with rich metadata.
@@ -172,7 +267,6 @@ async def get_twitch_live(
     tags, language, duration, and velocity indicators.
     """
     try:
-        collector = get_twitch_collector()
         raw_streams = await collector.fetch_top_streams(limit=limit, game_id=game_id)
         
         now = datetime.utcnow()
@@ -225,6 +319,7 @@ async def get_twitch_live(
 async def get_twitch_games(
     limit: int = Query(20, ge=1, le=50),
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    collector: TwitchCollectorDep = None,
 ) -> TwitchGamesResponse:
     """
     Get current top games on Twitch with rich metadata.
@@ -251,8 +346,6 @@ async def get_twitch_games(
     }
     
     try:
-        collector = get_twitch_collector()
-        
         # Fetch top games
         raw_games = await collector.fetch_top_games(limit=limit)
         
@@ -351,6 +444,7 @@ async def get_twitch_clips(
     period: str = Query("day", pattern="^(day|week|month|all)$"),
     limit: int = Query(20, ge=1, le=100),
     current_user: Optional[TokenPayload] = Depends(get_current_user_optional),
+    collector: TwitchCollectorDep = None,
 ) -> TwitchClipsResponse:
     """
     Get top Twitch clips for a game or overall.
@@ -361,8 +455,6 @@ async def get_twitch_clips(
     Periods: day, week, month, all
     """
     try:
-        collector = get_twitch_collector()
-        
         # If no game_id, get clips from top games
         if not game_id:
             # Get top game

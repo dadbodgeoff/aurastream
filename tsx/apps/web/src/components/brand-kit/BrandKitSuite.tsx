@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useBrandKit,
@@ -93,6 +93,9 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
 
   // Logo upload mutation
   const uploadLogoMutation = useUploadLogo();
+  
+  // Track in-progress saves to prevent concurrent mutations
+  const savingRef = useRef<Set<string>>(new Set());
 
   // Populate from API data
   useEffect(() => {
@@ -133,8 +136,12 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
     window.history.replaceState({}, '', url.toString());
   }, []);
 
-  // Save handlers with enterprise toast feedback
+  // Save handlers with enterprise toast feedback and mutation deduplication
   const handleSaveIdentity = async () => {
+    // Prevent concurrent identity saves
+    if (savingRef.current.has('identity')) return;
+    savingRef.current.add('identity');
+    
     try {
       if (isNew) {
         const result = await createMutation.mutateAsync({
@@ -202,11 +209,15 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
         onRetry: handleSaveIdentity,
         onNavigate: (path) => router.push(path),
       });
+    } finally {
+      savingRef.current.delete('identity');
     }
   };
 
   const handleSaveColors = async () => {
-    if (!brandKitId) return;
+    if (!brandKitId || savingRef.current.has('colors')) return;
+    savingRef.current.add('colors');
+    
     try {
       await updateColorsMutation.mutateAsync({ brandKitId, colors });
       showSuccessToast('Colors saved!', {
@@ -216,11 +227,15 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
       showErrorToast(err, {
         onRetry: handleSaveColors,
       });
+    } finally {
+      savingRef.current.delete('colors');
     }
   };
 
   const handleSaveTypography = async () => {
-    if (!brandKitId) return;
+    if (!brandKitId || savingRef.current.has('typography')) return;
+    savingRef.current.add('typography');
+    
     try {
       await updateTypographyMutation.mutateAsync({ brandKitId, typography });
       showSuccessToast('Typography saved!', {
@@ -230,11 +245,15 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
       showErrorToast(err, {
         onRetry: handleSaveTypography,
       });
+    } finally {
+      savingRef.current.delete('typography');
     }
   };
 
   const handleSaveVoice = async () => {
-    if (!brandKitId) return;
+    if (!brandKitId || savingRef.current.has('voice')) return;
+    savingRef.current.add('voice');
+    
     try {
       await updateVoiceMutation.mutateAsync({ brandKitId, voice });
       showSuccessToast('Brand voice saved!', {
@@ -244,11 +263,15 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
       showErrorToast(err, {
         onRetry: handleSaveVoice,
       });
+    } finally {
+      savingRef.current.delete('voice');
     }
   };
 
   const handleSaveGuidelines = async () => {
-    if (!brandKitId) return;
+    if (!brandKitId || savingRef.current.has('guidelines')) return;
+    savingRef.current.add('guidelines');
+    
     try {
       await updateGuidelinesMutation.mutateAsync({ brandKitId, guidelines });
       showSuccessToast('Guidelines saved!', {
@@ -258,6 +281,8 @@ export function BrandKitSuite({ brandKitId }: BrandKitSuiteProps) {
       showErrorToast(err, {
         onRetry: handleSaveGuidelines,
       });
+    } finally {
+      savingRef.current.delete('guidelines');
     }
   };
 

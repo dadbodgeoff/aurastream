@@ -15,6 +15,7 @@ import { Check, ChevronRight, Sparkles, ArrowLeft, Palette } from 'lucide-react'
 import confetti from 'canvas-confetti';
 
 import { useCreateBrandKit, type BrandKitTone } from '@aurastream/api-client';
+import { useSimpleAnalytics } from '@aurastream/shared';
 import { showSuccessToast, showErrorToast } from '@/utils/errorMessages';
 import { cn } from '@/lib/utils';
 
@@ -82,6 +83,7 @@ type WizardStep = 'setup' | 'creating' | 'success';
 export function QuickSetupWizard({ onComplete, onCancel }: QuickSetupWizardProps) {
   const router = useRouter();
   const createMutation = useCreateBrandKit();
+  const { trackEvent } = useSimpleAnalytics();
   
   const [step, setStep] = useState<WizardStep>('setup');
   const [createdKitId, setCreatedKitId] = useState<string | null>(null);
@@ -120,6 +122,9 @@ export function QuickSetupWizard({ onComplete, onCancel }: QuickSetupWizardProps
       
       setCreatedKitId(result.id);
       setStep('success');
+      
+      // Track brand kit creation
+      trackEvent('brand_kit_created', { brandKitId: result.id, tone });
       
       // Celebration!
       confetti({

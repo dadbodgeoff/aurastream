@@ -95,13 +95,32 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
                   videoId: thumb.videoId,
                   title: thumb.title,
                   thumbnailUrl: thumb.thumbnailUrl || thumb.url,
+                  viewCount: thumb.viewCount,
                   layoutType: thumb.layoutType,
+                  textPlacement: thumb.textPlacement,
+                  focalPoint: thumb.focalPoint,
                   colorMood: thumb.colorMood,
+                  backgroundStyle: thumb.backgroundStyle,
                   whyItWorks: thumb.whyItWorks,
                   hasFace: thumb.hasFace,
                   hasText: thumb.hasText,
                   textContent: thumb.textContent,
+                  hasBorder: thumb.hasBorder,
+                  hasGlowEffects: thumb.hasGlowEffects,
+                  hasArrowsCircles: thumb.hasArrowsCircles,
                   dominantColors: thumb.dominantColors,
+                  faceExpression: thumb.faceExpression,
+                  facePosition: thumb.facePosition,
+                  faceSize: thumb.faceSize,
+                  faceLookingDirection: thumb.faceLookingDirection,
+                  layoutRecipe: thumb.layoutRecipe,
+                  colorRecipe: thumb.colorRecipe,
+                  difficulty: thumb.difficulty,
+                  channelName: thumb.channelName,
+                  publishedAt: thumb.publishedAt,
+                  hashtags: thumb.hashtags,
+                  formatType: thumb.formatType,
+                  aspectRatio: thumb.aspectRatio,
                 }))}`}
                 className="flex-shrink-0 w-28 aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-interactive-500/50 transition-colors relative"
               >
@@ -125,18 +144,28 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
                   variant="bodySmall" 
                   weight="medium" 
                   lineClamp={2} 
-                  className="mb-1.5 group-hover:text-interactive-400 transition-colors"
+                  className="mb-1 group-hover:text-interactive-400 transition-colors"
                 >
                   {thumb.title}
                 </Text>
 
+                {/* Channel + Time */}
+                <div className="flex items-center gap-2 mb-1.5">
+                  {thumb.channelName && (
+                    <Micro color="tertiary">{thumb.channelName}</Micro>
+                  )}
+                  {thumb.publishedAt && (
+                    <Micro color="tertiary">• {formatTimeAgo(thumb.publishedAt)}</Micro>
+                  )}
+                </div>
+
                 {/* Stats Row */}
-                <div className="flex flex-wrap items-center gap-2 mb-2">
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
                   {thumb.viewCount && (
                     <Badge variant="success" size="xs" icon={<Eye className="w-3 h-3" />}>
                       {thumb.viewCount >= 1000000 
                         ? `${(thumb.viewCount / 1000000).toFixed(1)}M` 
-                        : `${(thumb.viewCount / 1000).toFixed(0)}K`} views
+                        : `${(thumb.viewCount / 1000).toFixed(0)}K`}
                     </Badge>
                   )}
                   {thumb.layoutType && (
@@ -147,6 +176,22 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
                   {thumb.colorMood && (
                     <Badge size="xs" icon={<Palette className="w-2.5 h-2.5" />} className="bg-purple-500/10 text-purple-400 border-purple-500/30">
                       {thumb.colorMood}
+                    </Badge>
+                  )}
+                  {thumb.formatType && thumb.formatType !== 'standard' && (
+                    <Badge size="xs" className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30">
+                      {thumb.formatType}
+                    </Badge>
+                  )}
+                  {thumb.difficulty && (
+                    <Badge size="xs" className={
+                      thumb.difficulty === 'easy' 
+                        ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                        : thumb.difficulty === 'medium'
+                          ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+                          : 'bg-red-500/10 text-red-400 border-red-500/30'
+                    }>
+                      {thumb.difficulty}
                     </Badge>
                   )}
                 </div>
@@ -172,7 +217,19 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
                   {thumb.hasGlowEffects && (
                     <Badge variant="secondary" size="xs">glow</Badge>
                   )}
+                  {thumb.hasArrowsCircles && (
+                    <Badge variant="secondary" size="xs">arrows</Badge>
+                  )}
                 </div>
+
+                {/* Hashtags */}
+                {thumb.hashtags && thumb.hashtags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {thumb.hashtags.slice(0, 3).map((tag, i) => (
+                      <Micro key={i} className="text-interactive-400">#{tag}</Micro>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </article>
@@ -196,6 +253,99 @@ export function ThumbnailFeed({ categoryKey, categoryName }: ThumbnailFeedProps)
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {/* Category Patterns - Aggregated insights */}
+      {insight && (insight.commonLayout || insight.commonColors?.length > 0 || insight.mustHaveElements?.length > 0) && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl mt-2 space-y-3">
+          <Label className="text-blue-400">📊 Category Patterns</Label>
+          
+          {/* Common Layout */}
+          {insight.commonLayout && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide">Most Common Layout</Micro>
+              <Caption color="secondary">{insight.commonLayout}</Caption>
+            </div>
+          )}
+
+          {/* Ideal Layout */}
+          {insight.idealLayout && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide">Ideal Layout</Micro>
+              <Caption color="secondary">{insight.idealLayout}</Caption>
+            </div>
+          )}
+
+          {/* Common Colors */}
+          {insight.commonColors && insight.commonColors.length > 0 && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide mb-1">Common Colors</Micro>
+              <div className="flex gap-1">
+                {insight.commonColors.slice(0, 5).map((color, i) => (
+                  <div 
+                    key={i}
+                    className="w-5 h-5 rounded border border-white/20"
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Ideal Color Palette */}
+          {insight.idealColorPalette && insight.idealColorPalette.length > 0 && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide mb-1">Ideal Palette</Micro>
+              <div className="flex gap-1">
+                {insight.idealColorPalette.slice(0, 5).map((color, i) => (
+                  <div 
+                    key={i}
+                    className="w-5 h-5 rounded border border-white/20"
+                    style={{ backgroundColor: color }}
+                    title={color}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Common Elements */}
+          {insight.commonElements && insight.commonElements.length > 0 && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide mb-1">Common Elements</Micro>
+              <div className="flex flex-wrap gap-1">
+                {insight.commonElements.map((el, i) => (
+                  <Badge key={i} variant="secondary" size="xs">{el}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Must Have Elements */}
+          {insight.mustHaveElements && insight.mustHaveElements.length > 0 && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide mb-1">Must Have ✓</Micro>
+              <div className="flex flex-wrap gap-1">
+                {insight.mustHaveElements.map((el, i) => (
+                  <Badge key={i} size="xs" className="bg-green-500/10 text-green-400 border-green-500/30">{el}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Avoid Elements */}
+          {insight.avoidElements && insight.avoidElements.length > 0 && (
+            <div>
+              <Micro color="tertiary" className="uppercase tracking-wide mb-1">Avoid ✗</Micro>
+              <div className="flex flex-wrap gap-1">
+                {insight.avoidElements.map((el, i) => (
+                  <Badge key={i} size="xs" className="bg-red-500/10 text-red-400 border-red-500/30">{el}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

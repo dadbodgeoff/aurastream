@@ -292,6 +292,7 @@ class CreativeDirectorServiceV2:
         session_id: str,
         user_id: str,
         message: str,
+        reference_assets: list[dict] | None = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Continue the creative direction conversation.
@@ -300,6 +301,7 @@ class CreativeDirectorServiceV2:
             session_id: Session UUID
             user_id: User ID for ownership check
             message: User's response/refinement
+            reference_assets: Optional list of reference assets from user's library
             
         Yields:
             StreamChunk objects with tokens, intent status, etc.
@@ -321,8 +323,14 @@ class CreativeDirectorServiceV2:
             )
             return
         
+        # Build the user message with reference assets context
+        user_message_content = message
+        if reference_assets:
+            ref_context = self._build_reference_assets_context(reference_assets)
+            user_message_content = f"{message}\n\n{ref_context}"
+        
         # Build messages
-        messages = self.prompts.build_conversation_messages(session, message)
+        messages = self.prompts.build_conversation_messages(session, user_message_content)
         
         # Stream response
         full_response = ""
@@ -499,6 +507,39 @@ class CreativeDirectorServiceV2:
         except Exception as e:
             logger.warning(f"Search failed: {e}")
             return None
+    
+    def _build_reference_assets_context(self, reference_assets: list[dict]) -> str:
+        """
+        Build context string for reference assets attached to a message.
+        
+        Args:
+            reference_assets: List of reference asset dictionaries
+                
+        Returns:
+            Formatted context string for the LLM
+        """
+        if not reference_assets:
+            return ""
+        
+        lines = ["📎 Reference images attached:"]
+        for i, asset in enumerate(reference_assets, 1):
+            asset_type = asset.get("asset_type", "image")
+            display_name = asset.get("display_name", f"Reference {i}")
+            description = asset.get("description", "")
+            url = asset.get("url", "")
+            
+            ref_line = f"  {i}. [{asset_type}] \"{display_name}\""
+            if description:
+                ref_line += f" - {description}"
+            if url:
+                ref_line += f" (URL: {url})"
+            
+            lines.append(ref_line)
+        
+        lines.append("")
+        lines.append("Please consider these visual references when refining the creative direction.")
+        
+        return "\n".join(lines)
     
     async def _stream_llm_response(
         self,

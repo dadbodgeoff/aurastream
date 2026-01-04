@@ -20,7 +20,10 @@ from backend.api.schemas.thumbnail_recreate import (
     UploadFaceRequest,
     UploadFaceResponse,
 )
-from backend.services.thumbnail_recreate_service import get_thumbnail_recreate_service
+from backend.api.service_dependencies import (
+    ThumbnailRecreateServiceDep,
+    UsageLimitServiceDep,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,8 @@ router = APIRouter(prefix="/thumbnails", tags=["Thumbnail Recreation"])
 async def recreate_thumbnail(
     request: RecreateRequest,
     current_user: TokenPayload = Depends(get_current_user),
+    service: ThumbnailRecreateServiceDep = None,
+    usage_service: UsageLimitServiceDep = None,
 ):
     """
     Recreate a winning thumbnail with user's face.
@@ -45,10 +50,7 @@ async def recreate_thumbnail(
     - Pro: Counts toward 50 creations/month
     - Studio: Unlimited
     """
-    from backend.services.usage_limit_service import get_usage_limit_service
-    
     # Check usage limits (counts as a creation)
-    usage_service = get_usage_limit_service()
     usage = await usage_service.check_limit(current_user.sub, "creations")
     
     if not usage.can_use:
@@ -73,8 +75,6 @@ async def recreate_thumbnail(
                 detail="Face image required. Provide face_image_base64 or face_asset_id."
             )
     
-    service = get_thumbnail_recreate_service()
-    
     try:
         result = await service.recreate(
             user_id=current_user.sub,
@@ -87,6 +87,12 @@ async def recreate_thumbnail(
             use_brand_colors=request.use_brand_colors,
             brand_kit_id=request.brand_kit_id,
             additional_instructions=request.additional_instructions,
+            # Media asset data (legacy mode - individual placements)
+            media_asset_ids=request.media_asset_ids,
+            media_asset_placements=[p.model_dump() for p in request.media_asset_placements] if request.media_asset_placements else None,
+            # Canvas snapshot mode - single image with composition (more cost-effective)
+            canvas_snapshot_url=request.canvas_snapshot_url,
+            canvas_snapshot_description=request.canvas_snapshot_description,
         )
         
         # Increment usage counter after successful creation
@@ -105,13 +111,13 @@ async def recreate_thumbnail(
 async def get_recreation_status(
     recreation_id: str,
     current_user: TokenPayload = Depends(get_current_user),
+    service: ThumbnailRecreateServiceDep = None,
 ):
     """
     Check status of a thumbnail recreation.
     
     Poll this endpoint to track progress and get the result when complete.
     """
-    service = get_thumbnail_recreate_service()
     
     try:
         result = await service.get_status(
@@ -133,13 +139,13 @@ async def get_recreation_history(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current_user: TokenPayload = Depends(get_current_user),
+    service: ThumbnailRecreateServiceDep = None,
 ):
     """
     Get user's thumbnail recreation history.
     
     Returns past recreations with their status and results.
     """
-    service = get_thumbnail_recreate_service()
     
     result = await service.get_history(
         user_id=current_user.sub,

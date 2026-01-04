@@ -14,7 +14,7 @@ import {
   useOptimisticAssetDeletion,
   useOptimisticBulkAssetDeletion,
 } from '@aurastream/api-client';
-import { useAuth } from '@aurastream/shared';
+import { useAuth, useSimpleAnalytics } from '@aurastream/shared';
 import {
   AssetCard,
   JobCard,
@@ -53,6 +53,7 @@ export default function IntelAssetsPage() {
   const jobIdParam = searchParams.get('job');
   const assetIdParam = searchParams.get('asset');
   const { user } = useAuth();
+  const { trackEvent } = useSimpleAnalytics();
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -120,11 +121,14 @@ export default function IntelAssetsPage() {
     downloadAsset({
       url: asset.url,
       filename,
-      onSuccess: () => toast.success('Download started'),
+      onSuccess: () => {
+        toast.success('Download started');
+        trackEvent('asset_downloaded', { assetId: asset.id, assetType: asset.asset_type });
+      },
       onError: (error) => toast.error(`Download failed: ${error.message}`),
       onShowIOSInstructions: () => toast.info('Long-press the image and tap "Add to Photos" to save'),
     });
-  }, []);
+  }, [trackEvent]);
 
   const handleDelete = useCallback(() => {
     if (!deleteConfirm) return;
