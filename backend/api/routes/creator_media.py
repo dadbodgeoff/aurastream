@@ -61,6 +61,9 @@ async def check_access(
     Media Library is available for Pro and Studio subscribers only.
     Free users will see has_access=false.
     
+    NOTE: Fetches current tier from database to handle cases where
+    user upgraded but hasn't refreshed their token yet.
+    
     Returns:
     - has_access: Whether user can use the library
     - tier: User's current tier
@@ -68,7 +71,20 @@ async def check_access(
     - max_per_prompt: Maximum assets per prompt injection (2)
     - upgrade_message: Message for free users
     """
-    user_tier = getattr(current_user, "tier", "free")
+    # Fetch current tier from database (not token) to handle upgrades
+    from backend.database.supabase_client import get_supabase_client
+    
+    try:
+        client = get_supabase_client()
+        result = client.table("users").select("subscription_tier").eq("id", current_user.sub).execute()
+        if result.data and len(result.data) > 0:
+            user_tier = result.data[0].get("subscription_tier", "free")
+        else:
+            user_tier = getattr(current_user, "tier", "free")
+    except Exception as e:
+        logger.warning(f"Failed to fetch user tier from DB, using token tier: {e}")
+        user_tier = getattr(current_user, "tier", "free")
+    
     has_access = can_access_media_library(user_tier)
     
     return {
