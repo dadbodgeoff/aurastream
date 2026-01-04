@@ -112,55 +112,26 @@ class NanoBananaClient:
     # Strict content constraint to prevent hallucination
     # This is prepended to every prompt to ensure the model only renders
     # what is explicitly provided and doesn't invent additional content
-    STRICT_CONTENT_CONSTRAINT = """STRICT CONTENT RULES - YOU MUST FOLLOW THESE:
+    # Version 2.0 - Simplified from 28 rules to 10 essential rules
+    PROMPT_VERSION = "2.0"
+    
+    STRICT_CONTENT_CONSTRAINT = """STRICT RULES:
 
-## REFERENCE IMAGE / CANVAS LAYOUT - HIGHEST PRIORITY
-0. If a reference image or canvas layout is provided (the first image in this request):
-   - REPLICATE the exact composition, layout, and spatial arrangement shown
-   - PRESERVE all element positions, sizes, and relationships from the reference
-   - The reference image defines WHERE things go - your job is to make it look polished
-   - DO NOT rearrange, reposition, or ignore elements shown in the reference
-   - Treat sketches, annotations, and placeholders as placement guides
+1. REFERENCE IMAGE: If provided, COPY the exact layout and element positions. The reference defines WHERE things go.
 
-## TEXT RENDERING - HIGHEST PRIORITY
-1. If the prompt includes ANY text (title, subtitle, CTA, labels), you MUST render that text EXACTLY as written
-2. Text must be clearly legible and prominently displayed
-3. Spell every word EXACTLY as provided - no corrections, no changes
-4. If text is in quotes, render it EXACTLY including capitalization
-5. TEXT MUST NEVER BE COVERED OR OBSCURED by any visual elements, characters, or assets
-6. Ensure adequate contrast between text and background for maximum readability
-7. Use professional typography hierarchy: headlines largest, subtext smaller, CTAs prominent
+2. TEXT: Render ALL text EXACTLY as written - no corrections, no changes. Text must be legible and never covered.
 
-## LAYOUT & COMPOSITION - ENTERPRISE GRADE
-8. Follow professional design patterns with clear visual hierarchy
-9. Leave breathing room around text - no elements should crowd or overlap text
-10. Characters/subjects should be positioned to COMPLEMENT text, never cover it
-11. Use rule of thirds for balanced composition
-12. Maintain consistent margins and padding throughout the design
-13. Text placement zones should be kept clear of busy visual elements
+3. QUANTITIES: If prompt says "3 items" - render EXACTLY 3. If it says "Monday, Wednesday" - show ONLY those days.
 
-## CONTENT RULES
-14. DO NOT add any text, words, letters, numbers, dates, or labels unless explicitly specified in the prompt
-15. DO NOT invent or add extra items, elements, or details not mentioned in the prompt
-16. If the prompt says "3 items" - render EXACTLY 3, not more, not less
-17. If the prompt mentions specific days (e.g., "Monday, Wednesday, Friday") - show ONLY those days
-18. DO NOT add watermarks, signatures, timestamps, or any identifying marks
-19. Render ONLY what is explicitly described - nothing more, nothing less
+4. NO ADDITIONS: Do NOT add text, labels, watermarks, or elements not explicitly mentioned.
 
-## CHARACTER RENDERING (when applicable)
-20. If character details are provided (hair color, eye color, skin tone, expression, body type), render them EXACTLY as specified
-21. Characters should have consistent proportions and professional quality
-22. Expressions should be clear and match the mood of the content
+5. CHARACTERS: If character details are specified (hair, eyes, expression), render them EXACTLY as described.
 
-## STYLE FREEDOM
-23. You may be creative with visual style, colors, and artistic interpretation
-24. You may NOT be creative with content, text, quantity, or character appearance when specified
+6. EMOTES/BADGES: Use bold outlines, flat colors, high contrast. Must be recognizable at 28x28 pixels.
 
-## SCALABILITY FOR EMOTES/BADGES (when applicable)
-25. For emotes, badges, or icons: Create VECTOR-STYLE art with bold outlines and flat colors
-26. Design must be recognizable when scaled down to 28x28 pixels
-27. Use thick outlines (3-4px minimum), high contrast, and simple iconic shapes
-28. Avoid fine details, thin lines, or gradients that disappear at small sizes
+7. STYLE: You MAY be creative with colors, artistic style, and visual flair.
+
+8. CONTENT: You may NOT be creative with text, quantities, or specified character appearance.
 
 """
     

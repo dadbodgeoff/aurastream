@@ -34,6 +34,12 @@ from backend.services.coach.grounding import (
     GroundingStrategy,
     get_grounding_strategy,
 )
+# Import IntentExtractor - single source of truth for intent extraction
+from backend.services.coach.intent_extractor import (
+    IntentExtractor,
+    CreativeIntent,
+    get_intent_extractor,
+)
 
 
 @dataclass
@@ -42,45 +48,6 @@ class StreamChunk:
     type: str  # "token", "intent_ready", "grounding", "grounding_complete", "done", "error"
     content: str = ""
     metadata: Optional[Dict[str, Any]] = None
-
-
-@dataclass
-class CreativeIntent:
-    """
-    User's refined creative intent - NOT a prompt.
-    
-    This is what the user wants, described in natural language.
-    The actual prompt construction happens in the generation pipeline.
-    """
-    description: str  # User's refined description
-    subject: Optional[str] = None  # Main subject (character, object, scene)
-    action: Optional[str] = None  # What's happening (pose, expression, movement)
-    emotion: Optional[str] = None  # Emotional tone (hype, cozy, intense)
-    elements: List[str] = None  # Additional elements (sparkles, effects, etc.)
-    confidence_score: float = 0.0
-    
-    def __post_init__(self):
-        if self.elements is None:
-            self.elements = []
-    
-    def to_generation_input(self) -> str:
-        """
-        Convert intent to a clean description for the generation pipeline.
-        This is NOT the final prompt - just the user's refined intent.
-        """
-        parts = []
-        if self.subject:
-            parts.append(self.subject)
-        if self.action:
-            parts.append(self.action)
-        # Don't include "custom" as an emotion - it's just a placeholder
-        if self.emotion and self.emotion.lower() != "custom":
-            parts.append(f"{self.emotion} mood")
-        if self.elements:
-            parts.append(", ".join(self.elements))
-        if self.description and self.description not in " ".join(parts):
-            parts.append(self.description)
-        return ", ".join(parts) if parts else self.description
 
 
 @dataclass
@@ -120,6 +87,8 @@ class CreativeDirectorService:
     # System prompt - concise creative assistant
     SYSTEM_PROMPT_BASE = '''You help streamers create {asset_type} assets.
 
+{reference_assets_section}
+
 RULE #1: Do what the user asks. If they request changes, make them. If they ask questions, answer them.
 
 Context: {brand_context} | {game_context} | {mood_context}
@@ -139,6 +108,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         grounding_strategy: Optional[GroundingStrategy] = None,
         validator: Optional[OutputValidator] = None,
         llm_client=None,
+        intent_extractor: Optional[IntentExtractor] = None,
     ):
         """
         Initialize the creative director service.
@@ -148,11 +118,13 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             grounding_strategy: Grounding strategy instance
             validator: Output validator instance (validates intent clarity)
             llm_client: LLM client for chat completions
+            intent_extractor: Intent extractor instance (uses singleton if not provided)
         """
         self._session_manager = session_manager
         self._grounding_strategy = grounding_strategy
         self._validator = validator
         self.llm = llm_client
+        self._intent_extractor = intent_extractor
     
     @property
     def sessions(self) -> SessionManager:
@@ -174,6 +146,13 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         if self._validator is None:
             self._validator = get_validator()
         return self._validator
+    
+    @property
+    def intent_extractor(self) -> IntentExtractor:
+        """Lazy-load intent extractor."""
+        if self._intent_extractor is None:
+            self._intent_extractor = get_intent_extractor()
+        return self._intent_extractor
     
     async def start_with_context(
         self,
@@ -335,8 +314,12 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             yield StreamChunk(type="token", content=full_response)
         
         # Check if intent is ready (coach indicated description is clear)
-        is_ready = self._check_intent_ready(full_response)
-        refined_intent = self._extract_intent(full_response, description, mood)
+        is_ready = self.intent_extractor.check_intent_ready(full_response)
+        refined_intent = self.intent_extractor.extract_from_response(
+            response=full_response,
+            original_description=description,
+            mood=mood,
+        )
         
         # Store the current intent
         if refined_intent:
@@ -414,8 +397,12 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             )
             return
         
+        # Store reference assets in session for later use in generation
+        if reference_assets:
+            await self._store_reference_assets(session_id, reference_assets)
+        
         # Rebuild system prompt from stored context
-        system_prompt = self._build_system_prompt_from_session(session)
+        system_prompt = self._build_system_prompt_from_session(session, reference_assets)
         
         # Build the user message with reference assets context
         user_message_content = message
@@ -464,13 +451,13 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             yield StreamChunk(type="token", content=full_response)
         
         # Check if intent is ready
-        is_ready = self._check_intent_ready(full_response)
+        is_ready = self.intent_extractor.check_intent_ready(full_response)
         
-        # Build refined intent from conversation
-        refined_intent = self._extract_intent_from_conversation(
-            full_response,
-            message,
-            session,
+        # Build refined intent from conversation using IntentExtractor
+        refined_intent = self.intent_extractor.extract_from_conversation(
+            response=full_response,
+            user_message=message,
+            session=session,
         )
         
         if refined_intent:
@@ -605,6 +592,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         custom_mood: Optional[str],
         game_context: str,
         preferences: Optional[Dict[str, Any]] = None,
+        reference_assets_section: str = "",
     ) -> str:
         """Build system prompt for creative director mode with optional preferences."""
         colors = brand_context.get("colors", [])
@@ -625,6 +613,7 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
             game_context=game_section,
             mood_context=mood_section,
             color_list=color_list,
+            reference_assets_section=reference_assets_section,
         )
         
         # Apply preferences to modify coach behavior
@@ -719,8 +708,8 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         
         return "\n".join(lines)
     
-    def _build_system_prompt_from_session(self, session: CoachSession) -> str:
-        """Rebuild system prompt from session data."""
+    def _build_system_prompt_from_session(self, session: CoachSession, reference_assets: list[dict] | None = None) -> str:
+        """Rebuild system prompt from session data, including any reference assets."""
         brand_context = session.brand_context or {}
         
         # Add current understanding if we have one
@@ -728,15 +717,55 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         if session.current_prompt_draft:
             history_section = f"\nCurrent vision: {session.current_prompt_draft}"
         
+        # Build reference assets section if provided
+        ref_section = ""
+        if reference_assets:
+            ref_section = self._build_reference_assets_context(reference_assets)
+        
         base_prompt = self._build_system_prompt(
             brand_context=brand_context,
             asset_type=session.asset_type or "asset",
             mood=session.mood or "balanced",
             custom_mood=None,
             game_context=session.game_context or "",
+            reference_assets_section=ref_section,
         )
         
         return base_prompt + history_section
+    
+    async def _store_reference_assets(self, session_id: str, reference_assets: list[dict]) -> None:
+        """
+        Store reference assets in the session for use during generation.
+        
+        These assets will be passed to NanoBanana when the user generates.
+        
+        Args:
+            session_id: Session UUID
+            reference_assets: List of reference asset dictionaries
+        """
+        try:
+            session = await self.sessions.get(session_id)
+            if session:
+                # Initialize reference_assets list if not present
+                if not hasattr(session, 'reference_assets') or session.reference_assets is None:
+                    session.reference_assets = []
+                
+                # Add new reference assets (avoid duplicates by asset_id)
+                existing_ids = {a.get('asset_id') for a in session.reference_assets}
+                for asset in reference_assets:
+                    if asset.get('asset_id') not in existing_ids:
+                        session.reference_assets.append(asset)
+                        existing_ids.add(asset.get('asset_id'))
+                
+                # Save the updated session
+                await self.sessions._save(session)
+                
+                logger.info(
+                    f"Stored {len(reference_assets)} reference assets in session: "
+                    f"session_id={session_id}, total={len(session.reference_assets)}"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to store reference assets: {e}")
     
     def _build_first_message(
         self,
@@ -760,168 +789,6 @@ Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
         parts.append(f"My idea: {description}")
         
         return " ".join(parts)
-    
-    def _check_intent_ready(self, response: str) -> bool:
-        """Check if the coach indicated the intent is clear enough.
-        
-        Only returns True when the coach is definitively stating readiness,
-        not when asking questions like "Ready to create?"
-        """
-        import re
-        
-        # Explicit marker is always ready
-        if "[INTENT_READY]" in response:
-            return True
-        
-        # Check if the response ends with a question mark (asking for confirmation)
-        # If so, it's NOT ready
-        if response.rstrip().endswith("?"):
-            return False
-        
-        # Check for ready statements
-        # These patterns indicate the coach is stating readiness (not asking)
-        ready_patterns = [
-            r"(?:✨\s*)?(?:Ready to create|ready to create)",  # "Ready to create..."
-            r"(?:✨\s*)?Ready!",  # "Ready!"
-            r"(?:✨\s*)?Let's create",  # "Let's create..."
-            r"(?:✨\s*)?Perfect!",  # "Perfect!"
-            r"(?:✨\s*)?Ready\s+to\s+go",  # "Ready to go"
-        ]
-        
-        for pattern in ready_patterns:
-            if re.search(pattern, response, re.IGNORECASE):
-                return True
-        
-        # "✨ Perfect" or "✨ Ready" followed by content (not a question)
-        if "✨ Perfect" in response or "✨ Ready" in response:
-            return True
-        
-        return False
-    
-    def _extract_intent(
-        self,
-        response: str,
-        original_description: str,
-        mood: str,
-    ) -> Optional[CreativeIntent]:
-        """Extract creative intent from coach response."""
-        import re
-        
-        # Look for summary patterns - order matters, most specific first
-        summary_patterns = [
-            # "✨ Ready! A vibrant thumbnail..." or "Ready! A cool emote..."
-            r"(?:✨\s*)?Ready[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
-            # "Here's what I've got: a cool thumbnail"
-            r"Here's what I've got:\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
-            # "So we're going for a neon-style emote"
-            r"So we're going for\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
-            # "we'll create a dynamic banner"
-            r"we'll create\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
-            # "Perfect! A high-energy thumbnail"
-            r"(?:✨\s*)?Perfect[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
-        ]
-        
-        description = None
-        for pattern in summary_patterns:
-            match = re.search(pattern, response, re.IGNORECASE | re.DOTALL)
-            if match:
-                extracted = match.group(1).strip()
-                # Clean up the extracted text
-                extracted = re.sub(r'\[INTENT_READY\]', '', extracted).strip()
-                # Remove trailing punctuation if it's just a period
-                extracted = extracted.rstrip('.')
-                if extracted and len(extracted) > 10:  # Ensure we got something meaningful
-                    description = extracted
-                    break
-        
-        # Fallback to original only if we couldn't extract anything
-        if not description:
-            description = original_description
-        
-        # Calculate confidence based on response quality
-        confidence = 0.5
-        if self._check_intent_ready(response):
-            confidence = 0.85
-        elif "?" not in response[-50:]:  # No questions at end = more confident
-            confidence = 0.7
-        
-        return CreativeIntent(
-            description=description,
-            emotion=mood,
-            confidence_score=confidence,
-        )
-    
-    def _extract_intent_from_conversation(
-        self,
-        response: str,
-        user_message: str,
-        session: CoachSession,
-    ) -> Optional[CreativeIntent]:
-        """Extract refined intent from ongoing conversation."""
-        import re
-        
-        # Start with previous intent
-        base_description = session.current_prompt_draft or ""
-        
-        # Look for updated summary in response - order matters, most specific first
-        summary_patterns = [
-            # "✨ Ready! A vibrant thumbnail..." or "Ready! A cool emote..."
-            r"(?:✨\s*)?Ready[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
-            # "Here's what I've got: a cool thumbnail"
-            r"Here's what I've got:\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
-            # "So we're going for a neon-style emote"
-            r"So we're going for\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
-            # "Updated: a dynamic banner with neon effects"
-            r"Updated:\s*(.+?)(?:\.|Ready|\[INTENT_READY\]|$)",
-            # "Perfect! A high-energy thumbnail"
-            r"(?:✨\s*)?Perfect[!:]?\s*(.+?)(?:\[INTENT_READY\]|$)",
-        ]
-        
-        for pattern in summary_patterns:
-            match = re.search(pattern, response, re.IGNORECASE | re.DOTALL)
-            if match:
-                extracted = match.group(1).strip()
-                # Clean up the extracted text
-                extracted = re.sub(r'\[INTENT_READY\]', '', extracted).strip()
-                extracted = extracted.rstrip('.')
-                if extracted and len(extracted) > 10:  # Ensure we got something meaningful
-                    base_description = extracted
-                    break
-        
-        # If no summary found, combine previous with user additions
-        if not base_description and session.current_prompt_draft:
-            # Extract key additions from user message
-            additions = self._extract_additions(user_message)
-            if additions:
-                base_description = f"{session.current_prompt_draft}, {additions}"
-            else:
-                base_description = session.current_prompt_draft
-        
-        confidence = 0.6
-        if self._check_intent_ready(response):
-            confidence = 0.9
-        elif len(session.messages) > 4:  # More conversation = more refined
-            confidence = 0.75
-        
-        return CreativeIntent(
-            description=base_description,
-            emotion=session.mood,
-            confidence_score=confidence,
-        )
-    
-    def _extract_additions(self, message: str) -> str:
-        """Extract key additions from user message."""
-        # Remove common filler words
-        fillers = ["yes", "yeah", "sure", "ok", "okay", "sounds good", "perfect", "great"]
-        cleaned = message.lower()
-        for filler in fillers:
-            cleaned = cleaned.replace(filler, "")
-        
-        # If there's substantial content left, return it
-        cleaned = cleaned.strip()
-        if len(cleaned) > 10:
-            return message.strip()
-        return ""
     
     def _is_refinement(self, message: str) -> bool:
         """Check if message is a refinement request."""

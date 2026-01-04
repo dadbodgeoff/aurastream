@@ -148,44 +148,44 @@ class TestCreativeDirectorService:
         assert "Epic victory celebration with confetti" in message
     
     # =========================================================================
-    # Intent Ready Detection Tests
+    # Intent Ready Detection Tests (now delegated to IntentExtractor)
     # =========================================================================
     
     def test_check_intent_ready_detects_marker(self, service):
-        """Test detecting [INTENT_READY] marker."""
+        """Test detecting [INTENT_READY] marker via IntentExtractor."""
         response = "✨ Perfect! Here's what I've got: Victory fist pump. Ready to create? [INTENT_READY]"
-        assert service._check_intent_ready(response) is True
+        assert service.intent_extractor.check_intent_ready(response) is True
     
     def test_check_intent_ready_detects_ready_phrase(self, service):
         """Test detecting 'Ready to create!' statement (not question)."""
         # Statement with exclamation mark IS ready
         response = "Got it! So we're going for a hype celebration. Ready to create!"
-        assert service._check_intent_ready(response) is True
+        assert service.intent_extractor.check_intent_ready(response) is True
     
     def test_check_intent_ready_question_not_ready(self, service):
         """Test that 'Ready to create?' question is NOT ready."""
         # Question mark means the coach is asking, not stating readiness
         response = "Got it! So we're going for a hype celebration. Ready to create?"
-        assert service._check_intent_ready(response) is False
+        assert service.intent_extractor.check_intent_ready(response) is False
     
     def test_check_intent_ready_detects_perfect_emoji(self, service):
         """Test detecting ✨ Perfect phrase."""
         response = "✨ Perfect! That sounds amazing. Let's make it happen."
-        assert service._check_intent_ready(response) is True
+        assert service.intent_extractor.check_intent_ready(response) is True
     
     def test_check_intent_ready_returns_false_for_questions(self, service):
         """Test that questions are not detected as ready."""
         response = "Love the idea! Is this more of a fist-pump moment or jumping-for-joy energy?"
-        assert service._check_intent_ready(response) is False
+        assert service.intent_extractor.check_intent_ready(response) is False
     
     # =========================================================================
-    # Intent Extraction Tests
+    # Intent Extraction Tests (now delegated to IntentExtractor)
     # =========================================================================
     
     def test_extract_intent_from_summary(self, service):
-        """Test extracting intent from coach summary."""
+        """Test extracting intent from coach summary via IntentExtractor."""
         response = "Here's what I've got: Victory celebration with fist pump and sparkles."
-        intent = service._extract_intent(response, "victory emote", "hype")
+        intent = service.intent_extractor.extract_from_response(response, "victory emote", "hype")
         
         assert intent is not None
         assert "Victory celebration" in intent.description or "fist pump" in intent.description
@@ -193,7 +193,7 @@ class TestCreativeDirectorService:
     def test_extract_intent_uses_original_when_no_summary(self, service):
         """Test that original description is used when no summary found."""
         response = "Love the idea! What pose are you thinking?"
-        intent = service._extract_intent(response, "victory emote", "hype")
+        intent = service.intent_extractor.extract_from_response(response, "victory emote", "hype")
         
         assert intent is not None
         assert intent.description == "victory emote"
@@ -201,7 +201,7 @@ class TestCreativeDirectorService:
     def test_extract_intent_confidence_high_when_ready(self, service):
         """Test that confidence is high when intent is ready."""
         response = "✨ Perfect! Here's what I've got: Victory fist pump. [INTENT_READY]"
-        intent = service._extract_intent(response, "victory emote", "hype")
+        intent = service.intent_extractor.extract_from_response(response, "victory emote", "hype")
         
         assert intent is not None
         assert intent.confidence_score >= 0.8
@@ -580,17 +580,17 @@ class TestCreativeDirectorServiceEdgeCases:
         assert "nostalgic 90s vibes" in message
     
     def test_extract_intent_from_summary_pattern(self, service):
-        """Test intent extraction from 'Here's what I've got' pattern."""
+        """Test intent extraction from 'Here's what I've got' pattern via IntentExtractor."""
         response = "Here's what I've got: A happy character celebrating victory."
-        intent = service._extract_intent(response, "original", "hype")
+        intent = service.intent_extractor.extract_from_response(response, "original", "hype")
         
         assert intent is not None
         assert "happy character" in intent.description.lower()
     
     def test_extract_intent_from_going_for_pattern(self, service):
-        """Test intent extraction from 'So we're going for' pattern."""
+        """Test intent extraction from 'So we're going for' pattern via IntentExtractor."""
         response = "So we're going for a dynamic fist pump with sparkles. Ready to create?"
-        intent = service._extract_intent(response, "original", "hype")
+        intent = service.intent_extractor.extract_from_response(response, "original", "hype")
         
         assert intent is not None
         assert "fist pump" in intent.description.lower() or "sparkles" in intent.description.lower()

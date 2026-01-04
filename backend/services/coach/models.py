@@ -125,6 +125,10 @@ class CoachSession:
     refinements_used: int = 0
     last_generated_asset_id: Optional[str] = None
     
+    # NEW: Reference assets from user's media library
+    # These are passed to NanoBanana when generating from this session
+    reference_assets: List[Dict[str, Any]] = field(default_factory=list)
+    
     # Timestamps
     created_at: float = field(default_factory=lambda: datetime.now().timestamp())
     updated_at: float = field(default_factory=lambda: datetime.now().timestamp())
@@ -246,6 +250,8 @@ class CoachSession:
             "gemini_history": self.gemini_history,
             "refinements_used": self.refinements_used,
             "last_generated_asset_id": self.last_generated_asset_id,
+            # Reference assets
+            "reference_assets": self.reference_assets,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -291,6 +297,8 @@ class CoachSession:
             gemini_history=data.get("gemini_history", []),
             refinements_used=data.get("refinements_used", 0),
             last_generated_asset_id=data.get("last_generated_asset_id"),
+            # Reference assets
+            reference_assets=data.get("reference_assets", []),
             created_at=data.get("created_at", datetime.now().timestamp()),
             updated_at=data.get("updated_at", datetime.now().timestamp()),
         )

@@ -4,6 +4,32 @@
 
 After a deep audit of the Coach → NanoBanana flow, I found **several inconsistencies and areas for improvement**. The flow works but has redundant code, unclear separation of concerns, and some potential quality issues.
 
+**UPDATE (Jan 4, 2026):** Most issues have been fixed. See "Fixes Applied" section below.
+
+---
+
+## Fixes Applied ✅
+
+### 1. Removed Duplicate Intent Extraction Code ✅
+- Deleted `_check_intent_ready()`, `_extract_intent()`, and `_extract_intent_from_conversation()` from `coach_service.py`
+- Now uses `IntentExtractor` class from `intent_extractor.py` exclusively
+- Updated tests to use the new pattern
+
+### 2. Removed Duplicate CreativeIntent Class ✅
+- Deleted `CreativeIntent` dataclass from `coach_service.py`
+- Now imports from `intent_extractor.py` (single source of truth)
+
+### 3. Simplified STRICT_CONTENT_CONSTRAINT ✅
+- Reduced from 28 rules to 8 essential rules
+- Added `PROMPT_VERSION = "2.0"` for tracking
+- Saves ~500 tokens per generation
+
+### 4. Added Reference Assets to Session ✅
+- Added `reference_assets` field to `CoachSession` model
+- Coach now stores reference assets when user attaches them
+- Reference assets are included in system prompt context
+- Ready to be passed to NanoBanana for generation (next step)
+
 ---
 
 ## Current Flow Architecture
@@ -13,6 +39,7 @@ After a deep audit of the Coach → NanoBanana flow, I found **several inconsist
 │                           FRONTEND (User Input)                              │
 │  - Asset type, mood, game, description                                       │
 │  - Brand kit context (colors, tone, logo)                                    │
+│  - Reference assets from media library                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -20,8 +47,9 @@ After a deep audit of the Coach → NanoBanana flow, I found **several inconsist
 │                    COACH SERVICE (coach_service.py)                          │
 │  1. Builds system prompt with brand context                                  │
 │  2. Streams LLM response (Gemini text model)                                 │
-│  3. Extracts "intent" from response                                          │
-│  4. Returns refined description (NOT a prompt)                               │
+│  3. Extracts "intent" using IntentExtractor                                  │
+│  4. Stores reference assets in session                                       │
+│  5. Returns refined description (NOT a prompt)                               │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -44,7 +72,7 @@ After a deep audit of the Coach → NanoBanana flow, I found **several inconsist
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    NANO BANANA CLIENT (nano_banana_client.py)                │
-│  1. Prepends STRICT_CONTENT_CONSTRAINT (28 rules!)                           │
+│  1. Prepends STRICT_CONTENT_CONSTRAINT (8 rules - simplified!)               │
 │  2. Adds grounding (Google Search) if enabled                                │
 │  3. Calls Gemini 3 Pro Image Preview API                                     │
 │  4. Returns generated image                                                  │
@@ -53,32 +81,9 @@ After a deep audit of the Coach → NanoBanana flow, I found **several inconsist
 
 ---
 
-## Issues Found
+## Remaining Issues
 
-### 1. **Duplicate Intent Extraction Code** ⚠️
-
-There are TWO implementations of intent extraction:
-
-**File 1: `coach_service.py`**
-```python
-def _extract_intent(self, response, original_description, mood):
-    # 5 regex patterns
-    summary_patterns = [...]
-```
-
-**File 2: `intent_extractor.py`**
-```python
-class IntentExtractor:
-    EXTRACTION_PATTERNS = [...]  # 8 regex patterns
-```
-
-The `intent_extractor.py` is more robust (has validation, confidence scoring, better patterns) but `coach_service.py` uses its own inline implementation!
-
-**Recommendation:** Remove duplicate code from `coach_service.py` and use `IntentExtractor` exclusively.
-
----
-
-### 2. **Inconsistent Grounding Implementation** ⚠️
+### 1. **Inconsistent Grounding Implementation** ⚠️
 
 **Coach Grounding (for text LLM):**
 - Uses `GroundingStrategy` class
@@ -96,7 +101,16 @@ The `intent_extractor.py` is more robust (has validation, confidence scoring, be
 
 ---
 
-### 3. **STRICT_CONTENT_CONSTRAINT is Massive** ⚠️
+## Historical Issues (Fixed)
+
+### ~~1. Duplicate Intent Extraction Code~~ ✅ FIXED
+### ~~2. CreativeIntent Defined Twice~~ ✅ FIXED
+### ~~3. STRICT_CONTENT_CONSTRAINT is Massive~~ ✅ FIXED (reduced to 8 rules)
+### ~~4. No Prompt Versioning~~ ✅ FIXED (added PROMPT_VERSION = "2.0")
+
+---
+
+## Original Issues Found (for reference)
 
 The constraint prepended to every prompt is **28 rules** and ~2000 characters. This:
 - Consumes tokens on every request
