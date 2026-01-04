@@ -52,12 +52,6 @@ export interface CoachInputProps {
   isSessionLocked?: boolean;
   /** Callback to start a new chat session */
   onStartNewChat?: () => void;
-  /** Callback when reference image is uploaded */
-  onImageUpload?: (file: File) => void;
-  /** Currently uploaded reference image (for preview) */
-  referenceImage?: { file: File; preview: string } | null;
-  /** Callback to remove reference image */
-  onRemoveImage?: () => void;
   /** Selected reference assets from media library */
   selectedReferenceAssets?: SelectedReferenceAsset[];
   /** Callback when reference assets selection changes */
@@ -127,22 +121,6 @@ const LoadingSpinner = ({ className }: { className?: string }) => (
       fill="currentColor"
       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
     />
-  </svg>
-);
-
-const ImageIcon = ({ className }: { className?: string }) => (
-  <svg 
-    className={className} 
-    width="20" 
-    height="20" 
-    fill="none" 
-    viewBox="0 0 24 24" 
-    stroke="currentColor" 
-    strokeWidth={2}
-  >
-    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-    <circle cx="8.5" cy="8.5" r="1.5" />
-    <polyline points="21,15 16,10 5,21" />
   </svg>
 );
 
@@ -299,43 +277,6 @@ const SessionLockedState = memo(function SessionLockedState({
 
 SessionLockedState.displayName = 'SessionLockedState';
 
-/**
- * Reference image preview
- */
-interface ReferenceImagePreviewProps {
-  preview: string;
-  onRemove: () => void;
-}
-
-const ReferenceImagePreview = memo(function ReferenceImagePreview({
-  preview,
-  onRemove,
-}: ReferenceImagePreviewProps) {
-  return (
-    <div className="relative inline-block">
-      <img
-        src={preview}
-        alt="Reference"
-        className="w-16 h-16 object-cover rounded-lg border border-border-default"
-      />
-      <button
-        type="button"
-        onClick={onRemove}
-        className={cn(
-          'absolute -top-2 -right-2 p-1 rounded-full',
-          'bg-red-500 hover:bg-red-400 text-white',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500'
-        )}
-        aria-label="Remove reference image"
-      >
-        <XIcon className="w-3 h-3" />
-      </button>
-    </div>
-  );
-});
-
-ReferenceImagePreview.displayName = 'ReferenceImagePreview';
-
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -394,9 +335,6 @@ export const CoachInput = memo(function CoachInput({
   showCharacterCount = false,
   isSessionLocked = false,
   onStartNewChat,
-  onImageUpload,
-  referenceImage,
-  onRemoveImage,
   selectedReferenceAssets = [],
   onReferenceAssetsChange,
   testId = 'coach-input',
@@ -404,7 +342,6 @@ export const CoachInput = memo(function CoachInput({
   const prefersReducedMotion = useReducedMotion();
   const shouldAnimate = !prefersReducedMotion;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -459,34 +396,6 @@ export const CoachInput = memo(function CoachInput({
     }
   }, [onGenerateNow, isGenerationReady, isStreaming]);
 
-  // Handle file upload
-  const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file && onImageUpload) {
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-          return;
-        }
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-          return;
-        }
-        onImageUpload(file);
-      }
-      // Reset input so same file can be selected again
-      if (e.target) {
-        e.target.value = '';
-      }
-    },
-    [onImageUpload]
-  );
-
-  // Handle image button click
-  const handleImageButtonClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
   // Determine if send button should be disabled
   const isSendDisabled = !value.trim() || isStreaming || isSessionLocked;
 
@@ -529,19 +438,6 @@ export const CoachInput = memo(function CoachInput({
         />
       )}
 
-      {/* Reference Image Preview (file upload) */}
-      {referenceImage && onRemoveImage && (
-        <div className="flex items-start gap-2">
-          <ReferenceImagePreview
-            preview={referenceImage.preview}
-            onRemove={onRemoveImage}
-          />
-          <span className="text-xs text-text-tertiary mt-1">
-            Reference image attached
-          </span>
-        </div>
-      )}
-
       {/* Suggestion Chips */}
       {suggestions.length > 0 && (
         <SuggestionChips
@@ -563,37 +459,6 @@ export const CoachInput = memo(function CoachInput({
 
       {/* Input Area */}
       <div className="flex gap-2 items-end">
-        {/* Image Upload Button */}
-        {onImageUpload && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
-              aria-label="Upload reference image"
-            />
-            <button
-              type="button"
-              onClick={handleImageButtonClick}
-              disabled={isStreaming}
-              className={cn(
-                'flex-shrink-0 p-3 rounded-full',
-                'bg-background-elevated border border-border-default',
-                'text-text-secondary hover:text-text-primary hover:bg-background-surface',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-600/50',
-                shouldAnimate && 'transition-colors duration-200'
-              )}
-              aria-label="Upload reference image"
-              data-testid={`${testId}-image-button`}
-            >
-              <ImageIcon className="w-5 h-5" />
-            </button>
-          </>
-        )}
-
         {/* Textarea Container */}
         <div className="flex-1 relative">
           <textarea

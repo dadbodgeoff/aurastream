@@ -30,19 +30,20 @@ class TestCreativeIntent:
         assert intent.to_generation_input() == "A vibrant Fortnite thumbnail"
     
     def test_to_generation_input_with_components(self):
-        """Test generation input with all components."""
+        """Test generation input with all components (except mood which is excluded)."""
         intent = CreativeIntent(
             description="gaming thumbnail",
             subject="streamer character",
             action="celebrating victory",
-            emotion="hype",
+            emotion="hype",  # This should NOT appear in output - mood is style, not content
             elements=["sparkles", "neon glow"],
             confidence_score=0.9,
         )
         result = intent.to_generation_input()
         assert "streamer character" in result
         assert "celebrating victory" in result
-        assert "hype mood" in result
+        # Mood should NOT be in output - it was being rendered as "HYPE MOOD" text
+        assert "hype mood" not in result.lower()
         assert "sparkles" in result
     
     def test_to_generation_input_excludes_custom_mood(self):
@@ -62,15 +63,23 @@ class TestCreativeIntent:
         assert "custom" not in result.lower()
         assert "vibrant Fortnite thumbnail" in result
     
-    def test_to_generation_input_includes_real_mood(self):
-        """Test that real moods (not 'custom') ARE included."""
+    def test_to_generation_input_excludes_all_moods(self):
+        """
+        Test that ALL moods are excluded from text output.
+        
+        Moods should influence style, not be rendered as text on the image.
+        Previously "hype mood" was being rendered as visible text "HYPE MOOD".
+        """
         intent = CreativeIntent(
             description="A gaming thumbnail",
             emotion="hype",
             confidence_score=0.9,
         )
         result = intent.to_generation_input()
-        assert "hype mood" in result.lower()
+        # Mood should NOT be in the text output - it was being rendered as "HYPE MOOD" text
+        assert "hype mood" not in result.lower()
+        assert "hype" not in result.lower() or "hype" in "A gaming thumbnail".lower()
+        assert "gaming thumbnail" in result.lower()
     
     def test_is_valid_with_good_description(self):
         """Test validation passes for good descriptions."""

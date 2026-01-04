@@ -38,6 +38,7 @@ const INITIAL_STATE: CreateStudioState = {
 const TAB_TO_MODE: Record<string, CreationMode> = {
   templates: 'templates',
   custom: 'custom',
+  canvas: 'canvas',
   coach: 'custom', // Redirect coach tab to custom since coach tab is hidden
 };
 

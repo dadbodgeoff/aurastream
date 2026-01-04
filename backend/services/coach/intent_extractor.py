@@ -53,15 +53,19 @@ class CreativeIntent:
         """
         Convert intent to a clean description for the generation pipeline.
         This is NOT the final prompt - just the user's refined intent.
+        
+        NOTE: Mood/emotion is NOT included here as text because it would be
+        rendered as visible text on the image. Mood should be handled separately
+        as a style directive, not part of the content description.
         """
         parts = []
         if self.subject:
             parts.append(self.subject)
         if self.action:
             parts.append(self.action)
-        # Don't include "custom" as an emotion - it's just a placeholder
-        if self.emotion and self.emotion.lower() != "custom":
-            parts.append(f"{self.emotion} mood")
+        # REMOVED: Don't include emotion/mood in the text description
+        # It was being rendered as "HYPE MOOD" text on the image
+        # Mood should be a style directive, not content
         if self.elements:
             parts.append(", ".join(self.elements))
         if self.description and self.description not in " ".join(parts):

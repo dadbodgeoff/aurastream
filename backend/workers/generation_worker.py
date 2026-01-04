@@ -574,7 +574,74 @@ Style: {user_prompt}"""
             context["warnings"].append(f"Failed to prepare reference assets: {e}")
             logger.warning(f"Failed to download reference assets: {e}")
     
-    # 6. Final verification
+    # 6. Auto-fetch image references for game elements in prompt
+    # This prevents hallucination by giving NanoBanana actual images to reference
+    # Skip if we already have media assets or canvas snapshot (user provided their own references)
+    auto_reference_enabled = job_params.get("auto_reference_images", True)  # Default enabled
+    if auto_reference_enabled and not context["input_image"] and not context["media_assets"]:
+        try:
+            from backend.services.coach.image_reference_service import get_image_reference_service
+            from backend.services.nano_banana_client import MediaAssetInput
+            
+            ref_service = get_image_reference_service()
+            game_hint = job_params.get("game_name") or job_params.get("game")
+            
+            # Search for game elements in the prompt
+            ref_result = await ref_service.get_references_for_prompt(
+                prompt=context["final_prompt"],
+                game_hint=game_hint,
+                max_references=3,  # Limit to avoid overwhelming the model
+            )
+            
+            if ref_result.references:
+                logger.info(
+                    f"Auto-fetched {len(ref_result.references)} image references for job_id={job_id}: "
+                    f"{[r.element.name for r in ref_result.references]}"
+                )
+                
+                # Convert to MediaAssetInput format
+                if context["media_assets"] is None:
+                    context["media_assets"] = []
+                
+                # Build reference context for prompt
+                ref_context = "\n\nVISUAL REFERENCES (use these as ground truth for appearance):\n"
+                
+                for i, ref in enumerate(ref_result.references, 1):
+                    # Add as media asset
+                    context["media_assets"].append(MediaAssetInput(
+                        image_data=ref.image_data,
+                        mime_type=ref.mime_type,
+                        asset_id=f"auto_ref_{i}",
+                        display_name=ref.element.name,
+                        asset_type=ref.element.element_type.value,
+                    ))
+                    
+                    # Add to prompt context
+                    ref_context += (
+                        f"- Image {i}: {ref.element.name} ({ref.element.element_type.value}) "
+                        f"- COPY this exact appearance, do NOT hallucinate\n"
+                    )
+                
+                ref_context += "\nIMPORTANT: Use these reference images as the EXACT visual source. Do not guess or imagine what these elements look like.\n"
+                
+                context["final_prompt"] = f"{context['final_prompt']}{ref_context}"
+                
+            elif ref_result.elements_found:
+                # Found elements but couldn't fetch images
+                context["warnings"].append(
+                    f"Found game elements but couldn't fetch references: {[e.name for e in ref_result.elements_not_found]}"
+                )
+                logger.warning(
+                    f"Could not fetch image references for: {[e.name for e in ref_result.elements_not_found]}"
+                )
+                
+        except ImportError:
+            logger.debug("Image reference service not available")
+        except Exception as e:
+            context["warnings"].append(f"Auto-reference fetch failed: {e}")
+            logger.warning(f"Failed to auto-fetch image references: {e}")
+    
+    # 7. Final verification
     # Log the prepared context for debugging
     logger.info(
         f"Generation context prepared: job_id={job_id}, "

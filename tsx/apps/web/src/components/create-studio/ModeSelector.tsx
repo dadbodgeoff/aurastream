@@ -36,6 +36,13 @@ const SparklesIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const CanvasIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 9h18M9 21V9" />
+  </svg>
+);
+
 const CheckIcon = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -60,6 +67,13 @@ const MODES: ModeConfig[] = [
     icon: '🎨',
   },
   {
+    id: 'canvas',
+    label: 'Canvas Studio',
+    description: 'Design your scene visually, AI makes it pro',
+    icon: '🖼️',
+    badge: 'New',
+  },
+  {
     id: 'coach',
     label: 'AI Coach',
     description: 'Get AI guidance to craft the perfect prompt',
@@ -80,6 +94,7 @@ const MODE_ICONS: Record<CreationMode, React.FC<{ className?: string }>> = {
   templates: ZapIcon,
   custom: PencilIcon,
   coach: SparklesIcon,
+  canvas: CanvasIcon,
 };
 
 // Mode colors for visual distinction - refined palette
@@ -112,6 +127,16 @@ const MODE_COLORS: Record<CreationMode, {
     iconBg: 'bg-sky-500/15',
     glow: 'shadow-sky-500/10',
     gradient: 'from-sky-500/20 to-transparent',
+  },
+  canvas: {
+    bg: 'bg-amber-500/5',
+    bgHover: 'hover:bg-amber-500/10',
+    border: 'border-amber-500/20',
+    borderActive: 'border-amber-400/50',
+    icon: 'text-amber-400',
+    iconBg: 'bg-amber-500/15',
+    glow: 'shadow-amber-500/10',
+    gradient: 'from-amber-500/20 to-transparent',
   },
   coach: {
     bg: 'bg-violet-500/5',
@@ -194,7 +219,7 @@ export function ModeSelector({
     <div className={cn('space-y-2', className)}>
       {/* Mode cards - Compact inline layout */}
       <div 
-        className="grid grid-cols-2 gap-3"
+        className="grid grid-cols-3 gap-3"
         role="tablist"
         aria-label="Creation mode"
       >
@@ -339,6 +364,7 @@ export function ModeSelector({
       <p className="text-[11px] text-text-muted/60 text-center">
         {activeMode === 'templates' && '✨ Best for quick results'}
         {activeMode === 'custom' && '🎯 Full control mode'}
+        {activeMode === 'canvas' && '🖼️ Visual-first creation'}
         {activeMode === 'coach' && '🧠 AI-guided prompts'}
       </p>
     </div>

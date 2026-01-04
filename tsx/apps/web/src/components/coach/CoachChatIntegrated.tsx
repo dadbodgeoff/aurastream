@@ -696,7 +696,6 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
   const [turnsUsed, setTurnsUsed] = useState(0);
   const [generatedAsset, setGeneratedAsset] = useState<Asset | null>(null);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
-  const [referenceImage, setReferenceImage] = useState<{ file: File; preview: string } | null>(null);
   const [isTweaking, setIsTweaking] = useState(false);
   const [selectedReferenceAssets, setSelectedReferenceAssets] = useState<Array<{
     assetId: string;
@@ -745,6 +744,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     asset: generationAsset,
     error: generationError,
     triggerGeneration,
+    trackJob,
     reset: resetGeneration,
   } = useInlineGeneration({
     sessionId: sessionId || '',
@@ -933,27 +933,8 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     setLocalError(null);
   }, [startNewSession]);
 
-  // Handle reference image upload
-  const handleImageUpload = useCallback((file: File) => {
-    const preview = URL.createObjectURL(file);
-    setReferenceImage({ file, preview });
-  }, []);
-
-  // Handle reference image removal
-  const handleRemoveImage = useCallback(() => {
-    if (referenceImage?.preview) {
-      URL.revokeObjectURL(referenceImage.preview);
-    }
-    setReferenceImage(null);
-  }, [referenceImage]);
-
   // Handle start new chat
   const handleStartNewChat = useCallback(() => {
-    // Clean up reference image
-    if (referenceImage?.preview) {
-      URL.revokeObjectURL(referenceImage.preview);
-    }
-    setReferenceImage(null);
     setSelectedReferenceAssets([]); // Clear reference assets
     setIsSessionLocked(false);
     setGeneratedAsset(null);
@@ -963,7 +944,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     resetGeneration();
     startNewSession();
     onEndSession?.();
-  }, [referenceImage, resetGeneration, startNewSession, onEndSession]);
+  }, [resetGeneration, startNewSession, onEndSession]);
 
   // Handle tweak - refine the generated asset with feedback
   const handleTweak = useCallback(async (feedback: string) => {
@@ -972,35 +953,23 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     setIsTweaking(true);
     try {
       const response = await apiClient.generation.refineJob(activeJobId, { refinement: feedback });
-      // Reset generation state and trigger new generation tracking
+      // Reset generation state for the new job
       resetGeneration();
       setIsSessionLocked(false);
       setGeneratedAsset(null);
-      // The new job will be tracked - navigate or update state
-      // For inline experience, we'll trigger generation tracking for the new job
+      
       log.info('Tweak submitted, new job:', response.newJob.id);
-      // Trigger generation for the new job
-      await triggerGeneration({
-        assetType: mapAssetTypeForGeneration(assetType) as any,
-        customPrompt: `${refinedDescription} [TWEAK: ${feedback}]`,
-        brandKitId,
-      });
+      
+      // Track the new refinement job (don't create a new one!)
+      // The refineJob endpoint already created and enqueued the job
+      trackJob(response.newJob.id);
     } catch (err) {
       log.error('Tweak failed:', err);
       setLocalError(err instanceof Error ? err.message : 'Failed to tweak asset');
     } finally {
       setIsTweaking(false);
     }
-  }, [activeJobId, resetGeneration, triggerGeneration, assetType, refinedDescription, brandKitId]);
-
-  // Cleanup reference image on unmount
-  useEffect(() => {
-    return () => {
-      if (referenceImage?.preview) {
-        URL.revokeObjectURL(referenceImage.preview);
-      }
-    };
-  }, [referenceImage]);
+  }, [activeJobId, resetGeneration, trackJob]);
 
   // Show error toast for certain error types
   useEffect(() => {
@@ -1258,9 +1227,6 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
         onGenerateNow={handleGenerateNow}
         isSessionLocked={isSessionLocked}
         onStartNewChat={handleStartNewChat}
-        onImageUpload={handleImageUpload}
-        referenceImage={referenceImage}
-        onRemoveImage={handleRemoveImage}
         selectedReferenceAssets={selectedReferenceAssets}
         onReferenceAssetsChange={setSelectedReferenceAssets}
         placeholder={

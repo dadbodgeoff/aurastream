@@ -91,7 +91,8 @@ class CreativeDirectorService:
 
 RULE #1: Do what the user asks. If they request changes, make them. If they ask questions, answer them.
 
-Context: {brand_context} | {game_context} | {mood_context}
+Context: {brand_context} | {game_context}
+Style/Mood: {mood_context} (this influences the FEELING, do NOT include as visible text)
 Brand colors: {color_list}
 
 Gather (only what's missing): subject, style/mood, any text to include.
@@ -99,7 +100,12 @@ Gather (only what's missing): subject, style/mood, any text to include.
 Keep responses to 2-3 sentences. Confirm any text spelling. When ready:
 "✨ Ready! [DETAILED summary with ALL specific names, locations, characters, and exact text] [INTENT_READY]"
 
-CRITICAL: Your [summary] MUST include ALL specific details - game locations by name (e.g. "Sandy Strip" not "a POI"), character names, skin names, exact text. Generic summaries will fail.
+CRITICAL RULES FOR YOUR SUMMARY:
+1. Include ALL specific details - game locations by name (e.g. "Battlewood Boulevard" not "a POI")
+2. Include character names, skin names, exact text to display
+3. Do NOT include mood words (hype, cozy, rage) as text to render - mood is a style directive
+4. If user wants text displayed, put it in quotes: display "VICTORY ROYALE"
+5. Generic summaries will fail - be specific!
 '''
     
     MAX_TURNS = 10

@@ -17,8 +17,9 @@ import type { LogoPosition, LogoSize } from '@aurastream/api-client';
  * - templates: Quick Templates with pre-built vibes (50% usage)
  * - custom: Build Your Own prompt (1% usage)
  * - coach: AI-guided prompt refinement (49% usage)
+ * - canvas: Full visual canvas layout → AI polish
  */
-export type CreationMode = 'templates' | 'custom' | 'coach';
+export type CreationMode = 'templates' | 'custom' | 'coach' | 'canvas';
 
 /**
  * Mode metadata for UI display.
@@ -146,6 +147,18 @@ export interface CustomPanelProps {
  * Props for CoachPanel component.
  */
 export interface CoachPanelProps {
+  /** Callback when generation completes */
+  onGenerationComplete?: (assetId: string) => void;
+  /** Additional className */
+  className?: string;
+}
+
+/**
+ * Props for CanvasPanel component.
+ */
+export interface CanvasPanelProps {
+  /** Callback when generation starts */
+  onGenerationStart?: (jobId: string) => void;
   /** Callback when generation completes */
   onGenerationComplete?: (assetId: string) => void;
   /** Additional className */

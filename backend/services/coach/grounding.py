@@ -290,13 +290,30 @@ Examples:
         # Quick check for game mentions that need grounding
         for game in self.FREQUENTLY_UPDATING_GAMES:
             if game in message_lower:
-                # Check if it's asking about current/recent content
+                # Check if it's asking about current/recent content OR specific locations
                 current_terms = ["current", "new", "latest", "season", "chapter", "episode", "update", "event"]
+                # Also trigger grounding for specific location/POI mentions
+                location_terms = ["boulevard", "strip", "towers", "tilted", "pleasant", "retail", "salty", "lazy", "loot", "poi", "location", "spot", "landing"]
+                
                 if any(term in message_lower for term in current_terms):
                     return GroundingDecision(
                         should_ground=True,
                         query=f"{game} current season 2024",
                         reason=f"Game content changes frequently: {game}",
+                    )
+                
+                # For specific locations, search for what they look like
+                if any(term in message_lower for term in location_terms):
+                    # Extract the location name from the message
+                    # Look for capitalized words that might be location names
+                    import re
+                    # Find potential location names (capitalized words)
+                    potential_locations = re.findall(r'[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*', message)
+                    location_query = " ".join(potential_locations[:3]) if potential_locations else message[:50]
+                    return GroundingDecision(
+                        should_ground=True,
+                        query=f"{game} {location_query} location what it looks like",
+                        reason=f"Specific game location mentioned - need visual reference",
                     )
         
         # Check cache for similar queries

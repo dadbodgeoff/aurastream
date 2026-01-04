@@ -119,19 +119,29 @@ class NanoBananaClient:
 
 1. REFERENCE IMAGE: If provided, COPY the exact layout and element positions. The reference defines WHERE things go.
 
-2. TEXT: Render ALL text EXACTLY as written - no corrections, no changes. Text must be legible and never covered.
+2. TEXT RENDERING - CRITICAL:
+   - Render ALL text EXACTLY as written - no corrections, no changes
+   - Text must be FULLY VISIBLE and NEVER covered by characters, objects, or effects
+   - Characters and objects must be BEHIND or BESIDE text, never overlapping it
+   - If text says "BATTLEWOOD BOULEVARD" render exactly that, not "BATTLEWOOD VD"
 
 3. QUANTITIES: If prompt says "3 items" - render EXACTLY 3. If it says "Monday, Wednesday" - show ONLY those days.
 
 4. NO ADDITIONS: Do NOT add text, labels, watermarks, or elements not explicitly mentioned.
+   - Do NOT render mood words like "HYPE", "COZY", "RAGE" as visible text unless explicitly requested
+   - Mood describes the STYLE/FEELING, not text to display
 
 5. CHARACTERS: If character details are specified (hair, eyes, expression), render them EXACTLY as described.
+   - Characters must NOT block or overlap any text in the image
 
 6. EMOTES/BADGES: Use bold outlines, flat colors, high contrast. Must be recognizable at 28x28 pixels.
 
 7. STYLE: You MAY be creative with colors, artistic style, and visual flair.
 
 8. CONTENT: You may NOT be creative with text, quantities, or specified character appearance.
+
+9. GAME LOCATIONS: If a specific game location is mentioned (e.g. "Battlewood Boulevard", "Tilted Towers"), 
+   search for what it actually looks like - do NOT hallucinate or guess the appearance.
 
 """
     

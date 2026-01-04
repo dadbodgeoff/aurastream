@@ -249,12 +249,14 @@ export function MediaAssetPicker({
             </div>
           </button>
 
-          {/* Canvas Studio - Full Editor */}
+          {/* Canvas Studio - Full Editor (HIDDEN: conflicts with prompt-based generation) */}
+          {/* TODO: Re-enable when Canvas Studio has its own dedicated flow where the canvas IS the prompt */}
+          {false && (
           <button
             onClick={() => setIsCanvasStudioOpen(true)}
             className={cn(
               'flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 transition-all',
-              sketchElements && sketchElements.length > 0
+              (sketchElements?.length ?? 0) > 0
                 ? 'border-interactive-500 bg-interactive-500/10 text-interactive-400'
                 : 'border-border-subtle bg-background-surface text-text-secondary hover:border-interactive-500 hover:text-text-primary'
             )}
@@ -265,6 +267,7 @@ export function MediaAssetPicker({
               <p className="text-xs opacity-70">Full editor + sketch</p>
             </div>
           </button>
+          )}
         </div>
       )}
 

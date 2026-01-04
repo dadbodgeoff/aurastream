@@ -472,7 +472,10 @@ class TestCoachOutput:
         )
         
         assert output.final_prompt == intent.to_generation_input()
-        assert "hype mood" in output.final_prompt
+        # FIXED: Mood should NOT be in the final prompt - it was being rendered as text
+        # The mood should influence style, not be part of the content description
+        assert "hype mood" not in output.final_prompt.lower()
+        assert "hype" not in output.final_prompt.lower()  # Mood should not appear at all
     
     def test_coach_output_confidence_score_property(self):
         """Test that confidence_score property returns the intent's score."""

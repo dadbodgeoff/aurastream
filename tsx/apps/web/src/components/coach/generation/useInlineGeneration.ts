@@ -85,6 +85,8 @@ export interface UseInlineGenerationOptions {
 export interface UseInlineGenerationResult {
   /** Trigger a new generation */
   triggerGeneration: (options: GenerateOptions) => Promise<string>;
+  /** Track an existing job (for refinements) */
+  trackJob: (jobId: string) => void;
   /** Current job ID (null if no active job) */
   jobId: string | null;
   /** Current generation status */
@@ -336,6 +338,26 @@ export function useInlineGeneration(
   }, [clearPolling, pollJobStatus]);
 
   /**
+   * Track an existing job (for refinements that already created a job)
+   */
+  const trackJob = useCallback((existingJobId: string) => {
+    // Reset state
+    setError(null);
+    setAsset(null);
+    setProgress(0);
+    setStatus('queued');
+    currentPollDelayRef.current = INITIAL_POLL_INTERVAL;
+    clearPolling();
+    
+    setJobId(existingJobId);
+
+    // Start polling
+    pollIntervalRef.current = setTimeout(() => {
+      pollJobStatus(existingJobId);
+    }, INITIAL_POLL_INTERVAL);
+  }, [clearPolling, pollJobStatus]);
+
+  /**
    * Reset the hook state
    */
   const reset = useCallback(() => {
@@ -357,6 +379,7 @@ export function useInlineGeneration(
 
   return {
     triggerGeneration,
+    trackJob,
     jobId,
     status,
     progress,

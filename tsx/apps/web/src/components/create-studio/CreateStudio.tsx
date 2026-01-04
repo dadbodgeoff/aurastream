@@ -18,6 +18,7 @@ import { ModeSelector } from './ModeSelector';
 import { TemplatePanel } from './TemplatePanel';
 import { CustomPanel } from './CustomPanel';
 import { CoachPanel } from './CoachPanel';
+import { CanvasPanel } from './CanvasPanel';
 import { useCreateStudio } from './useCreateStudio';
 import type { CreateStudioProps, CreationMode } from './types';
 
@@ -162,6 +163,15 @@ export function CreateStudio({
           {/* Coach Panel */}
           {state.activeMode === 'coach' && (
             <CoachPanel
+              onGenerationComplete={handleGenerationComplete}
+              className="h-full overflow-y-auto"
+            />
+          )}
+
+          {/* Canvas Panel */}
+          {state.activeMode === 'canvas' && (
+            <CanvasPanel
+              onGenerationStart={handleGenerationStart}
               onGenerationComplete={handleGenerationComplete}
               className="h-full overflow-y-auto"
             />

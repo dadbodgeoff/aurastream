@@ -135,6 +135,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     try {
       const response = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
+        cache: 'no-store',  // Prevent browser caching of job status
       });
       
       // Check again after async operation
@@ -163,6 +164,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
         // Fetch the generated asset
         const assetsResponse = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}/assets`, {
           headers: { 'Authorization': `Bearer ${accessToken}` },
+          cache: 'no-store',  // Prevent browser caching of assets
         });
         
         if (!isMountedRef.current) return;
@@ -179,9 +181,12 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
             const asset = assets[0];
             console.log('[ProfileCreator] Setting generated asset:', asset);
             
+            // Add cache-busting timestamp to prevent browser from showing cached old image
+            const cacheBustedUrl = `${asset.url}${asset.url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+            
             setGeneratedAsset({
               id: asset.id,
-              url: asset.url,
+              url: cacheBustedUrl,
               assetType: asset.asset_type || asset.assetType,
               width: asset.width,
               height: asset.height,
