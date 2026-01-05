@@ -3,13 +3,14 @@
  * 
  * Wrapper for CoachPageContent in the Create Studio.
  * Provides the AI-guided prompt refinement experience.
+ * Supports canvas context from Canvas panel for canvas → coach flow.
  * 
  * @module create-studio/CoachPanel
  */
 
 'use client';
 
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type { CoachPanelProps } from './types';
 
@@ -96,18 +97,34 @@ function CoachPanelSkeleton() {
  * - Lazy loading for performance
  * - Loading skeleton
  * - Generation completion callback
+ * - Canvas context support for canvas → coach flow
  * 
  * @example
  * ```tsx
  * <CoachPanel
  *   onGenerationComplete={(assetId) => console.log('Generated:', assetId)}
+ *   canvasContext={{ snapshotUrl: '...', description: '...' }}
  * />
  * ```
  */
 export function CoachPanel({
   onGenerationComplete,
+  canvasContext,
+  onClearCanvasContext,
   className,
 }: CoachPanelProps) {
+  // Log canvas context for debugging
+  useEffect(() => {
+    if (canvasContext) {
+      console.log('[CoachPanel] Received canvas context:', {
+        snapshotUrl: canvasContext.snapshotUrl,
+        description: canvasContext.description?.slice(0, 100),
+        assetType: canvasContext.assetType,
+        dimensions: `${canvasContext.width}x${canvasContext.height}`,
+      });
+    }
+  }, [canvasContext]);
+
   return (
     <div 
       className={cn('h-full', className)}
@@ -115,8 +132,47 @@ export function CoachPanel({
       id="panel-coach"
       aria-labelledby="tab-coach"
     >
+      {/* Canvas Context Banner */}
+      {canvasContext && (
+        <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-start gap-3">
+            <div className="w-16 h-12 rounded-lg bg-background-elevated overflow-hidden flex-shrink-0">
+              <img 
+                src={canvasContext.snapshotUrl} 
+                alt="Canvas snapshot"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-400">
+                Canvas attached
+              </p>
+              <p className="text-xs text-text-muted mt-0.5 line-clamp-2">
+                {canvasContext.description || `${canvasContext.width}×${canvasContext.height} ${canvasContext.assetType}`}
+              </p>
+            </div>
+            {onClearCanvasContext && (
+              <button
+                onClick={onClearCanvasContext}
+                className="p-1 rounded text-text-muted hover:text-text-primary transition-colors"
+                title="Remove canvas"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      
       <Suspense fallback={<CoachPanelSkeleton />}>
-        <CoachPageContent testId="create-studio-coach-panel" />
+        <CoachPageContent 
+          testId="create-studio-coach-panel"
+          canvasSnapshotUrl={canvasContext?.snapshotUrl}
+          canvasSnapshotDescription={canvasContext?.description}
+          initialAssetType={canvasContext?.assetType}
+        />
       </Suspense>
     </div>
   );

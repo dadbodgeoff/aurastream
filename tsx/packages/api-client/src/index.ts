@@ -817,6 +817,7 @@ export {
   useSetPrimary,
   useMediaForPrompt,
   useGetMediaForPrompt,
+  useRemoveBackground,
 } from './hooks/useCreatorMedia';
 
 // Canvas Snapshot hooks exports
@@ -1051,3 +1052,65 @@ export type {
   UseResilientSSEOptions,
   UseResilientSSEResult,
 } from './sse';
+
+// Canvas Projects type exports
+export type {
+  CanvasProject,
+  CanvasProjectListItem,
+  CanvasProjectListResponse,
+  CreateCanvasProjectRequest,
+  UpdateCanvasProjectRequest,
+} from './hooks/useCanvasProjects';
+
+// Canvas Projects hooks exports
+export {
+  canvasProjectKeys,
+  useCanvasProjects,
+  useCanvasProject,
+  useCreateCanvasProject,
+  useUpdateCanvasProject,
+  useDeleteCanvasProject,
+} from './hooks/useCanvasProjects';
+
+// Project Asset Overrides type exports
+export type {
+  ProjectAssetOverride,
+  ProjectAssetOverridesResponse,
+  UpsertOverrideRequest,
+  BulkOverrideItem,
+  RemoveBackgroundInProjectResponse,
+} from './hooks/useProjectAssetOverrides';
+
+// Project Asset Overrides hooks exports
+export {
+  projectAssetOverrideKeys,
+  useProjectAssetOverrides,
+  useProjectAssetOverride,
+  useUpsertProjectAssetOverride,
+  useDeleteProjectAssetOverride,
+  useBulkUpsertProjectAssetOverrides,
+  useRemoveBackgroundInProject,
+  getEffectiveAssetUrl,
+  overridesToMap,
+} from './hooks/useProjectAssetOverrides';
+
+// Community Hub type exports
+export type {
+  CommunityHubAsset,
+  CommunityHubCategory,
+  ListCommunityHubAssetsParams,
+  ListCommunityHubAssetsResponse,
+  ListCommunityHubCategoriesResponse,
+  CommunityHubSummaryResponse,
+} from './types/communityHub';
+
+// Community Hub hooks exports
+export {
+  communityHubKeys,
+  useCommunityHubAssets,
+  useCommunityHubAsset,
+  useCommunityHubCategories,
+  useCommunityHubSummary,
+  useTrackCommunityHubUsage,
+  communityHubAssetToMediaAsset,
+} from './hooks/useCommunityHub';

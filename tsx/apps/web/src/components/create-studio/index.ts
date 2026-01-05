@@ -5,6 +5,7 @@
  * - Quick Templates (50% of users) - Pre-built templates with vibes
  * - Build Your Own (1% of users) - Custom prompt creation
  * - AI Coach (49% of users) - Guided prompt refinement
+ * - Canvas Studio - Visual scene design with AI polish
  * 
  * @module create-studio
  */
@@ -20,6 +21,7 @@ export { ModeSelector } from './ModeSelector';
 export { TemplatePanel } from './TemplatePanel';
 export { CustomPanel } from './CustomPanel';
 export { CoachPanel } from './CoachPanel';
+export { CanvasPanel } from './CanvasPanel';
 export { PreviewPanel } from './PreviewPanel';
 
 // State management

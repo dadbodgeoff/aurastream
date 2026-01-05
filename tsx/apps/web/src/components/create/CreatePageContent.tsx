@@ -373,6 +373,15 @@ export function CreatePageContent({
     handleGenerate(refinedPrompt);
   }, []);
 
+  // Handle inline generation complete (from coach chat)
+  const handleInlineGenerateComplete = useCallback((asset: { id: string; url: string; assetType: string }) => {
+    log.info('Inline generation complete:', asset);
+    // Clear draft on successful generation
+    clearDraft();
+    // The asset is already displayed in the coach chat with download/share/tweak options
+    // No redirect needed - user stays in the flow
+  }, [clearDraft]);
+
   const handleGenerate = async (promptOverride?: string) => {
     const finalPrompt = promptOverride ?? prompt;
 
@@ -644,7 +653,7 @@ export function CreatePageContent({
               game={coachGame}
               description={coachDescription}
               onGenerateNow={handleGenerateFromCoach}
-              onGenerateComplete={() => {}}
+              onGenerateComplete={handleInlineGenerateComplete}
               selectedMediaAssets={selectedMediaAssets}
               mediaAssetPlacements={mediaAssetPlacements}
               sketchElements={sketchElements}

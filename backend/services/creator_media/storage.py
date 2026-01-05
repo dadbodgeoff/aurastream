@@ -196,6 +196,27 @@ class MediaStorageService:
             logger.warning(f"Storage delete failed (may not exist): {e}")
             return False
     
+    async def download(self, storage_path: str) -> bytes:
+        """
+        Download file from storage.
+        
+        Args:
+            storage_path: Full storage path
+            
+        Returns:
+            Raw file bytes
+            
+        Raises:
+            StorageError: If download fails
+        """
+        try:
+            response = self.db.storage.from_(BUCKET_NAME).download(storage_path)
+            logger.info(f"Storage download: path={storage_path}, size={len(response)}")
+            return response
+        except Exception as e:
+            logger.error(f"Storage download failed: {e}")
+            raise StorageError(f"Failed to download file: {e}")
+    
     async def get_signed_url(
         self,
         storage_path: str,

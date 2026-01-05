@@ -1,183 +1,165 @@
 """
-Creative Director Coach service package.
+Coach Service - AI-powered prompt refinement for content creators.
 
-This package contains all services for the Creative Director Coach feature:
-- Session management
-- Output validation
-- Grounding strategy
-- Static tips
-- Main coach service
+This module provides the Prompt Coach feature, which helps users
+articulate their creative vision through conversation without
+exposing the actual prompts used for generation.
 
-The Creative Director Coach is a Premium-only feature that helps users
-articulate their creative vision through conversation, without exposing
-the actual prompts used for generation.
+Public API:
+    CoachService          - Main service orchestrator
+    get_coach_service     - Get the singleton instance
+    
+Models:
+    CoachSession          - Session data model
+    CoachMessage          - Message in a session
+    PromptSuggestion      - Prompt version in history
+    
+Streaming:
+    StreamChunk           - Streaming response chunk
+    
+Intent:
+    CreativeIntent        - Extracted user intent
+    IntentExtractor       - Extract intent from responses
+    
+Exceptions:
+    SessionNotFoundError  - Session not found
+    SessionExpiredError   - Session expired
+    SessionLimitExceededError - Limits exceeded
 
-Architecture (v2 - Enterprise Refactor):
-- IntentExtractor: Extracts refined descriptions from LLM responses
-- PromptBuilder: Constructs system prompts and user messages
-- ResponseProcessor: Coordinates response processing and session updates
-- SessionManager: Handles session storage and retrieval
-- GroundingStrategy: Handles web search decisions
-- CreativeDirectorService: Main orchestrator (legacy)
-- CreativeDirectorServiceV2: Refactored orchestrator with clear SoC
+For tips-only users:
+    StaticTipsService     - Curated tips for free/pro tiers
 """
 
+# Main service
+from backend.services.coach.service import CoachService, get_coach_service
+
+# Core models (from legacy location for backwards compatibility)
 from backend.services.coach.models import (
     CoachSession,
     CoachMessage,
     PromptSuggestion,
 )
-from backend.services.coach.session_manager import (
-    SessionManager,
+
+# Core types and exceptions
+from backend.services.coach.core import (
+    # Types
+    AssetType,
+    MoodType,
+    StreamChunkType,
+    SessionStatus,
+    TierType,
+    ValidationSeverity,
+    MAX_TURNS,
+    MAX_TOKENS_IN,
+    MAX_TOKENS_OUT,
+    SESSION_TTL_SECONDS,
+    TIER_ACCESS,
+    has_coach_access,
+    has_grounding_access,
+    # Exceptions
     SessionNotFoundError,
     SessionExpiredError,
     SessionLimitExceededError,
-    get_session_manager,
+    GroundingError,
 )
-from backend.services.coach.validator import (
-    ValidationSeverity,
+
+# Streaming
+from backend.services.coach.llm import StreamChunk
+
+# Intent
+from backend.services.coach.intent import (
+    CreativeIntent,
+    IntentExtractor,
+    get_intent_extractor,
     ValidationIssue,
     ValidationResult,
     OutputValidator,
     get_validator,
 )
+
+# Session
+from backend.services.coach.session import SessionManager, get_session_manager
+
+# Grounding
 from backend.services.coach.grounding import (
-    ConfidenceLevel,
-    GroundingAssessment,
+    GroundingStrategy,
     GroundingDecision,
     GroundingResult,
-    GroundingStrategy,
-    GroundingOrchestrator,
     get_grounding_strategy,
     get_grounding_orchestrator,
-)
-# Legacy coach service (still used by routes)
-from backend.services.coach.coach_service import (
-    StreamChunk,
-    CreativeIntent,
-    CoachOutput,
-    CreativeDirectorService,
-    PromptCoachService,  # Backwards compatibility alias
-    get_coach_service,
-)
-# New enterprise components (v2)
-from backend.services.coach.intent_extractor import (
-    IntentExtractor,
-    get_intent_extractor,
-)
-from backend.services.coach.prompt_builder import (
-    PromptContext,
-    PromptBuilder,
-    get_prompt_builder,
-)
-from backend.services.coach.response_processor import (
-    ProcessedResponse,
-    ResponseProcessor,
-    get_response_processor,
-)
-from backend.services.coach.coach_service_v2 import (
-    CreativeDirectorServiceV2,
-    get_coach_service_v2,
-)
-from backend.services.coach.tips_service import (
-    PromptTip,
-    StaticTipsService,
-    get_tips_service,
-)
-from backend.services.coach.llm_client import (
-    CoachLLMClient,
-    get_llm_client,
-    GroundingMetadata,
-)
-from backend.services.coach.partial_validator import (
-    StreamingCoachResponse,
-    StreamingValidator,
-    get_streaming_validator,
-)
-from backend.services.coach.search_service import (
-    SearchResult,
-    WebSearchService,
-    DuckDuckGoSearchService,
-    MockSearchService,
     get_search_service,
-    reset_search_service,
-)
-from backend.services.coach.analytics_service import (
-    SessionOutcome,
-    SuccessPattern,
-    CoachAnalyticsService,
-    get_analytics_service,
 )
 
+# Tips
+from backend.services.coach.tips.service import StaticTipsService, get_tips_service
+
+# Analytics
+from backend.services.coach.analytics.service import CoachAnalyticsService, get_analytics_service
+
+# LLM Client (for advanced usage)
+from backend.services.coach.llm import CoachLLMClient, get_llm_client
+
+# Backwards compatibility aliases
+PromptCoachService = CoachService  # Legacy name
+
+
 __all__ = [
+    # Main Service
+    "CoachService",
+    "get_coach_service",
+    "PromptCoachService",  # Legacy alias
     # Models
     "CoachSession",
     "CoachMessage",
     "PromptSuggestion",
-    # Session Manager
-    "SessionManager",
+    # Types
+    "AssetType",
+    "MoodType",
+    "StreamChunkType",
+    "SessionStatus",
+    "TierType",
+    "ValidationSeverity",
+    # Constants
+    "MAX_TURNS",
+    "MAX_TOKENS_IN",
+    "MAX_TOKENS_OUT",
+    "SESSION_TTL_SECONDS",
+    "TIER_ACCESS",
+    # Helper Functions
+    "has_coach_access",
+    "has_grounding_access",
+    # Exceptions
     "SessionNotFoundError",
     "SessionExpiredError",
     "SessionLimitExceededError",
-    "get_session_manager",
-    # Validator
-    "ValidationSeverity",
+    "GroundingError",
+    # Streaming
+    "StreamChunk",
+    # Intent
+    "CreativeIntent",
+    "IntentExtractor",
+    "get_intent_extractor",
     "ValidationIssue",
     "ValidationResult",
     "OutputValidator",
     "get_validator",
+    # Session
+    "SessionManager",
+    "get_session_manager",
     # Grounding
-    "ConfidenceLevel",
-    "GroundingAssessment",
+    "GroundingStrategy",
     "GroundingDecision",
     "GroundingResult",
-    "GroundingStrategy",
-    "GroundingOrchestrator",
     "get_grounding_strategy",
     "get_grounding_orchestrator",
-    # Coach Service (legacy)
-    "StreamChunk",
-    "CreativeIntent",
-    "CoachOutput",
-    "CreativeDirectorService",
-    "PromptCoachService",  # Backwards compatibility
-    "get_coach_service",
-    # Intent Extractor (v2)
-    "IntentExtractor",
-    "get_intent_extractor",
-    # Prompt Builder (v2)
-    "PromptContext",
-    "PromptBuilder",
-    "get_prompt_builder",
-    # Response Processor (v2)
-    "ProcessedResponse",
-    "ResponseProcessor",
-    "get_response_processor",
-    # Coach Service v2
-    "CreativeDirectorServiceV2",
-    "get_coach_service_v2",
-    # Tips Service
-    "PromptTip",
+    "get_search_service",
+    # Tips
     "StaticTipsService",
     "get_tips_service",
-    # LLM Client
-    "CoachLLMClient",
-    "get_llm_client",
-    "GroundingMetadata",
-    # Partial Validator
-    "StreamingCoachResponse",
-    "StreamingValidator",
-    "get_streaming_validator",
-    # Search Service
-    "SearchResult",
-    "WebSearchService",
-    "DuckDuckGoSearchService",
-    "MockSearchService",
-    "get_search_service",
-    "reset_search_service",
-    # Analytics Service
-    "SessionOutcome",
-    "SuccessPattern",
+    # Analytics
     "CoachAnalyticsService",
     "get_analytics_service",
+    # LLM
+    "CoachLLMClient",
+    "get_llm_client",
 ]

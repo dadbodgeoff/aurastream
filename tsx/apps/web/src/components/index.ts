@@ -1,8 +1,6 @@
 // Streamer Studio Web Components
 // Re-export all components for easy imports
 
-export { ProtectedRoute, withProtectedRoute, useProtectedRoute } from './ProtectedRoute';
-
 // Navigation components
 export * from './navigation';
 

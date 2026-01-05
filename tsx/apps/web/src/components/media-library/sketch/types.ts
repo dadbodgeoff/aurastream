@@ -31,7 +31,13 @@ export type SketchTool =
   | 'arrow'       // Directional arrows
   | 'text'        // Text labels
   | 'sticker'     // Stickers/stamps
-  | 'eraser';     // Erase elements
+  | 'eraser'      // Erase elements
+  | 'eyedropper'; // Pick color from canvas
+
+/**
+ * Line style for strokes
+ */
+export type LineStyle = 'solid' | 'dashed' | 'dotted';
 
 /**
  * Tool configuration
@@ -49,12 +55,18 @@ export interface ToolConfig {
 export interface BrushSettings {
   /** Stroke color (hex) */
   color: string;
+  /** Secondary color for quick swap (X key) */
+  secondaryColor: string;
   /** Stroke width in pixels */
   strokeWidth: number;
   /** Opacity (0-100) */
   opacity: number;
   /** Whether shapes are filled */
   filled: boolean;
+  /** Line style (solid, dashed, dotted) */
+  lineStyle: LineStyle;
+  /** Line stabilization strength (0-100, 0 = off) */
+  stabilization: number;
 }
 
 /**
@@ -117,15 +129,29 @@ export interface SketchActions {
   setTool: (tool: SketchTool) => void;
   setBrush: (settings: Partial<BrushSettings>) => void;
   setText: (settings: Partial<TextSettings>) => void;
+  swapColors: () => void;
+  pickColor: (color: string) => void;
   
   // Element actions
   addElement: (element: import('../canvas-export/types').AnySketchElement) => void;
   updateElement: (id: string, updates: Partial<import('../canvas-export/types').AnySketchElement>) => void;
   deleteElement: (id: string) => void;
+  duplicateElement: (id: string) => void;
   moveElement: (id: string, deltaX: number, deltaY: number) => void;
   finishMove: () => void;
   selectElement: (id: string | null) => void;
   clearAll: () => void;
+  
+  // Layer actions
+  bringForward: (id: string) => void;
+  sendBackward: (id: string) => void;
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  
+  // Transform actions
+  flipHorizontal: (id: string) => void;
+  flipVertical: (id: string) => void;
+  setElementOpacity: (id: string, opacity: number) => void;
   
   // Drawing actions
   startDrawing: (element: import('../canvas-export/types').AnySketchElement) => void;

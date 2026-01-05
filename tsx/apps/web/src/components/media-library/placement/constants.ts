@@ -127,10 +127,11 @@ export const SIZE_PRESETS: Array<{
   unit: 'percent' | 'px';
 }> = [
   { id: 'tiny', label: 'Tiny', size: 5, unit: 'percent' },
-  { id: 'small', label: 'Small', size: 10, unit: 'percent' },
-  { id: 'medium', label: 'Medium', size: 20, unit: 'percent' },
-  { id: 'large', label: 'Large', size: 35, unit: 'percent' },
-  { id: 'xlarge', label: 'X-Large', size: 50, unit: 'percent' },
+  { id: 'small', label: 'Small', size: 15, unit: 'percent' },
+  { id: 'medium', label: 'Med', size: 30, unit: 'percent' },
+  { id: 'large', label: 'Lg', size: 50, unit: 'percent' },
+  { id: 'xlarge', label: 'XL', size: 75, unit: 'percent' },
+  { id: 'fill', label: 'Fill', size: 100, unit: 'percent' },
 ];
 
 /**
@@ -148,6 +149,10 @@ export function getRegionFromPosition(x: number, y: number): CanvasRegion {
 
 /**
  * Create default placement for an asset
+ * 
+ * IMPORTANT: New placements always start with useOriginalUrl: true
+ * This ensures project isolation - each project starts fresh and users
+ * must explicitly choose to use the processed (bg-removed) version.
  */
 export function createDefaultPlacement(
   asset: MediaAsset,
@@ -172,6 +177,9 @@ export function createDefaultPlacement(
     zIndex: index + 1,
     rotation: DEFAULT_PLACEMENT.rotation,
     opacity: DEFAULT_PLACEMENT.opacity,
+    // Always start with original - user must explicitly enable processed version
+    // This ensures each project is isolated from global asset modifications
+    useOriginalUrl: true,
   };
 }
 

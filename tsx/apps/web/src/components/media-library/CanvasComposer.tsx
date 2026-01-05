@@ -45,6 +45,18 @@ import type { AnySketchElement } from './canvas-export/types';
 
 type ComposerMode = 'easy' | 'regions' | 'pro' | 'templates';
 
+// Modes that are locked with "Coming Soon"
+const LOCKED_COMPOSER_MODES: Set<ComposerMode> = new Set(['templates', 'easy']);
+
+// Lock icon for Coming Soon modes
+function LockIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+    </svg>
+  );
+}
+
 interface CanvasComposerProps {
   /** Whether modal is open */
   isOpen: boolean;
@@ -146,8 +158,8 @@ export function CanvasComposer({
   const dimensions = getCanvasDimensions(assetType);
   const canvasRendererRef = useRef<CanvasRendererHandle>(null);
   
-  // Mode state
-  const [mode, setMode] = useState<ComposerMode>('easy');
+  // Mode state - default to regions (skip locked modes: templates, easy)
+  const [mode, setMode] = useState<ComposerMode>('regions');
   
   // Easy mode elements
   const [easyElements, setEasyElements] = useState<AnySketchElement[]>(initialElements);
@@ -252,53 +264,40 @@ export function CanvasComposer({
           
           {/* Mode Toggle */}
           <div className="flex items-center gap-1 bg-background-base rounded-xl p-1">
-            <button
-              onClick={() => setMode('templates')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                mode === 'templates'
-                  ? 'bg-interactive-500 text-white shadow-lg'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
-              )}
-            >
-              <TemplateIcon />
-              Templates
-            </button>
-            <button
-              onClick={() => setMode('easy')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                mode === 'easy'
-                  ? 'bg-interactive-500 text-white shadow-lg'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
-              )}
-            >
-              🎨 Easy
-            </button>
-            <button
-              onClick={() => setMode('regions')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                mode === 'regions'
-                  ? 'bg-interactive-500 text-white shadow-lg'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
-              )}
-            >
-              <GridIcon />
-              Regions
-            </button>
-            <button
-              onClick={() => setMode('pro')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                mode === 'pro'
-                  ? 'bg-interactive-500 text-white shadow-lg'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
-              )}
-            >
-              <PenIcon />
-              Pro
-            </button>
+            {[
+              { id: 'templates' as ComposerMode, icon: <TemplateIcon />, label: 'Templates' },
+              { id: 'easy' as ComposerMode, icon: null, emoji: '🎨', label: 'Easy' },
+              { id: 'regions' as ComposerMode, icon: <GridIcon />, label: 'Regions' },
+              { id: 'pro' as ComposerMode, icon: <PenIcon />, label: 'Pro' },
+            ].map((m) => {
+              const isLocked = LOCKED_COMPOSER_MODES.has(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => !isLocked && setMode(m.id)}
+                  disabled={isLocked}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                    isLocked && 'opacity-50 cursor-not-allowed',
+                    mode === m.id && !isLocked
+                      ? 'bg-interactive-500 text-white shadow-lg'
+                      : !isLocked
+                        ? 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
+                        : 'text-text-muted'
+                  )}
+                  title={isLocked ? `${m.label} - Coming Soon` : m.label}
+                >
+                  {m.icon || m.emoji}
+                  {m.label}
+                  {isLocked && (
+                    <span className="flex items-center gap-0.5 ml-1 px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-amber-500/80 text-black">
+                      <LockIcon />
+                      Soon
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           
           <button

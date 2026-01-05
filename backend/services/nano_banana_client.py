@@ -112,36 +112,38 @@ class NanoBananaClient:
     # Strict content constraint to prevent hallucination
     # This is prepended to every prompt to ensure the model only renders
     # what is explicitly provided and doesn't invent additional content
-    # Version 2.0 - Simplified from 28 rules to 10 essential rules
-    PROMPT_VERSION = "2.0"
+    # Version 2.1 - Added anti-screenshot rules
+    PROMPT_VERSION = "2.1"
     
     STRICT_CONTENT_CONSTRAINT = """STRICT RULES:
 
-1. REFERENCE IMAGE: If provided, COPY the exact layout and element positions. The reference defines WHERE things go.
+1. CREATE ORIGINAL ART - Do NOT use screenshots, gameplay footage, or existing images.
+   - Generate NEW artwork in a stylized, professional thumbnail style
+   - NO game HUD elements (health bars, minimaps, inventory, crosshairs)
+   - NO watermarks or UI from other sources
 
-2. TEXT RENDERING - CRITICAL:
+2. REFERENCE IMAGE: If provided, COPY the exact layout and element positions. The reference defines WHERE things go.
+
+3. TEXT RENDERING - CRITICAL:
    - Render ALL text EXACTLY as written - no corrections, no changes
    - Text must be FULLY VISIBLE and NEVER covered by characters, objects, or effects
    - Characters and objects must be BEHIND or BESIDE text, never overlapping it
-   - If text says "BATTLEWOOD BOULEVARD" render exactly that, not "BATTLEWOOD VD"
 
-3. QUANTITIES: If prompt says "3 items" - render EXACTLY 3. If it says "Monday, Wednesday" - show ONLY those days.
+4. QUANTITIES: If prompt says "3 items" - render EXACTLY 3. If it says "Monday, Wednesday" - show ONLY those days.
 
-4. NO ADDITIONS: Do NOT add text, labels, watermarks, or elements not explicitly mentioned.
+5. NO ADDITIONS: Do NOT add text, labels, watermarks, or elements not explicitly mentioned.
    - Do NOT render mood words like "HYPE", "COZY", "RAGE" as visible text unless explicitly requested
-   - Mood describes the STYLE/FEELING, not text to display
 
-5. CHARACTERS: If character details are specified (hair, eyes, expression), render them EXACTLY as described.
+6. CHARACTERS: If character details are specified (hair, eyes, expression), render them EXACTLY as described.
    - Characters must NOT block or overlap any text in the image
 
-6. EMOTES/BADGES: Use bold outlines, flat colors, high contrast. Must be recognizable at 28x28 pixels.
+7. EMOTES/BADGES: Use bold outlines, flat colors, high contrast. Must be recognizable at 28x28 pixels.
 
-7. STYLE: You MAY be creative with colors, artistic style, and visual flair.
+8. STYLE: You MAY be creative with colors, artistic style, and visual flair.
 
-8. CONTENT: You may NOT be creative with text, quantities, or specified character appearance.
+9. CONTENT: You may NOT be creative with text, quantities, or specified character appearance.
 
-9. GAME LOCATIONS: If a specific game location is mentioned (e.g. "Battlewood Boulevard", "Tilted Towers"), 
-   search for what it actually looks like - do NOT hallucinate or guess the appearance.
+10. GAME CONTENT: Use Google Search to understand what game elements look like, then CREATE original stylized art.
 
 """
     
@@ -413,11 +415,17 @@ Refinement request: """
             )
         else:
             # Single-turn: Original behavior
-            # For canvas/reference image mode, use minimal prompt (the canvas IS the instruction)
+            # For canvas/reference image mode, add transformation instructions
             # For regular generation, prepend strict content constraint
             if input_image is not None:
-                # Canvas mode - prompt is already optimized, just add dimensions
-                constrained_prompt = f"{prompt}\n\nOutput: {width}x{height} pixels."
+                # Canvas mode - tell Gemini to TRANSFORM the reference, not just return it
+                # The reference image is a LAYOUT GUIDE, not something to copy pixel-for-pixel
+                canvas_constraint = """IMPORTANT: The attached image is a LAYOUT REFERENCE showing element positions.
+You must CREATE NEW ARTWORK that follows this layout - do NOT return the input image unchanged.
+Generate a polished, professional result with proper lighting, depth, and visual quality.
+
+"""
+                constrained_prompt = f"{canvas_constraint}{prompt}\n\nOutput dimensions: {width}x{height} pixels."
             else:
                 # Regular mode - use full constraint to prevent hallucination
                 constrained_prompt = f"{self.STRICT_CONTENT_CONSTRAINT}{prompt}\n\nGenerate this as a {width}x{height} pixel image."

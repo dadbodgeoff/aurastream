@@ -74,13 +74,8 @@ import { getCanvasDimensions } from '../media-library/placement/constants';
 // Feature Flag
 // ============================================================================
 
-const COACH_UX_2025_ENABLED = process.env.NEXT_PUBLIC_COACH_UX_2025 !== 'false';
-
-// Debug logging (only when dev logging is enabled)
-if (typeof window !== 'undefined') {
-  log.info('COACH_UX_2025_ENABLED:', COACH_UX_2025_ENABLED);
-  log.debug('NEXT_PUBLIC_COACH_UX_2025:', process.env.NEXT_PUBLIC_COACH_UX_2025);
-}
+// Always use the new UX - inline generation with streaming
+const COACH_UX_2025_ENABLED = true;
 
 // ============================================================================
 // Type Definitions
@@ -497,7 +492,13 @@ const EnhancedCoachMessage = memo(function EnhancedCoachMessage({
   // Clean content
   const displayContent = useMemo(() => {
     let cleaned = content.replace(/```prompt\n?[\s\S]*?```/g, '');
-    cleaned = cleaned.replace(/\[INTENT_READY\]/g, '');
+    // Remove [INTENT_READY] markers (internal use only)
+    cleaned = cleaned.replace(/\s*\[INTENT_READY\]\s*/gi, ' ');
+    // Replace "✨ Ready!" + detailed prompt with simple confirmation
+    const readyMatch = cleaned.match(/✨\s*Ready!\s*(.+)/s);
+    if (readyMatch) {
+      cleaned = cleaned.replace(/✨\s*Ready!\s*.+/s, "✨ Got it! I understand exactly what you want.");
+    }
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
     return cleaned;
   }, [content]);
@@ -544,15 +545,12 @@ const EnhancedCoachMessage = memo(function EnhancedCoachMessage({
   // Assistant message with thinking indicator
   if (showThinkingIndicator) {
     return (
-      <div className="flex gap-3" role="article" aria-label="Coach message">
+      <div className="flex gap-3" role="article" aria-label="AuraBot message">
         <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-background-elevated text-text-secondary border border-border-default">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <rect x="3" y="11" width="18" height="10" rx="2" />
-            <circle cx="12" cy="5" r="2" />
-            <path d="M12 7v4M7 15h.01M17 15h.01" />
-          </svg>
+          <span className="text-xs font-bold">A</span>
         </div>
         <div className="flex-1 min-w-0 max-w-full sm:max-w-[85%]">
+          <span className="text-xs font-medium text-accent-500 mb-1 block">AuraBot</span>
           <ThinkingIndicator stage={thinkingStage} />
         </div>
       </div>
@@ -561,15 +559,12 @@ const EnhancedCoachMessage = memo(function EnhancedCoachMessage({
 
   // Assistant message with content
   return (
-    <div className="flex gap-3" role="article" aria-label="Coach message">
+    <div className="flex gap-3" role="article" aria-label="AuraBot message">
       <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-background-elevated text-text-secondary border border-border-default">
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <rect x="3" y="11" width="18" height="10" rx="2" />
-          <circle cx="12" cy="5" r="2" />
-          <path d="M12 7v4M7 15h.01M17 15h.01" />
-        </svg>
+        <span className="text-xs font-bold">A</span>
       </div>
       <div className="flex-1 min-w-0 max-w-full sm:max-w-[85%]">
+        <span className="text-xs font-medium text-accent-500 mb-1 block">AuraBot</span>
         <div className="inline-block rounded-2xl rounded-tl-sm px-4 py-3 bg-background-surface border border-border-default text-text-primary text-sm leading-relaxed">
           {/* Grounding indicator */}
           {groundingUsed && (
@@ -823,8 +818,16 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
     log.debug('isGenerationReady:', isGenerationReady);
     log.debug('isStreaming:', isStreaming);
     
-    if (!refinedDescription || !isGenerationReady || isStreaming) {
+    // Use intent-based readiness from backend (NOT turn-based)
+    // The backend's intent schema determines when generation is ready based on:
+    // 1. Required parameters being filled
+    // 2. Ambiguous annotations being resolved
+    // 3. User having confirmed the vision
+    if (!refinedDescription || isStreaming || !isGenerationReady) {
       log.debug('handleGenerateNow - conditions not met, returning');
+      if (!isGenerationReady) {
+        log.debug('handleGenerateNow - intent schema says not ready yet');
+      }
       return;
     }
 
@@ -902,7 +905,7 @@ export const CoachChatIntegrated = memo(function CoachChatIntegrated({
       log.error('Generation failed:', err);
       setLocalError(err instanceof Error ? err.message : 'Generation failed');
     }
-  }, [refinedDescription, isGenerationReady, isStreaming, triggerGeneration, assetType, brandKitId, selectedMediaAssets, mediaAssetPlacements, sketchElements, canvasSnapshotUrl, canvasSnapshotDescription, useCanvasMode, prepareCanvasForGeneration]);
+  }, [refinedDescription, isStreaming, isGenerationReady, triggerGeneration, assetType, brandKitId, selectedMediaAssets, mediaAssetPlacements, sketchElements, canvasSnapshotUrl, canvasSnapshotDescription, useCanvasMode, prepareCanvasForGeneration]);
 
   // Handle end session
   const handleEndSession = useCallback(async () => {

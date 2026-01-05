@@ -54,8 +54,8 @@ logger = logging.getLogger(__name__)
 # HTTP client timeout for fetching remote assets
 FETCH_TIMEOUT_SECONDS = 30
 
-# Maximum number of assets to composite (safety limit)
-MAX_COMPOSITE_ASSETS = 5
+# Maximum number of assets to composite (no limit - user controls via canvas)
+MAX_COMPOSITE_ASSETS = 100
 
 # Minimum asset size as percentage of canvas (prevents invisible assets)
 MIN_SIZE_PERCENT = 1.0
@@ -438,10 +438,9 @@ class MediaAssetCompositor:
         
         errors: List[str] = []
         
-        # Limit number of assets
-        if len(placements) > MAX_COMPOSITE_ASSETS:
-            placements = placements[:MAX_COMPOSITE_ASSETS]
-            errors.append(f"Truncated to {MAX_COMPOSITE_ASSETS} assets")
+        # Warn if many assets (performance consideration)
+        if len(placements) > 20:
+            errors.append(f"Large number of assets ({len(placements)}) may affect performance")
         
         try:
             # Get actual dimensions from base image (quick operation)

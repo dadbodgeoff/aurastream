@@ -407,6 +407,81 @@ class CreatorMediaService:
         
         return result
     
+    async def process_background_removal(
+        self,
+        user_id: str,
+        asset_id: str,
+    ) -> MediaAssetModel:
+        """
+        Process background removal on an existing asset.
+        
+        Downloads the original image, removes background, uploads processed
+        version, and updates the database record.
+        
+        Args:
+            user_id: User's ID
+            asset_id: Asset ID
+            
+        Returns:
+            Updated MediaAssetModel with processed_url
+            
+        Raises:
+            ValueError: If asset not found or already processed
+            RuntimeError: If background removal fails
+        """
+        # Get existing asset
+        existing = await self.get(user_id, asset_id)
+        
+        # Check if already processed
+        if existing.has_background_removed and existing.processed_url:
+            logger.info(f"Asset {asset_id} already has background removed")
+            return existing
+        
+        # Download original image
+        try:
+            image_data = await self.storage.download(existing.storage_path)
+        except Exception as e:
+            logger.error(f"Failed to download asset {asset_id}: {e}")
+            raise RuntimeError(f"Failed to download original image: {e}")
+        
+        # Process background removal
+        try:
+            logger.info(f"Processing background removal for asset {asset_id}")
+            processed_data = await self.bg_removal.remove_background(image_data)
+        except Exception as e:
+            logger.error(f"Background removal failed for {asset_id}: {e}")
+            raise RuntimeError(f"Background removal failed: {e}")
+        
+        # Upload processed version
+        try:
+            processed_result = await self.storage.upload(
+                user_id=user_id,
+                asset_type=existing.asset_type,
+                asset_id=asset_id,
+                data=processed_data,
+                mime_type="image/png",  # Always PNG for transparency
+                suffix="_processed",
+            )
+        except Exception as e:
+            logger.error(f"Failed to upload processed asset {asset_id}: {e}")
+            raise RuntimeError(f"Failed to save processed image: {e}")
+        
+        # Update database record
+        update_data = {
+            "processed_url": processed_result.url,
+            "processed_storage_path": processed_result.storage_path,
+            "has_background_removed": True,
+        }
+        
+        result = await self.repository.update(user_id, asset_id, update_data)
+        if not result:
+            # Cleanup uploaded file
+            await self.storage.delete(processed_result.storage_path)
+            raise ValueError(f"Failed to update asset record: {asset_id}")
+        
+        logger.info(f"Background removed successfully for asset {asset_id}")
+        return result
+    
     # ========================================================================
     # Delete Operations
     # ========================================================================

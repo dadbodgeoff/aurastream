@@ -41,6 +41,12 @@ export interface CoachContextFormProps {
   onStartChat: (request: StartCoachRequest) => void;
   /** Whether the form is in a loading state (e.g., starting session) */
   isLoading?: boolean;
+  /** Initial asset type (e.g., from canvas panel) */
+  initialAssetType?: AssetType;
+  /** Canvas snapshot URL (from canvas → coach flow) */
+  canvasSnapshotUrl?: string;
+  /** Canvas snapshot description for AI context */
+  canvasSnapshotDescription?: string;
 }
 
 // ============================================================================
@@ -713,7 +719,13 @@ function DescriptionInput({ description, onChange, error }: DescriptionInputProp
  * />
  * ```
  */
-export function CoachContextForm({ onStartChat, isLoading = false }: CoachContextFormProps) {
+export function CoachContextForm({ 
+  onStartChat, 
+  isLoading = false,
+  initialAssetType,
+  canvasSnapshotUrl,
+  canvasSnapshotDescription,
+}: CoachContextFormProps) {
   // Check coach access and trial status
   const { hasAccess, trialAvailable, trialUsed, upgradeMessage, isLoading: isAccessLoading } = useCoachAccess();
   
@@ -734,6 +746,13 @@ export function CoachContextForm({ onStartChat, isLoading = false }: CoachContex
     buildStartRequest,
   } = useCoachContext();
 
+  // Set initial asset type from props (e.g., from canvas panel)
+  React.useEffect(() => {
+    if (initialAssetType && !state.assetType) {
+      setAssetType(initialAssetType);
+    }
+  }, [initialAssetType, state.assetType, setAssetType]);
+
   // Extract brand kits from response
   const brandKits = useMemo(() => {
     return brandKitsData?.brandKits ?? [];
@@ -752,6 +771,11 @@ export function CoachContextForm({ onStartChat, isLoading = false }: CoachContex
   const handleStartChat = () => {
     const request = buildStartRequest();
     if (request) {
+      // Add canvas context if provided
+      if (canvasSnapshotUrl) {
+        request.canvas_snapshot_url = canvasSnapshotUrl;
+        request.canvas_snapshot_description = canvasSnapshotDescription;
+      }
       onStartChat(request);
     }
   };

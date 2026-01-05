@@ -46,9 +46,9 @@ export interface CreateCoachIntegrationProps {
   game?: string;
   /** User's description of what they want to create */
   description?: string;
-  /** Callback when user clicks "Generate Now" with refined prompt */
-  onGenerateNow: (prompt: string) => void;
-  /** Callback when generation completes (for new UX) */
+  /** @deprecated Legacy callback - no longer used with new UX */
+  onGenerateNow?: (prompt: string) => void;
+  /** Callback when generation completes (inline generation) */
   onGenerateComplete?: (asset: Asset) => void;
   /** Callback when session ends */
   onEndSession?: () => void;
@@ -478,18 +478,25 @@ export function CreateCoachIntegration({
     );
   }
 
-  log.info('Using LegacyCoachIntegration (fallback)');
-  // Fallback to legacy implementation
+  // Legacy fallback removed - always use new UX with inline generation
+  // This code path should never be reached since COACH_UX_2025_ENABLED is always true
+  log.warn('Unexpected: COACH_UX_2025_ENABLED is false, but legacy fallback was removed');
   return (
-    <LegacyCoachIntegration
+    <CoachChatIntegrated
       assetType={assetType}
       brandKitId={brandKitId}
-      mood={mood}
-      customMood={customMood}
-      game={game}
-      description={description}
-      onGenerateNow={onGenerateNow}
+      brandKitName={selectedBrandKit?.name}
+      onGenerateComplete={handleGenerateComplete}
+      onEndSession={onEndSession}
+      initialRequest={initialRequest ?? undefined}
+      selectedMediaAssets={selectedMediaAssets}
+      mediaAssetPlacements={mediaAssetPlacements}
+      sketchElements={sketchElements}
+      canvasSnapshotUrl={canvasSnapshotUrl}
+      canvasSnapshotDescription={canvasSnapshotDescription}
+      useCanvasMode={useCanvasMode}
       className={className}
+      testId="create-coach-integration"
     />
   );
 }

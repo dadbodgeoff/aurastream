@@ -27,6 +27,7 @@ export function PlacementCanvas({
   onPlacementsChange,
   selectedId: controlledSelectedId,
   onSelectionChange,
+  isInteractive = true,
   className,
 }: PlacementCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -94,6 +95,8 @@ export function PlacementCanvas({
     placement: AssetPlacement,
     handle?: string
   ) => {
+    if (!isInteractive) return;
+    
     e.preventDefault();
     e.stopPropagation();
     
@@ -110,7 +113,7 @@ export function PlacementCanvas({
       startPosition: { ...placement.position },
       startSize: { ...placement.size },
     });
-  }, [getCanvasCoords]);
+  }, [isInteractive, getCanvasCoords]);
 
   // Handle mouse move
   useEffect(() => {
@@ -191,15 +194,16 @@ export function PlacementCanvas({
 
   // Deselect on canvas click (only if clicking the canvas background, not an asset)
   const handleCanvasClick = useCallback((e: React.MouseEvent) => {
+    if (!isInteractive) return;
     // Only deselect if the click target is the canvas itself, not a child element
     if (e.target === canvasRef.current) {
       setSelectedId(null);
     }
-  }, [setSelectedId]);
+  }, [isInteractive, setSelectedId]);
 
   // Keyboard controls for selected asset
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId || !isInteractive) return;
     
     const handleKeyDown = (e: KeyboardEvent) => {
       const placement = placements.find(p => p.assetId === selectedId);
@@ -293,7 +297,10 @@ export function PlacementCanvas({
         {/* Interactive Canvas */}
         <div
           ref={canvasRef}
-          className="absolute inset-0 cursor-default"
+          className={cn(
+            "absolute inset-0",
+            isInteractive ? "cursor-default" : "pointer-events-none"
+          )}
           onClick={handleCanvasClick}
         >
           {/* Placed Assets */}
@@ -301,13 +308,15 @@ export function PlacementCanvas({
             .sort((a, b) => a.zIndex - b.zIndex)
             .map((placement) => {
               const isSelected = placement.assetId === selectedId;
+              // Use object-cover when asset is meant to fill (size >= 95%)
+              const isFillMode = placement.size.width >= 95 && placement.size.height >= 95;
               
               return (
                 <div
                   key={placement.assetId}
                   className={cn(
-                    'absolute cursor-move transition-shadow',
-                    isSelected && 'ring-2 ring-interactive-500 ring-offset-2 ring-offset-background-base'
+                    'absolute cursor-move',
+                    isSelected && 'ring-1 ring-interactive-500'
                   )}
                   style={{
                     left: `${placement.position.x}%`,
@@ -320,23 +329,26 @@ export function PlacementCanvas({
                   }}
                   onMouseDown={(e) => handleAssetMouseDown(e, placement)}
                 >
-                  {/* Asset Image */}
+                  {/* Asset Image - use object-cover for fill mode */}
                   <img
-                    src={placement.asset.thumbnailUrl || placement.asset.url}
+                    src={placement.asset.processedUrl || placement.asset.thumbnailUrl || placement.asset.url}
                     alt={placement.asset.displayName}
-                    className="w-full h-full object-contain pointer-events-none select-none"
+                    className={cn(
+                      'w-full h-full pointer-events-none select-none',
+                      isFillMode ? 'object-cover' : 'object-contain'
+                    )}
                     draggable={false}
                   />
                   
-                  {/* Resize Handles (when selected) */}
+                  {/* Resize Handles (when selected) - smaller */}
                   {isSelected && (
                     <>
-                      {/* Corner handles */}
+                      {/* Corner handles - smaller */}
                       {['nw', 'ne', 'sw', 'se'].map((handle) => (
                         <div
                           key={handle}
                           className={cn(
-                            'absolute w-3 h-3 bg-interactive-500 rounded-full border-2 border-white shadow-md cursor-nwse-resize',
+                            'absolute w-2 h-2 bg-interactive-500 rounded-full border border-white shadow cursor-nwse-resize',
                             handle === 'nw' && 'top-0 left-0 -translate-x-1/2 -translate-y-1/2',
                             handle === 'ne' && 'top-0 right-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize',
                             handle === 'sw' && 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize',
@@ -346,14 +358,14 @@ export function PlacementCanvas({
                         />
                       ))}
                       
-                      {/* Edge handles */}
+                      {/* Edge handles - smaller */}
                       {['n', 'e', 's', 'w'].map((handle) => (
                         <div
                           key={handle}
                           className={cn(
-                            'absolute bg-interactive-500/50 rounded-sm',
-                            (handle === 'n' || handle === 's') && 'left-1/2 -translate-x-1/2 w-8 h-2 cursor-ns-resize',
-                            (handle === 'e' || handle === 'w') && 'top-1/2 -translate-y-1/2 w-2 h-8 cursor-ew-resize',
+                            'absolute bg-interactive-500/60 rounded-sm',
+                            (handle === 'n' || handle === 's') && 'left-1/2 -translate-x-1/2 w-6 h-1.5 cursor-ns-resize',
+                            (handle === 'e' || handle === 'w') && 'top-1/2 -translate-y-1/2 w-1.5 h-6 cursor-ew-resize',
                             handle === 'n' && 'top-0 -translate-y-1/2',
                             handle === 's' && 'bottom-0 translate-y-1/2',
                             handle === 'e' && 'right-0 translate-x-1/2',

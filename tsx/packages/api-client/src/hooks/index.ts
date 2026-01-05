@@ -171,6 +171,7 @@ export {
   useSetPrimary,
   useMediaForPrompt,
   useGetMediaForPrompt,
+  useRemoveBackground,
 } from './useCreatorMedia';
 
 // Canvas Snapshot hooks
@@ -183,3 +184,51 @@ export type {
   CanvasSnapshotUploadRequest,
   CanvasSnapshotUploadResponse,
 } from './useCanvasSnapshot';
+
+// Canvas Projects hooks
+export {
+  canvasProjectKeys,
+  useCanvasProjects,
+  useCanvasProject,
+  useCreateCanvasProject,
+  useUpdateCanvasProject,
+  useDeleteCanvasProject,
+} from './useCanvasProjects';
+export type {
+  CanvasProject,
+  CanvasProjectListItem,
+  CanvasProjectListResponse,
+  CreateCanvasProjectRequest,
+  UpdateCanvasProjectRequest,
+} from './useCanvasProjects';
+
+// Project Asset Overrides hooks
+export {
+  projectAssetOverrideKeys,
+  useProjectAssetOverrides,
+  useProjectAssetOverride,
+  useUpsertProjectAssetOverride,
+  useDeleteProjectAssetOverride,
+  useBulkUpsertProjectAssetOverrides,
+  useRemoveBackgroundInProject,
+  getEffectiveAssetUrl,
+  overridesToMap,
+} from './useProjectAssetOverrides';
+export type {
+  ProjectAssetOverride,
+  ProjectAssetOverridesResponse,
+  UpsertOverrideRequest,
+  BulkOverrideItem,
+  RemoveBackgroundInProjectResponse,
+} from './useProjectAssetOverrides';
+
+// Community Hub hooks
+export {
+  communityHubKeys,
+  useCommunityHubAssets,
+  useCommunityHubAsset,
+  useCommunityHubCategories,
+  useCommunityHubSummary,
+  useTrackCommunityHubUsage,
+  communityHubAssetToMediaAsset,
+} from './useCommunityHub';

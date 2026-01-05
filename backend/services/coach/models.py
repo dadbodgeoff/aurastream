@@ -8,6 +8,7 @@ separate from the API schemas. They handle:
 - Prompt refinement history
 - Token usage tracking
 - Redis serialization/deserialization
+- Creative intent schema tracking
 """
 
 from dataclasses import dataclass, field
@@ -85,6 +86,7 @@ class CoachSession:
     - Prompt evolution history
     - Grounding call tracking
     - Multi-turn image refinement history
+    - Creative intent schema (NEW)
     
     Sessions are stored in Redis with TTL for automatic expiration.
     """
@@ -119,13 +121,21 @@ class CoachSession:
     # Generic metadata for extensions (e.g., profile creator)
     metadata: Optional[Dict[str, Any]] = None
     
-    # NEW: Multi-turn image refinement support
+    # NEW: Creative Intent Schema
+    # Tracks structured intent parameters for generation readiness
+    intent_schema: Optional[Dict[str, Any]] = None
+    
+    # NEW: Canvas Intent Schema
+    # Tracks classified canvas elements for Coach → Nano Banana flow
+    canvas_schema: Optional[Dict[str, Any]] = None
+    
+    # Multi-turn image refinement support
     # Stores Gemini conversation history for cheaper refinements
     gemini_history: List[Dict[str, Any]] = field(default_factory=list)
     refinements_used: int = 0
     last_generated_asset_id: Optional[str] = None
     
-    # NEW: Reference assets from user's media library
+    # Reference assets from user's media library
     # These are passed to NanoBanana when generating from this session
     reference_assets: List[Dict[str, Any]] = field(default_factory=list)
     
@@ -246,6 +256,10 @@ class CoachSession:
             "current_prompt_draft": self.current_prompt_draft,
             "brand_aesthetic": self.brand_aesthetic,
             "metadata": self.metadata,
+            # Intent schema
+            "intent_schema": self.intent_schema,
+            # Canvas schema
+            "canvas_schema": self.canvas_schema,
             # Multi-turn refinement fields
             "gemini_history": self.gemini_history,
             "refinements_used": self.refinements_used,
@@ -293,6 +307,10 @@ class CoachSession:
             current_prompt_draft=data.get("current_prompt_draft"),
             brand_aesthetic=data.get("brand_aesthetic"),
             metadata=data.get("metadata"),
+            # Intent schema
+            intent_schema=data.get("intent_schema"),
+            # Canvas schema
+            canvas_schema=data.get("canvas_schema"),
             # Multi-turn refinement fields
             gemini_history=data.get("gemini_history", []),
             refinements_used=data.get("refinements_used", 0),

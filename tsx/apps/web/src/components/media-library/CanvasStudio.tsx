@@ -53,6 +53,17 @@ interface CanvasStudioProps {
     promptDescription: string;
     selectedTemplate?: CanvasTemplate;
   }) => void;
+  /** Optional callback for "Discuss with Coach" flow */
+  onDiscussWithCoach?: (data: {
+    placements: AssetPlacement[];
+    elements: AnySketchElement[];
+    regions: LabeledRegion[];
+    description: string;
+    promptDescription: string;
+    selectedTemplate?: CanvasTemplate;
+  }) => void;
+  /** Whether coach upload is in progress */
+  isUploadingToCoach?: boolean;
 }
 
 // ============================================================================
@@ -154,6 +165,9 @@ function SmallXIcon() {
 // Mode Config
 // ============================================================================
 
+// Modes that are locked with "Coming Soon"
+const LOCKED_MODES: Set<CanvasMode> = new Set(['templates', 'easy']);
+
 const MODES: { id: CanvasMode; label: string; icon: React.ReactNode; description: string }[] = [
   { id: 'templates', label: 'Templates', icon: <TemplateIcon />, description: 'Start with a layout' },
   { id: 'easy', label: 'Easy', icon: <BoxIcon />, description: 'Draw simple boxes' },
@@ -161,6 +175,15 @@ const MODES: { id: CanvasMode; label: string; icon: React.ReactNode; description
   { id: 'assets', label: 'Assets', icon: <LayersIcon />, description: 'Place your media' },
   { id: 'pro', label: 'Pro', icon: <PenIcon />, description: 'Full drawing tools' },
 ];
+
+// Lock icon for Coming Soon modes
+function LockIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+    </svg>
+  );
+}
 
 // ============================================================================
 // Component
@@ -175,6 +198,8 @@ export function CanvasStudio({
   initialSketchElements = [],
   initialRegions = [],
   onSave,
+  onDiscussWithCoach,
+  isUploadingToCoach = false,
 }: CanvasStudioProps) {
   const dimensions = useMemo(() => getCanvasDimensions(assetType), [assetType]);
   const canvasRendererRef = useRef<CanvasRendererHandle>(null);
@@ -194,13 +219,13 @@ export function CanvasStudio({
     sortOrder: 'desc',
   });
   
-  // Mode state - default to assets if assets provided, otherwise templates
-  // Users can always switch between modes using the tabs
+  // Mode state - default to assets if assets provided, otherwise regions (skip locked modes)
+  // Users can always switch between unlocked modes using the tabs
   const [mode, setMode] = useState<CanvasMode>(() => {
     if (initialAssets.length > 0) return 'assets';
     if (initialRegions.length > 0) return 'regions';
-    if (initialSketchElements.length > 0) return 'easy';
-    return 'templates'; // Start with templates for new users
+    // Skip locked modes (templates, easy) - default to regions
+    return 'regions';
   });
   
   // Placement state (for assets mode)
@@ -406,6 +431,18 @@ export function CanvasStudio({
     });
     onClose();
   }, [placements, proElements, easyElements, regions, description, promptDescription, selectedTemplate, mode, onSave, onClose]);
+
+  const handleDiscussWithCoachClick = useCallback(() => {
+    if (!onDiscussWithCoach) return;
+    onDiscussWithCoach({
+      placements,
+      elements: mode === 'pro' ? proElements : easyElements,
+      regions,
+      description,
+      promptDescription,
+      selectedTemplate: selectedTemplate || undefined,
+    });
+  }, [placements, proElements, easyElements, regions, description, promptDescription, selectedTemplate, mode, onDiscussWithCoach]);
   
   const handleCancel = useCallback(() => {
     if (initialPlacements && initialPlacements.length > 0) {
@@ -452,27 +489,40 @@ export function CanvasStudio({
           
           {/* Mode Tabs */}
           <div className="flex items-center gap-1 bg-background-base rounded-xl p-1 overflow-x-auto">
-            {MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
-                  mode === m.id
-                    ? 'bg-interactive-500 text-white shadow-lg'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
-                )}
-                title={m.description}
-              >
-                {m.icon}
-                <span className="hidden sm:inline">{m.label}</span>
-                {m.id === 'assets' && assets.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-micro rounded-full bg-white/20">
-                    {assets.length}
-                  </span>
-                )}
-              </button>
-            ))}
+            {MODES.map((m) => {
+              const isLocked = LOCKED_MODES.has(m.id);
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => !isLocked && setMode(m.id)}
+                  disabled={isLocked}
+                  className={cn(
+                    'relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                    isLocked && 'opacity-50 cursor-not-allowed',
+                    mode === m.id && !isLocked
+                      ? 'bg-interactive-500 text-white shadow-lg'
+                      : !isLocked
+                        ? 'text-text-secondary hover:text-text-primary hover:bg-background-surface'
+                        : 'text-text-muted'
+                  )}
+                  title={isLocked ? `${m.label} - Coming Soon` : m.description}
+                >
+                  {m.icon}
+                  <span className="hidden sm:inline">{m.label}</span>
+                  {isLocked && (
+                    <span className="flex items-center gap-0.5 ml-1 px-1.5 py-0.5 text-[9px] font-semibold rounded-full bg-amber-500/80 text-black">
+                      <LockIcon />
+                      <span className="hidden sm:inline">Soon</span>
+                    </span>
+                  )}
+                  {m.id === 'assets' && assets.length > 0 && !isLocked && (
+                    <span className="ml-1 px-1.5 py-0.5 text-micro rounded-full bg-white/20">
+                      {assets.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           
           <button
@@ -726,6 +776,38 @@ export function CanvasStudio({
             >
               Cancel
             </button>
+            
+            {/* Discuss with Coach Button */}
+            {onDiscussWithCoach && (
+              <button
+                onClick={handleDiscussWithCoachClick}
+                disabled={isUploadingToCoach}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+                  "bg-amber-500/10 text-amber-400 border border-amber-500/30",
+                  "hover:bg-amber-500/20 hover:border-amber-500/50",
+                  isUploadingToCoach && "opacity-50 cursor-not-allowed"
+                )}
+              >
+                {isUploadingToCoach ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    Discuss with Coach
+                  </>
+                )}
+              </button>
+            )}
+            
             <button
               onClick={handleSave}
               className="flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium bg-interactive-500 text-white hover:bg-interactive-600 transition-colors shadow-lg shadow-interactive-500/20"

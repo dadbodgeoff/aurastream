@@ -222,10 +222,13 @@ class MediaAssetPlacement(BaseModel):
     Matches the generation.py schema exactly for consistency.
     Allows users to specify exact position, size, rotation, and opacity
     for their media assets in the generated output.
+    
+    Supports both personal library assets and community hub assets.
+    Community hub assets are identified by asset_id starting with "community_".
     """
     asset_id: str = Field(
         ...,
-        description="ID of the media asset to place"
+        description="ID of the media asset to place. Community hub assets start with 'community_'"
     )
     display_name: str = Field(
         ...,
@@ -233,11 +236,24 @@ class MediaAssetPlacement(BaseModel):
     )
     asset_type: str = Field(
         ...,
-        description="Type of the asset (face, logo, character, etc.)"
+        description="Type of the asset (face, logo, character, background, reference, etc.)"
     )
     url: str = Field(
         ...,
         description="URL of the asset (preferably processed/transparent version)"
+    )
+    # Community Hub metadata
+    is_community_asset: bool = Field(
+        default=False,
+        description="Whether this asset is from the community hub (vs personal library)"
+    )
+    game_category: Optional[str] = Field(
+        None,
+        description="Game category for community hub assets (e.g., 'fortnite', 'arc_raiders')"
+    )
+    game_name: Optional[str] = Field(
+        None,
+        description="Human-readable game name for community hub assets"
     )
     x: float = Field(
         ...,
@@ -354,6 +370,11 @@ class StartCoachRequest(BaseModel):
         None,
         max_length=2000,
         description="Description of canvas snapshot contents for AI context (asset names, positions, sketch annotations)."
+    )
+    # NEW: Compact canvas context for backend classification system
+    canvas_context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Compact JSON canvas context for element classification. Format: {canvas: {type, size}, assets: [...], texts: [...], drawings: [...]}. Triggers token-conscious classification system."
     )
     # Coach preferences for this session
     preferences: Optional[CoachPreferences] = Field(

@@ -13,6 +13,7 @@ import { ASSET_TYPE_ICONS, ASSET_TYPE_COLORS } from './constants';
 import { PlacementModal, type AssetPlacement } from './placement';
 import { CanvasStudioModal } from './CanvasStudioModal';
 import type { AnySketchElement } from './canvas-export/types';
+import type { CanvasProjectState } from './canvas-studio/types';
 
 interface MediaAssetPickerProps {
   selectedAssets: MediaAsset[];
@@ -139,14 +140,17 @@ export function MediaAssetPicker({
     }
   }, [onPlacementsChange]);
 
-  const handleCanvasStudioSave = useCallback((newPlacements: AssetPlacement[], newSketchElements: AnySketchElement[]) => {
+  const handleCanvasStudioSave = useCallback((state: CanvasProjectState) => {
+    const { placements: newPlacements, sketchElements: newSketchElements, assets: newAssets } = state;
+    // Update selected assets with the full asset list from canvas
+    onSelectionChange(newAssets);
     if (onPlacementsChange) {
       onPlacementsChange(newPlacements);
     }
     if (onSketchElementsChange) {
       onSketchElementsChange(newSketchElements);
     }
-  }, [onPlacementsChange, onSketchElementsChange]);
+  }, [onSelectionChange, onPlacementsChange, onSketchElementsChange]);
 
   const hasPlacement = useCallback((assetId: string) => {
     return placements?.some(p => p.assetId === assetId) ?? false;

@@ -18,6 +18,14 @@ export type PositionAnchor = 'center' | 'top-left' | 'top-right' | 'bottom-left'
 export type SizeUnit = 'percent' | 'px';
 
 /**
+ * Fit mode for how images scale within their bounds
+ * - 'contain': Fit entire image within bounds (may have letterboxing)
+ * - 'cover': Fill bounds completely (may crop image)
+ * - 'fill': Stretch to fill bounds exactly (may distort)
+ */
+export type FitMode = 'contain' | 'cover' | 'fill';
+
+/**
  * Human-readable region names for prompt generation
  */
 export type CanvasRegion = 
@@ -69,6 +77,21 @@ export interface AssetPlacement {
   rotation: number;
   /** Opacity (0-100) */
   opacity: number;
+  /** 
+   * How the image scales within its bounds.
+   * - 'contain': Fit entire image (no crop, may letterbox)
+   * - 'cover': Fill bounds (may crop to maintain aspect ratio)
+   * - 'fill': Stretch to fill (may distort)
+   * Default: 'cover' for fill mode, 'contain' otherwise
+   */
+  fitMode?: FitMode;
+  /** 
+   * Force use of original URL instead of processed URL.
+   * When true, ignores background removal for THIS placement only.
+   * Enables per-project isolation of asset modifications.
+   * Default: true (new placements start with original)
+   */
+  useOriginalUrl?: boolean;
 }
 
 /**
@@ -95,9 +118,6 @@ export interface PlacementState {
 // Note: SerializedPlacement for API transmission is defined in @aurastream/api-client
 // Use serializePlacements() from api-client to convert AssetPlacement[] for API calls
 
-/**
- * Props for the placement canvas component
- */
 export interface PlacementCanvasProps {
   /** Asset type being created (determines canvas size) */
   assetType: string;
@@ -111,6 +131,8 @@ export interface PlacementCanvasProps {
   selectedId?: string | null;
   /** Callback when selection changes (controlled mode) */
   onSelectionChange?: (id: string | null) => void;
+  /** Whether interactions are enabled (drag, resize, select) */
+  isInteractive?: boolean;
   /** Optional className */
   className?: string;
 }

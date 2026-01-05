@@ -444,25 +444,68 @@ async def _prepare_generation_context(
                     context["input_image"] = response.content
                     context["input_mime_type"] = "image/png"
                     
-                    # Build prompt with CANVAS as primary, user prompt as style guidance
+                    # Build prompt with CANVAS as reference, coach prompt as PRIMARY instructions
                     canvas_description = job_params.get("canvas_snapshot_description", "")
-                    user_prompt = job.prompt.strip() if job.prompt else ""
+                    coach_prompt = job.prompt.strip() if job.prompt else ""
                     
-                    # MINIMAL canvas prompt - Gemini works better with concise instructions
-                    canvas_section = f"""COPY THE LAYOUT from the image above EXACTLY.
+                    # Log what we're working with
+                    logger.info(f"[CANVAS DEBUG] job_id={job_id} coach_prompt: {coach_prompt[:500] if coach_prompt else 'NONE'}...")
+                    logger.info(f"[CANVAS DEBUG] job_id={job_id} canvas_description: {canvas_description}")
+                    
+                    # Check if coach_prompt already contains structured sections (from service.py)
+                    # If it has "CANVAS LAYOUT:" and "USER REQUESTS:", use it directly
+                    if "CANVAS LAYOUT:" in coach_prompt and "USER REQUESTS:" in coach_prompt:
+                        # Coach already built a structured prompt - use it with wrapper
+                        canvas_section = f"""CREATE a professional YouTube gaming thumbnail based on this reference layout.
 
-Elements: {canvas_description}
+REFERENCE IMAGE: Shows element positions to follow (attached image)
 
-Keep all elements in the SAME positions. Make it look polished."""
+{coach_prompt}
 
-                    if user_prompt:
-                        style_section = f"""
+=== CRITICAL RULES ===
+1. CREATE NEW ARTWORK - Do NOT copy the reference image pixel-for-pixel
+2. Follow the LAYOUT (where things are positioned) but make it look professional
+3. TEXT STYLING: Any text must be BOLD, LARGE, and use YouTube gaming thumbnail style fonts
+   - Main text should be HUGE and eye-catching
+   - Use dramatic colors, outlines, and shadows
+   - Text should POP and be readable at small sizes
+4. If the USER REQUESTS say to REMOVE text, DO NOT include that text
+5. If the USER REQUESTS say to CHANGE text, use the NEW text they specified
+6. Add professional lighting, depth, and visual polish
+7. Make it look like a TOP YouTube gaming thumbnail that gets clicks
 
-Style: {user_prompt}"""
+Output: {width}x{height} pixels"""
                     else:
-                        style_section = ""
+                        # Legacy format - build prompt from scratch
+                        canvas_section = f"""CREATE a professional YouTube gaming thumbnail based on this reference layout.
+
+REFERENCE IMAGE: Shows element positions to follow (attached image)
+Canvas elements: {canvas_description}
+
+=== YOUR INSTRUCTIONS ===
+{coach_prompt if coach_prompt else "Transform this into a polished, professional gaming thumbnail."}
+
+=== CRITICAL RULES ===
+1. CREATE NEW ARTWORK - Do NOT copy the reference image pixel-for-pixel
+2. Follow the LAYOUT (where things are positioned) but make it look professional
+3. TEXT STYLING: Any text must be BOLD, LARGE, and use YouTube gaming thumbnail style fonts
+   - Main text should be HUGE and eye-catching
+   - Use dramatic colors, outlines, and shadows
+   - Text should POP and be readable at small sizes
+4. If the instructions say to REMOVE text, DO NOT include that text
+5. If the instructions say to CHANGE text, use the NEW text they specified
+6. Add professional lighting, depth, and visual polish
+7. Make it look like a TOP YouTube gaming thumbnail that gets clicks
+
+Output: {width}x{height} pixels"""
+
+                    context["final_prompt"] = canvas_section
                     
-                    context["final_prompt"] = f"{canvas_section}{style_section}"
+                    # LOG THE FULL PROMPT FOR DEBUGGING
+                    logger.info(f"[NANO BANANA PROMPT] job_id={job_id}")
+                    logger.info(f"{'='*60}")
+                    logger.info(f"{context['final_prompt']}")
+                    logger.info(f"{'='*60}")
                     
                     logger.info(f"[CANVAS DEBUG] job_id={job_id} Downloaded canvas snapshot: {len(response.content)} bytes")
                     logger.info(f"[CANVAS DEBUG] job_id={job_id} Canvas-first prompt built, length={len(context['final_prompt'])}")
@@ -580,7 +623,7 @@ Style: {user_prompt}"""
     auto_reference_enabled = job_params.get("auto_reference_images", True)  # Default enabled
     if auto_reference_enabled and not context["input_image"] and not context["media_assets"]:
         try:
-            from backend.services.coach.image_reference_service import get_image_reference_service
+            from backend.services.coach.grounding import get_image_reference_service
             from backend.services.nano_banana_client import MediaAssetInput
             
             ref_service = get_image_reference_service()

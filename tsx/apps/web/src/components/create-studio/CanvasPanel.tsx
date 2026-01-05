@@ -7,30 +7,43 @@
  * Features:
  * - Welcome back experience with previous projects
  * - New project creation with dimension selection
- * - Project save/recall functionality
+ * - Project save/recall functionality (persisted to Supabase)
  * - Full canvas editor integration
+ * - "Discuss with Coach" flow for AI-guided refinement
  * 
  * @module create-studio/CanvasPanel
  */
 
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { CanvasStudioModal } from '@/components/media-library/CanvasStudioModal';
+import {
+  useCanvasProjects,
+  useCanvasProject,
+  useCreateCanvasProject,
+  useUpdateCanvasProject,
+  useDeleteCanvasProject,
+} from '@aurastream/api-client';
+import type { AssetPlacement } from '@/components/media-library/placement/types';
+import type { AnySketchElement } from '@/components/media-library/canvas-export/types';
+import type { CanvasProjectState } from '@/components/media-library/canvas-studio/types';
 import type { CanvasPanelProps } from './types';
 
 // =============================================================================
 // Types
 // =============================================================================
 
-interface CanvasProject {
+// Local type definition (matches api-client export)
+interface CanvasProjectListItem {
   id: string;
   name: string;
   assetType: string;
-  thumbnailUrl?: string;
-  updatedAt: string;
+  thumbnailUrl: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface DimensionOption {
@@ -135,56 +148,83 @@ const CanvasIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const TrashIcon = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+  </svg>
+);
+
 // =============================================================================
 // Sub-Components
 // =============================================================================
 
 interface ProjectCardProps {
-  project: CanvasProject;
+  project: CanvasProjectListItem;
   onClick: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
 }
 
-function ProjectCard({ project, onClick }: ProjectCardProps) {
+function ProjectCard({ project, onClick, onDelete, isDeleting }: ProjectCardProps) {
   const timeAgo = getTimeAgo(project.updatedAt);
   
   return (
-    <motion.button
+    <motion.div
       whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
       className={cn(
-        'flex flex-col items-start gap-3 p-4 rounded-xl',
+        'relative flex flex-col items-start gap-3 p-4 rounded-xl',
         'bg-background-surface/50 border border-white/5',
         'hover:bg-background-surface hover:border-white/10',
-        'transition-all duration-200 text-left w-full'
+        'transition-all duration-200 text-left w-full group'
       )}
     >
-      {/* Thumbnail */}
-      <div className="w-full aspect-video rounded-lg bg-background-elevated overflow-hidden">
-        {project.thumbnailUrl ? (
-          <img 
-            src={project.thumbnailUrl} 
-            alt={project.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <CanvasIcon className="w-8 h-8 text-text-muted" />
-          </div>
+      {/* Delete button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        disabled={isDeleting}
+        className={cn(
+          'absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100',
+          'bg-red-500/10 text-red-400 hover:bg-red-500/20',
+          'transition-all duration-200',
+          isDeleting && 'opacity-50 cursor-not-allowed'
         )}
-      </div>
+      >
+        <TrashIcon className="w-4 h-4" />
+      </button>
       
-      {/* Info */}
-      <div className="w-full">
-        <h3 className="font-medium text-sm text-text-primary truncate">
-          {project.name}
-        </h3>
-        <div className="flex items-center gap-1.5 mt-1">
-          <ClockIcon className="w-3 h-3 text-text-muted" />
-          <span className="text-xs text-text-muted">{timeAgo}</span>
+      {/* Clickable area */}
+      <button onClick={onClick} className="w-full text-left">
+        {/* Thumbnail */}
+        <div className="w-full aspect-video rounded-lg bg-background-elevated overflow-hidden">
+          {project.thumbnailUrl ? (
+            <img 
+              src={project.thumbnailUrl} 
+              alt={project.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <CanvasIcon className="w-8 h-8 text-text-muted" />
+            </div>
+          )}
         </div>
-      </div>
-    </motion.button>
+        
+        {/* Info */}
+        <div className="w-full mt-3">
+          <h3 className="font-medium text-sm text-text-primary truncate">
+            {project.name}
+          </h3>
+          <div className="flex items-center gap-1.5 mt-1">
+            <ClockIcon className="w-3 h-3 text-text-muted" />
+            <span className="text-xs text-text-muted">{timeAgo}</span>
+          </div>
+        </div>
+      </button>
+    </motion.div>
   );
 }
 
@@ -210,56 +250,44 @@ function getTimeAgo(dateString: string): string {
 export function CanvasPanel({
   onGenerationStart,
   onGenerationComplete,
+  onSwitchToCoach,
   className,
 }: CanvasPanelProps) {
   const [view, setView] = useState<PanelView>('welcome');
-  const [projects, setProjects] = useState<CanvasProject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedDimension, setSelectedDimension] = useState<DimensionOption | null>(null);
-  const [activeProject, setActiveProject] = useState<CanvasProject | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [isNewProject, setIsNewProject] = useState(false);
 
-  // Load projects from localStorage (will be replaced with API later)
-  useEffect(() => {
-    const loadProjects = () => {
-      try {
-        const saved = localStorage.getItem('canvas_studio_projects');
-        if (saved) {
-          setProjects(JSON.parse(saved));
-        }
-      } catch (e) {
-        console.error('Failed to load canvas projects:', e);
-      }
-      setIsLoading(false);
-    };
-    
-    loadProjects();
-  }, []);
+  // API hooks
+  const { data: projectsData, isLoading: isLoadingProjects } = useCanvasProjects({ limit: 20 });
+  const { data: activeProject, isLoading: isLoadingProject } = useCanvasProject(
+    activeProjectId || '', 
+    { enabled: !!activeProjectId && !isNewProject }
+  );
+  const createProject = useCreateCanvasProject();
+  const updateProject = useUpdateCanvasProject();
+  const deleteProject = useDeleteCanvasProject();
+
+  const projects = projectsData?.projects || [];
 
   // Handle starting a new project
   const handleNewProject = useCallback(() => {
     setView('dimensions');
   }, []);
 
-  // Handle dimension selection
+  // Handle dimension selection - creates a new project
   const handleDimensionSelect = useCallback((dimension: DimensionOption) => {
     setSelectedDimension(dimension);
-    
-    // Create new project
-    const newProject: CanvasProject = {
-      id: `project_${Date.now()}`,
-      name: `Untitled ${dimension.label}`,
-      assetType: dimension.id,
-      updatedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    };
-    
-    setActiveProject(newProject);
+    setIsNewProject(true);
+    setActiveProjectId(null);
     setView('editor');
   }, []);
 
   // Handle opening existing project
-  const handleOpenProject = useCallback((project: CanvasProject) => {
-    setActiveProject(project);
+  const handleOpenProject = useCallback((project: CanvasProjectListItem) => {
+    setActiveProjectId(project.id);
+    setIsNewProject(false);
+    setSelectedDimension(null);
     setView('editor');
   }, []);
 
@@ -267,11 +295,96 @@ export function CanvasPanel({
   const handleBack = useCallback(() => {
     if (view === 'editor') {
       setView('welcome');
-      setActiveProject(null);
+      setActiveProjectId(null);
+      setIsNewProject(false);
+      setSelectedDimension(null);
     } else if (view === 'dimensions') {
       setView('welcome');
     }
   }, [view]);
+
+  // Handle project deletion
+  const handleDeleteProject = useCallback((projectId: string) => {
+    if (confirm('Are you sure you want to delete this project?')) {
+      deleteProject.mutate(projectId);
+    }
+  }, [deleteProject]);
+
+  // Handle canvas save - creates or updates project in Supabase
+  // Now receives full project state including thumbnail
+  const handleCanvasSave = useCallback((state: CanvasProjectState) => {
+    const { placements, sketchElements, assets, thumbnailUrl } = state;
+    
+    if (isNewProject && selectedDimension) {
+      // Create new project
+      createProject.mutate({
+        name: `Untitled ${selectedDimension.label}`,
+        assetType: selectedDimension.id,
+        sketchElements,
+        placements,
+        assets,
+        thumbnailUrl,
+      }, {
+        onSuccess: (project: { id: string }) => {
+          console.log('[CanvasPanel] Created project:', project.id);
+          setView('welcome');
+          setActiveProjectId(null);
+          setIsNewProject(false);
+          setSelectedDimension(null);
+        },
+        onError: (error: Error) => {
+          console.error('[CanvasPanel] Failed to create project:', error);
+        },
+      });
+    } else if (activeProjectId) {
+      // Update existing project
+      updateProject.mutate({
+        projectId: activeProjectId,
+        sketchElements,
+        placements,
+        assets,
+        thumbnailUrl,
+      }, {
+        onSuccess: (project: { id: string }) => {
+          console.log('[CanvasPanel] Updated project:', project.id);
+          setView('welcome');
+          setActiveProjectId(null);
+        },
+        onError: (error: Error) => {
+          console.error('[CanvasPanel] Failed to update project:', error);
+        },
+      });
+    }
+  }, [isNewProject, selectedDimension, activeProjectId, createProject, updateProject]);
+
+  // Determine asset type for editor
+  const editorAssetType = isNewProject 
+    ? selectedDimension?.id 
+    : activeProject?.assetType;
+
+  // Determine initial data for editor - now includes assets
+  // ENTERPRISE FIX: Only use data when it's actually loaded (not empty defaults)
+  const initialSketchElements = isNewProject ? [] : (activeProject?.sketchElements || []);
+  const initialPlacements = isNewProject ? [] : (activeProject?.placements || []);
+  const initialAssets = isNewProject ? [] : (activeProject?.assets || []);
+  
+  // Check if project data is fully loaded
+  // For existing projects, we need activeProject to be defined (API returned data)
+  // The project might legitimately have empty arrays if user saved an empty canvas
+  const isProjectDataReady = isNewProject || (activeProject !== undefined && !isLoadingProject);
+
+  // Debug logging
+  console.log('[CanvasPanel] Project data:', {
+    isNewProject,
+    activeProjectId,
+    isLoadingProject,
+    hasActiveProject: !!activeProject,
+    isProjectDataReady,
+    sketchElementsCount: initialSketchElements.length,
+    placementsCount: initialPlacements.length,
+    assetsCount: initialAssets.length,
+    sketchElementTypes: initialSketchElements.map((el: any) => el.type),
+  });
 
   return (
     <div className={cn('h-full flex flex-col', className)}>
@@ -316,26 +429,36 @@ export function CanvasPanel({
             </motion.button>
 
             {/* Recent Projects */}
-            {!isLoading && projects.length > 0 && (
+            {!isLoadingProjects && projects.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <FolderIcon className="w-4 h-4 text-text-muted" />
                   <h3 className="text-sm font-medium text-text-secondary">Recent Projects</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {projects.slice(0, 6).map((project) => (
+                  {projects.slice(0, 6).map((project: CanvasProjectListItem) => (
                     <ProjectCard
                       key={project.id}
                       project={project}
                       onClick={() => handleOpenProject(project)}
+                      onDelete={() => handleDeleteProject(project.id)}
+                      isDeleting={deleteProject.isPending}
                     />
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Loading State */}
+            {isLoadingProjects && (
+              <div className="text-center py-8">
+                <div className="w-8 h-8 mx-auto mb-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                <p className="text-sm text-text-muted">Loading projects...</p>
+              </div>
+            )}
+
             {/* Empty State */}
-            {!isLoading && projects.length === 0 && (
+            {!isLoadingProjects && projects.length === 0 && (
               <div className="text-center py-8">
                 <FolderIcon className="w-12 h-12 mx-auto mb-3 text-text-muted/50" />
                 <p className="text-sm text-text-muted">No projects yet</p>
@@ -406,7 +529,7 @@ export function CanvasPanel({
         )}
 
         {/* Editor View */}
-        {view === 'editor' && activeProject && (
+        {view === 'editor' && editorAssetType && (
           <motion.div
             key="editor"
             initial={{ opacity: 0, y: 10 }}
@@ -414,32 +537,33 @@ export function CanvasPanel({
             exit={{ opacity: 0, y: -10 }}
             className="flex-1 flex flex-col"
           >
-            {/* Back Button */}
-            <button
-              onClick={handleBack}
-              className="flex items-center gap-2 text-sm text-text-muted hover:text-text-primary mb-4 transition-colors"
-            >
-              <ArrowLeftIcon className="w-4 h-4" />
-              Back to Projects
-            </button>
-
-            {/* Editor Placeholder */}
-            <div className="flex-1 flex items-center justify-center rounded-xl border-2 border-dashed border-white/10 bg-background-surface/30">
-              <div className="text-center p-8">
-                <CanvasIcon className="w-16 h-16 mx-auto mb-4 text-text-muted/50" />
-                <h3 className="text-lg font-medium text-text-primary mb-2">
-                  Canvas Editor Coming Soon
-                </h3>
-                <p className="text-sm text-text-muted max-w-sm">
-                  The full canvas editor will be integrated here.
-                  You'll be able to upload backgrounds, position assets,
-                  and send your composition to AI for professional polish.
-                </p>
-                <p className="text-xs text-amber-400 mt-4">
-                  Project: {activeProject.name}
-                </p>
+            {/* Loading state for existing project */}
+            {/* ENTERPRISE FIX: Show loading until activeProject is fully loaded with data */}
+            {!isNewProject && (!activeProject || isLoadingProject) && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-8 h-8 mx-auto mb-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                  <p className="text-sm text-text-muted">Loading project...</p>
+                </div>
               </div>
-            </div>
+            )}
+            
+            {/* Canvas Studio Modal - Full Editor */}
+            {/* ENTERPRISE FIX: Only render when data is fully loaded */}
+            {/* Use key to force re-mount when project changes, ensuring fresh initialization */}
+            {/* For existing projects, wait until activeProject has actual data (not just defined) */}
+            {(isNewProject || (isProjectDataReady && activeProject)) && (
+              <CanvasStudioModal
+                key={activeProjectId || 'new'}
+                isOpen={true}
+                onClose={handleBack}
+                assetType={editorAssetType}
+                assets={initialAssets}
+                initialPlacements={initialPlacements as AssetPlacement[]}
+                initialSketchElements={initialSketchElements as AnySketchElement[]}
+                onSave={handleCanvasSave}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

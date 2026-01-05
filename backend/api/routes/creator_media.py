@@ -332,6 +332,35 @@ async def update_media(
         raise HTTPException(status_code=404, detail="Media asset not found")
 
 
+@router.post("/{asset_id}/remove-background", response_model=MediaAsset)
+async def remove_background(
+    asset_id: str,
+    current_user: TokenPayload = Depends(get_current_user),
+    service: CreatorMediaServiceDep = None,
+):
+    """
+    Remove background from an existing media asset.
+    
+    Processes the original image through AI background removal and
+    stores the transparent version. The processed URL will be available
+    in the `processed_url` field.
+    
+    **Note:** Some asset types (background, reference, panel) do not
+    support background removal.
+    """
+    
+    try:
+        asset = await service.process_background_removal(
+            user_id=current_user.sub,
+            asset_id=asset_id,
+        )
+        return MediaAsset(**asset.to_dict())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{asset_id}", response_model=DeleteMediaResponse)
 async def delete_media(
     asset_id: str,

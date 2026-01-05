@@ -84,13 +84,31 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
       ...userConfig,
     };
     
+    /**
+     * Get the appropriate URL for a placement, respecting useOriginalUrl flag.
+     * This enables per-project isolation - each project can choose whether to
+     * use the processed (bg-removed) version or the original.
+     */
+    const getPlacementUrl = useCallback((placement: AssetPlacement): string | undefined => {
+      const { asset, useOriginalUrl } = placement;
+      
+      // If useOriginalUrl is set (or defaulted to true for new placements),
+      // skip processedUrl entirely - use original
+      if (useOriginalUrl) {
+        return asset.thumbnailUrl || asset.url;
+      }
+      
+      // User explicitly chose to use processed version
+      return asset.processedUrl || asset.thumbnailUrl || asset.url;
+    }, []);
+    
     // Preload all placement images
     useEffect(() => {
       const loadAllImages = async () => {
         const imageMap = new Map<string, HTMLImageElement>();
         
         for (const placement of placements) {
-          const url = placement.asset.processedUrl || placement.asset.thumbnailUrl || placement.asset.url;
+          const url = getPlacementUrl(placement);
           if (!url || imageMap.has(url)) continue;
           
           try {
@@ -105,7 +123,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
       };
       
       loadAllImages();
-    }, [placements]);
+    }, [placements, getPlacementUrl]);
     
     // Render to canvas
     const render = useCallback((scale: number = 1) => {
@@ -136,8 +154,8 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
       
       // Draw each placement
       for (const placement of sortedPlacements) {
-        const { asset, position, size, rotation, opacity } = placement;
-        const url = asset.processedUrl || asset.thumbnailUrl || asset.url;
+        const { position, size, rotation, opacity } = placement;
+        const url = getPlacementUrl(placement);
         const img = url ? loadedImages.get(url) : null;
         
         if (!img) continue;
@@ -157,6 +175,12 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
           drawHeight = size.height * scale;
         }
         
+        // Check if this is fill mode (size >= 95%)
+        const isFillMode = size.width >= 95 && size.height >= 95;
+        
+        // Determine fit behavior based on fitMode or legacy fill detection
+        const fitMode = placement.fitMode || (isFillMode ? 'cover' : 'contain');
+        
         ctx.save();
         ctx.globalAlpha = opacity / 100;
         ctx.translate(x, y);
@@ -165,7 +189,44 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
           ctx.rotate((rotation * Math.PI) / 180);
         }
         
-        ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        if (fitMode === 'fill') {
+          // Stretch to fill - may distort but shows full image
+          ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        } else if (fitMode === 'cover') {
+          // Use "cover" behavior - crop image to fill the area
+          const imgAspect = img.naturalWidth / img.naturalHeight;
+          const boxAspect = drawWidth / drawHeight;
+          
+          let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+          
+          if (imgAspect > boxAspect) {
+            // Image is wider - crop sides
+            sw = img.naturalHeight * boxAspect;
+            sx = (img.naturalWidth - sw) / 2;
+          } else {
+            // Image is taller - crop top/bottom
+            sh = img.naturalWidth / boxAspect;
+            sy = (img.naturalHeight - sh) / 2;
+          }
+          
+          ctx.drawImage(img, sx, sy, sw, sh, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        } else {
+          // Use "contain" behavior - fit image within area (no distortion, no crop)
+          const imgAspect = img.naturalWidth / img.naturalHeight;
+          const boxAspect = drawWidth / drawHeight;
+          
+          let finalWidth = drawWidth;
+          let finalHeight = drawHeight;
+          
+          if (imgAspect > boxAspect) {
+            finalHeight = drawWidth / imgAspect;
+          } else {
+            finalWidth = drawHeight * imgAspect;
+          }
+          
+          ctx.drawImage(img, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight);
+        }
+        
         ctx.restore();
       }
       
@@ -242,7 +303,9 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
           }
           
           case 'text': {
-            ctx.font = `${element.fontSize * scale}px ${element.fontFamily}`;
+            // fontSize is stored as actual pixel size, scale by export scale
+            const scaledFontSize = element.fontSize * scale;
+            ctx.font = `${scaledFontSize}px ${element.fontFamily}`;
             ctx.fillText(
               element.text,
               (element.x / 100) * scaledWidth,
@@ -290,7 +353,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
         
         ctx.restore();
       }
-    }, [width, height, placements, sketchElements, loadedImages, config.backgroundColor]);
+    }, [width, height, placements, sketchElements, loadedImages, config.backgroundColor, getPlacementUrl]);
     
     // Re-render when images load or placements change
     useEffect(() => {
@@ -325,8 +388,8 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
         const sortedPlacements = [...placements].sort((a, b) => a.zIndex - b.zIndex);
         
         for (const placement of sortedPlacements) {
-          const { asset, position, size, rotation, opacity } = placement;
-          const url = asset.processedUrl || asset.thumbnailUrl || asset.url;
+          const { position, size, rotation, opacity } = placement;
+          const url = getPlacementUrl(placement);
           
           if (!url) continue;
           
@@ -335,7 +398,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
           try {
             img = await loadImage(url);
           } catch {
-            console.warn(`Skipping ${asset.displayName} - failed to load`);
+            console.warn(`Skipping ${placement.asset.displayName} - failed to load`);
             continue;
           }
           
@@ -361,7 +424,50 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
             ctx.rotate((rotation * Math.PI) / 180);
           }
           
-          ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+          // Check if this is fill mode (size >= 95%)
+          const isFillMode = size.width >= 95 && size.height >= 95;
+          
+          // Determine fit behavior based on fitMode or legacy fill detection
+          const fitMode = placement.fitMode || (isFillMode ? 'cover' : 'contain');
+          
+          if (fitMode === 'fill') {
+            // Stretch to fill - may distort but shows full image
+            ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+          } else if (fitMode === 'cover') {
+            // Use "cover" behavior - crop image to fill the area
+            const imgAspect = img.naturalWidth / img.naturalHeight;
+            const boxAspect = drawWidth / drawHeight;
+            
+            let sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+            
+            if (imgAspect > boxAspect) {
+              // Image is wider - crop sides
+              sw = img.naturalHeight * boxAspect;
+              sx = (img.naturalWidth - sw) / 2;
+            } else {
+              // Image is taller - crop top/bottom
+              sh = img.naturalWidth / boxAspect;
+              sy = (img.naturalHeight - sh) / 2;
+            }
+            
+            ctx.drawImage(img, sx, sy, sw, sh, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+          } else {
+            // Use "contain" behavior - fit image within area (no distortion, no crop)
+            const imgAspect = img.naturalWidth / img.naturalHeight;
+            const boxAspect = drawWidth / drawHeight;
+            
+            let finalWidth = drawWidth;
+            let finalHeight = drawHeight;
+            
+            if (imgAspect > boxAspect) {
+              finalHeight = drawWidth / imgAspect;
+            } else {
+              finalWidth = drawHeight * imgAspect;
+            }
+            
+            ctx.drawImage(img, -finalWidth / 2, -finalHeight / 2, finalWidth, finalHeight);
+          }
+          
           ctx.restore();
         }
         
@@ -426,7 +532,9 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
               break;
             }
             case 'text': {
-              ctx.font = `${element.fontSize * config.scale}px ${element.fontFamily}`;
+              // fontSize is stored as actual pixel size, scale by export scale
+              const scaledFontSize = element.fontSize * config.scale;
+              ctx.font = `${scaledFontSize}px ${element.fontFamily}`;
               ctx.fillText(
                 element.text,
                 (element.x / 100) * scaledWidth,
@@ -484,7 +592,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererHandle, CanvasRendererPro
       } finally {
         setIsRendering(false);
       }
-    }, [width, height, placements, sketchElements, config]);
+    }, [width, height, placements, sketchElements, config, getPlacementUrl]);
     
     // Expose methods via ref
     useImperativeHandle(ref, () => ({

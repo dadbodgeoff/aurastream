@@ -245,8 +245,8 @@ class GenerateRequest(BaseModel):
     )
     custom_prompt: Optional[str] = Field(
         None,
-        max_length=500,
-        description="Optional custom prompt to guide generation",
+        max_length=3000,
+        description="Optional custom prompt to guide generation. Canvas Studio prompts may be longer.",
         examples=["Epic gaming moment with dramatic lighting"]
     )
     brand_customization: Optional[BrandCustomization] = Field(

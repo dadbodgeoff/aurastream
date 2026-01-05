@@ -20,7 +20,7 @@ import { CustomPanel } from './CustomPanel';
 import { CoachPanel } from './CoachPanel';
 import { CanvasPanel } from './CanvasPanel';
 import { useCreateStudio } from './useCreateStudio';
-import type { CreateStudioProps, CreationMode } from './types';
+import type { CreateStudioProps, CreationMode, CanvasContext } from './types';
 
 // =============================================================================
 // Icons
@@ -94,6 +94,19 @@ export function CreateStudio({
     }
   }, [isPremium, handleModeSelect]);
 
+  // Handle switching to coach with canvas context (from Canvas panel)
+  const handleSwitchToCoachWithCanvas = useCallback((context: CanvasContext) => {
+    if (isPremium) {
+      actions.switchToCoachWithCanvas(context);
+      onModeChange?.('coach');
+    }
+  }, [isPremium, actions, onModeChange]);
+
+  // Handle clearing canvas context after coach uses it
+  const handleClearCanvasContext = useCallback(() => {
+    actions.setCanvasContext(null);
+  }, [actions]);
+
   // Handle generation start
   const handleGenerationStart = useCallback((jobId: string) => {
     actions.startGeneration(jobId);
@@ -164,6 +177,8 @@ export function CreateStudio({
           {state.activeMode === 'coach' && (
             <CoachPanel
               onGenerationComplete={handleGenerationComplete}
+              canvasContext={state.canvasContext}
+              onClearCanvasContext={handleClearCanvasContext}
               className="h-full overflow-y-auto"
             />
           )}
@@ -173,6 +188,7 @@ export function CreateStudio({
             <CanvasPanel
               onGenerationStart={handleGenerationStart}
               onGenerationComplete={handleGenerationComplete}
+              onSwitchToCoach={handleSwitchToCoachWithCanvas}
               className="h-full overflow-y-auto"
             />
           )}

@@ -40,6 +40,21 @@ export interface ModeConfig {
 // =============================================================================
 
 /**
+ * Canvas context for passing between Canvas and Coach panels.
+ */
+export interface CanvasContext {
+  /** URL of the uploaded canvas snapshot */
+  snapshotUrl: string;
+  /** Description of canvas contents for AI context */
+  description: string;
+  /** Asset type from the canvas */
+  assetType: string;
+  /** Dimensions of the canvas */
+  width: number;
+  height: number;
+}
+
+/**
  * Complete state for Create Studio.
  */
 export interface CreateStudioState {
@@ -59,6 +74,8 @@ export interface CreateStudioState {
   jobId: string | null;
   /** Error message if any */
   error: string | null;
+  /** Canvas context from Canvas panel (for Coach integration) */
+  canvasContext: CanvasContext | null;
 }
 
 /**
@@ -83,6 +100,10 @@ export interface CreateStudioActions {
   setError: (error: string | null) => void;
   /** Reset to initial state */
   reset: () => void;
+  /** Set canvas context (from Canvas panel for Coach) */
+  setCanvasContext: (context: CanvasContext | null) => void;
+  /** Switch to coach with canvas context */
+  switchToCoachWithCanvas: (context: CanvasContext) => void;
 }
 
 // =============================================================================
@@ -149,6 +170,10 @@ export interface CustomPanelProps {
 export interface CoachPanelProps {
   /** Callback when generation completes */
   onGenerationComplete?: (assetId: string) => void;
+  /** Canvas context from Canvas panel (for canvas → coach flow) */
+  canvasContext?: CanvasContext | null;
+  /** Callback to clear canvas context after use */
+  onClearCanvasContext?: () => void;
   /** Additional className */
   className?: string;
 }
@@ -161,6 +186,8 @@ export interface CanvasPanelProps {
   onGenerationStart?: (jobId: string) => void;
   /** Callback when generation completes */
   onGenerationComplete?: (assetId: string) => void;
+  /** Callback to switch to coach with canvas context */
+  onSwitchToCoach?: (context: CanvasContext) => void;
   /** Additional className */
   className?: string;
 }

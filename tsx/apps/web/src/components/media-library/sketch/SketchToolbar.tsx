@@ -89,6 +89,17 @@ function EraserIcon({ className }: { className?: string }) {
   );
 }
 
+function EyedropperIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M2 22l1-1h3l9-9" />
+      <path d="M3 21v-3l9-9" />
+      <path d="M14.5 5.5l4 4" />
+      <path d="M18.5 9.5l-4-4 2.5-2.5a2.828 2.828 0 114 4L18.5 9.5z" />
+    </svg>
+  );
+}
+
 function StickerIcon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -137,6 +148,7 @@ const TOOL_ICONS: Record<SketchTool, React.FC<{ className?: string }>> = {
   text: TypeIcon,
   sticker: StickerIcon,
   eraser: EraserIcon,
+  eyedropper: EyedropperIcon,
 };
 
 // ============================================================================

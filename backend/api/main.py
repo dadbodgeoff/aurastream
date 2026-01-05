@@ -405,6 +405,9 @@ def create_app() -> FastAPI:
     from backend.api.routes.provenance import router as provenance_router
     from backend.api.routes.sse_recovery import router as sse_recovery_router
     from backend.api.routes.admin_rate_limits import router as admin_rate_limits_router
+    from backend.api.routes.canvas_projects import router as canvas_projects_router
+    from backend.api.routes.project_asset_overrides import router as project_asset_overrides_router
+    from backend.api.routes.community_hub import router as community_hub_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -447,6 +450,9 @@ def create_app() -> FastAPI:
     app.include_router(provenance_router, prefix="/api/v1", tags=["Intelligence Provenance"])
     app.include_router(sse_recovery_router, prefix="/api/v1", tags=["SSE Recovery"])
     app.include_router(admin_rate_limits_router, prefix="/api/v1", tags=["Admin - Rate Limits"])
+    app.include_router(canvas_projects_router, prefix="/api/v1", tags=["Canvas Projects"])
+    app.include_router(project_asset_overrides_router, prefix="/api/v1", tags=["Project Asset Overrides"])
+    app.include_router(community_hub_router, prefix="/api/v1", tags=["Community Hub"])
     
     # Prometheus metrics endpoint (if enabled)
     if METRICS_ENABLED:

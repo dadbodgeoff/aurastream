@@ -1,11 +1,38 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Poppins, Bebas_Neue, Oswald, Anton, Black_Ops_One, Russo_One, Orbitron, Press_Start_2P, Bangers, Permanent_Marker, Creepster } from 'next/font/google';
 import './globals.css';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { Providers } from './providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const poppins = Poppins({ weight: ['400', '600', '700', '900'], subsets: ['latin'], variable: '--font-poppins' });
+const bebasNeue = Bebas_Neue({ weight: '400', subsets: ['latin'], variable: '--font-bebas' });
+const oswald = Oswald({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-oswald' });
+const anton = Anton({ weight: '400', subsets: ['latin'], variable: '--font-anton' });
+const blackOpsOne = Black_Ops_One({ weight: '400', subsets: ['latin'], variable: '--font-blackops' });
+const russoOne = Russo_One({ weight: '400', subsets: ['latin'], variable: '--font-russo' });
+const orbitron = Orbitron({ weight: ['400', '700', '900'], subsets: ['latin'], variable: '--font-orbitron' });
+const pressStart2P = Press_Start_2P({ weight: '400', subsets: ['latin'], variable: '--font-pressstart' });
+const bangers = Bangers({ weight: '400', subsets: ['latin'], variable: '--font-bangers' });
+const permanentMarker = Permanent_Marker({ weight: '400', subsets: ['latin'], variable: '--font-marker' });
+const creepster = Creepster({ weight: '400', subsets: ['latin'], variable: '--font-creepster' });
+
+// Combined font classes for body
+const fontVariables = [
+  inter.variable,
+  poppins.variable,
+  bebasNeue.variable,
+  oswald.variable,
+  anton.variable,
+  blackOpsOne.variable,
+  russoOne.variable,
+  orbitron.variable,
+  pressStart2P.variable,
+  bangers.variable,
+  permanentMarker.variable,
+  creepster.variable,
+].join(' ');
 
 // Site configuration
 const siteConfig = {
@@ -112,7 +139,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${fontVariables} font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>
     </html>

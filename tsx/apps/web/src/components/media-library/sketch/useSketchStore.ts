@@ -61,6 +61,23 @@ export const useSketchStore = create<SketchStore>((set, get) => ({
     }));
   },
 
+  swapColors: () => {
+    set((state) => ({
+      brush: {
+        ...state.brush,
+        color: state.brush.secondaryColor,
+        secondaryColor: state.brush.color,
+      },
+    }));
+  },
+
+  pickColor: (color: string) => {
+    set((state) => ({
+      brush: { ...state.brush, color },
+      activeTool: state.activeTool === 'eyedropper' ? 'pen' : state.activeTool,
+    }));
+  },
+
   // ============================================================================
   // Element Actions
   // ============================================================================
@@ -93,6 +110,59 @@ export const useSketchStore = create<SketchStore>((set, get) => ({
     if (element) {
       pushHistory(`Delete ${element.type}`);
     }
+  },
+
+  duplicateElement: (id: string) => {
+    const { elements, pushHistory } = get();
+    const element = elements.find((el) => el.id === id);
+    
+    if (!element) return;
+    
+    // Create a deep copy with new ID and offset position
+    const newElement = JSON.parse(JSON.stringify(element)) as AnySketchElement;
+    newElement.id = generateId();
+    newElement.zIndex = Math.max(...elements.map(e => e.zIndex)) + 1;
+    
+    // Offset the duplicate slightly
+    const offset = 3; // 3% offset
+    switch (newElement.type) {
+      case 'freehand':
+        newElement.points = newElement.points.map(p => ({
+          x: Math.min(100, p.x + offset),
+          y: Math.min(100, p.y + offset),
+        }));
+        break;
+      case 'rectangle':
+        newElement.x = Math.min(100 - newElement.width, newElement.x + offset);
+        newElement.y = Math.min(100 - newElement.height, newElement.y + offset);
+        break;
+      case 'circle':
+        newElement.cx = Math.min(100 - newElement.rx, newElement.cx + offset);
+        newElement.cy = Math.min(100 - newElement.ry, newElement.cy + offset);
+        break;
+      case 'line':
+      case 'arrow':
+        newElement.startX = Math.min(100, newElement.startX + offset);
+        newElement.startY = Math.min(100, newElement.startY + offset);
+        newElement.endX = Math.min(100, newElement.endX + offset);
+        newElement.endY = Math.min(100, newElement.endY + offset);
+        break;
+      case 'text':
+        newElement.x = Math.min(100, newElement.x + offset);
+        newElement.y = Math.min(100, newElement.y + offset);
+        break;
+      case 'sticker':
+      case 'image':
+        newElement.x = Math.min(100 - newElement.width / 2, newElement.x + offset);
+        newElement.y = Math.min(100 - newElement.height / 2, newElement.y + offset);
+        break;
+    }
+    
+    set({ 
+      elements: [...elements, newElement],
+      selectedId: newElement.id,
+    });
+    pushHistory(`Duplicate ${element.type}`);
   },
 
   moveElement: (id: string, deltaX: number, deltaY: number) => {
@@ -168,6 +238,163 @@ export const useSketchStore = create<SketchStore>((set, get) => ({
     const { pushHistory } = get();
     set({ elements: [], selectedId: null });
     pushHistory('Clear all');
+  },
+
+  // ============================================================================
+  // Layer Actions
+  // ============================================================================
+
+  bringForward: (id: string) => {
+    const { elements, pushHistory } = get();
+    const element = elements.find(el => el.id === id);
+    if (!element) return;
+    
+    const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
+    const currentIndex = sortedElements.findIndex(el => el.id === id);
+    
+    if (currentIndex < sortedElements.length - 1) {
+      const nextElement = sortedElements[currentIndex + 1];
+      const newElements = elements.map(el => {
+        if (el.id === id) return { ...el, zIndex: nextElement.zIndex };
+        if (el.id === nextElement.id) return { ...el, zIndex: element.zIndex };
+        return el;
+      });
+      set({ elements: newElements });
+      pushHistory('Bring forward');
+    }
+  },
+
+  sendBackward: (id: string) => {
+    const { elements, pushHistory } = get();
+    const element = elements.find(el => el.id === id);
+    if (!element) return;
+    
+    const sortedElements = [...elements].sort((a, b) => a.zIndex - b.zIndex);
+    const currentIndex = sortedElements.findIndex(el => el.id === id);
+    
+    if (currentIndex > 0) {
+      const prevElement = sortedElements[currentIndex - 1];
+      const newElements = elements.map(el => {
+        if (el.id === id) return { ...el, zIndex: prevElement.zIndex };
+        if (el.id === prevElement.id) return { ...el, zIndex: element.zIndex };
+        return el;
+      });
+      set({ elements: newElements });
+      pushHistory('Send backward');
+    }
+  },
+
+  bringToFront: (id: string) => {
+    const { elements, pushHistory } = get();
+    const maxZIndex = Math.max(...elements.map(el => el.zIndex));
+    const newElements = elements.map(el =>
+      el.id === id ? { ...el, zIndex: maxZIndex + 1 } : el
+    );
+    set({ elements: newElements });
+    pushHistory('Bring to front');
+  },
+
+  sendToBack: (id: string) => {
+    const { elements, pushHistory } = get();
+    const minZIndex = Math.min(...elements.map(el => el.zIndex));
+    const newElements = elements.map(el =>
+      el.id === id ? { ...el, zIndex: minZIndex - 1 } : el
+    );
+    set({ elements: newElements });
+    pushHistory('Send to back');
+  },
+
+  // ============================================================================
+  // Transform Actions
+  // ============================================================================
+
+  flipHorizontal: (id: string) => {
+    const { elements, pushHistory } = get();
+    const newElements = elements.map((el): AnySketchElement => {
+      if (el.id !== id) return el;
+      
+      switch (el.type) {
+        case 'freehand': {
+          // Flip points around center
+          const xs = el.points.map(p => p.x);
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const centerX = (minX + maxX) / 2;
+          return {
+            ...el,
+            points: el.points.map(p => ({
+              x: centerX - (p.x - centerX),
+              y: p.y,
+            })),
+          };
+        }
+        case 'line':
+        case 'arrow': {
+          const centerX = (el.startX + el.endX) / 2;
+          return {
+            ...el,
+            startX: centerX - (el.startX - centerX),
+            endX: centerX - (el.endX - centerX),
+          };
+        }
+        case 'image':
+        case 'sticker':
+          return { ...el, flipX: !el.flipX };
+        default:
+          return { ...el, flipX: !el.flipX };
+      }
+    });
+    set({ elements: newElements });
+    pushHistory('Flip horizontal');
+  },
+
+  flipVertical: (id: string) => {
+    const { elements, pushHistory } = get();
+    const newElements = elements.map((el): AnySketchElement => {
+      if (el.id !== id) return el;
+      
+      switch (el.type) {
+        case 'freehand': {
+          const ys = el.points.map(p => p.y);
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+          const centerY = (minY + maxY) / 2;
+          return {
+            ...el,
+            points: el.points.map(p => ({
+              x: p.x,
+              y: centerY - (p.y - centerY),
+            })),
+          };
+        }
+        case 'line':
+        case 'arrow': {
+          const centerY = (el.startY + el.endY) / 2;
+          return {
+            ...el,
+            startY: centerY - (el.startY - centerY),
+            endY: centerY - (el.endY - centerY),
+          };
+        }
+        case 'image':
+        case 'sticker':
+          return { ...el, flipY: !el.flipY };
+        default:
+          return { ...el, flipY: !el.flipY };
+      }
+    });
+    set({ elements: newElements });
+    pushHistory('Flip vertical');
+  },
+
+  setElementOpacity: (id: string, opacity: number) => {
+    const { elements, pushHistory } = get();
+    const clampedOpacity = Math.max(0, Math.min(100, opacity));
+    const newElements = elements.map(el =>
+      el.id === id ? { ...el, opacity: clampedOpacity } : el
+    );
+    set({ elements: newElements });
+    pushHistory('Change opacity');
   },
 
   // ============================================================================

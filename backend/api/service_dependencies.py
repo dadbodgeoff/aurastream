@@ -216,7 +216,7 @@ def get_coach_service_dep():
     
     Enables FastAPI dependency injection and clean test mocking.
     """
-    from backend.services.coach.coach_service import get_coach_service
+    from backend.services.coach import get_coach_service
     return get_coach_service()
 
 
@@ -226,7 +226,7 @@ def get_session_manager_dep():
     
     Enables FastAPI dependency injection and clean test mocking.
     """
-    from backend.services.coach.session_manager import get_session_manager
+    from backend.services.coach import get_session_manager
     return get_session_manager()
 
 
@@ -236,7 +236,7 @@ def get_tips_service_dep():
     
     Enables FastAPI dependency injection and clean test mocking.
     """
-    from backend.services.coach.tips_service import get_tips_service
+    from backend.services.coach import get_tips_service
     return get_tips_service()
 
 
@@ -246,7 +246,7 @@ def get_coach_analytics_service_dep():
     
     Enables FastAPI dependency injection and clean test mocking.
     """
-    from backend.services.coach.analytics_service import get_analytics_service
+    from backend.services.coach import get_analytics_service
     return get_analytics_service()
 
 
@@ -695,10 +695,7 @@ if TYPE_CHECKING:
     from backend.services.avatar_service import AvatarService
     from backend.services.prompt_engine import PromptEngine
     from backend.services.quick_create_service import QuickCreateService
-    from backend.services.coach.coach_service import CoachService
-    from backend.services.coach.session_manager import SessionManager
-    from backend.services.coach.tips_service import TipsService
-    from backend.services.coach.analytics_service import CoachAnalyticsService
+    from backend.services.coach import CoachService, SessionManager, StaticTipsService as TipsService, CoachAnalyticsService
     from backend.services.twitch.context_engine import TwitchContextEngine
     from backend.services.twitch.pack_service import PackService
     from backend.services.twitch.game_meta import GameMetaService
@@ -880,16 +877,28 @@ def reset_all_service_singletons():
     except (ImportError, AttributeError):
         pass
     
-    # Coach services
+    # Coach services (new modular structure)
     try:
-        import backend.services.coach.coach_service as coach_mod
+        import backend.services.coach.service as coach_mod
         coach_mod._coach_service = None
     except (ImportError, AttributeError):
         pass
     
     try:
-        import backend.services.coach.session_manager as session_mod
+        import backend.services.coach.session.manager as session_mod
         session_mod._session_manager = None
+    except (ImportError, AttributeError):
+        pass
+    
+    try:
+        import backend.services.coach.tips.service as tips_mod
+        tips_mod._tips_service = None
+    except (ImportError, AttributeError):
+        pass
+    
+    try:
+        import backend.services.coach.analytics.service as analytics_mod
+        analytics_mod._analytics_service = None
     except (ImportError, AttributeError):
         pass
     

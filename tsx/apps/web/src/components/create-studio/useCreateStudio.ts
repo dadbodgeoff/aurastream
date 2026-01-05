@@ -14,7 +14,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import type { 
   CreationMode, 
   CreateStudioState, 
-  CreateStudioActions 
+  CreateStudioActions,
+  CanvasContext,
 } from './types';
 
 // =============================================================================
@@ -30,6 +31,7 @@ const INITIAL_STATE: CreateStudioState = {
   isGenerating: false,
   jobId: null,
   error: null,
+  canvasContext: null,
 };
 
 // Map URL tab params to creation modes
@@ -146,6 +148,27 @@ export function useCreateStudio(
     setState(INITIAL_STATE);
   }, []);
 
+  const setCanvasContext = useCallback((context: CanvasContext | null) => {
+    setState(prev => ({ ...prev, canvasContext: context }));
+  }, []);
+
+  const switchToCoachWithCanvas = useCallback((context: CanvasContext) => {
+    setState(prev => ({ 
+      ...prev, 
+      canvasContext: context,
+      assetType: context.assetType,
+      activeMode: 'coach',
+      error: null,
+    }));
+    
+    // Sync to URL if enabled
+    if (syncToUrl) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', 'coach');
+      router.replace(`?${params.toString()}`, { scroll: false });
+    }
+  }, [syncToUrl, searchParams, router]);
+
   // ==========================================================================
   // Memoized Actions Object
   // ==========================================================================
@@ -160,6 +183,8 @@ export function useCreateStudio(
     completeGeneration,
     setError,
     reset,
+    setCanvasContext,
+    switchToCoachWithCanvas,
   }), [
     setMode,
     togglePreview,
@@ -170,6 +195,8 @@ export function useCreateStudio(
     completeGeneration,
     setError,
     reset,
+    setCanvasContext,
+    switchToCoachWithCanvas,
   ]);
 
   return { state, actions };
@@ -179,4 +206,4 @@ export function useCreateStudio(
 // Exports
 // =============================================================================
 
-export type { CreateStudioState, CreateStudioActions };
+export type { CreateStudioState, CreateStudioActions, CanvasContext };

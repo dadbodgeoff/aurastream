@@ -645,3 +645,52 @@ export function useGetMediaForPrompt() {
     },
   });
 }
+
+// ============================================================================
+// Background Removal Hook
+// ============================================================================
+
+/**
+ * Remove background from an existing media asset.
+ * 
+ * Processes the original image through AI background removal and
+ * stores the transparent version. The processed URL will be available
+ * in the `processedUrl` field of the returned asset.
+ * 
+ * @example
+ * ```tsx
+ * const removeBackground = useRemoveBackground();
+ * 
+ * const handleRemoveBg = async (assetId: string) => {
+ *   const updated = await removeBackground.mutateAsync(assetId);
+ *   console.log('Processed URL:', updated.processedUrl);
+ * };
+ * ```
+ */
+export function useRemoveBackground() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (assetId: string): Promise<MediaAsset> => {
+      const token = getToken();
+      
+      const response = await fetch(`${API_BASE}/media-library/${assetId}/remove-background`, {
+        method: 'POST',
+        headers: authHeaders(token),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Failed to remove background' }));
+        throw new Error(error.detail || 'Failed to remove background');
+      }
+      
+      return transformMediaAsset(await response.json());
+    },
+    onSuccess: (data) => {
+      // Update the asset in cache
+      queryClient.setQueryData(creatorMediaKeys.detail(data.id), data);
+      // Invalidate lists to refresh
+      queryClient.invalidateQueries({ queryKey: creatorMediaKeys.lists() });
+    },
+  });
+}

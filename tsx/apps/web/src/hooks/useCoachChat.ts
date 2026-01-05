@@ -38,6 +38,15 @@ export interface IntentStatus {
   confidence: number;
   refinedDescription: string;
   turn?: number;
+  // New intent schema fields
+  readinessState?: 'not_ready' | 'needs_clarification' | 'needs_confirmation' | 'ready';
+  isConfirmation?: boolean;
+  userConfirmedVision?: boolean;
+  clarificationQuestions?: string[];
+  missingInfo?: string[];
+  sceneElementsCount?: number;
+  displayTextsCount?: number;
+  ambiguousCount?: number;
 }
 
 /** Validation issue from the coach (legacy support) */
@@ -65,6 +74,15 @@ export interface StreamChunkMetadata {
   confidence?: number;
   refined_description?: string;
   turn?: number;
+  // New intent schema fields
+  readiness_state?: string;
+  is_confirmation?: boolean;
+  user_confirmed_vision?: boolean;
+  clarification_questions?: string[];
+  missing_info?: string[];
+  scene_elements_count?: number;
+  display_texts_count?: number;
+  ambiguous_count?: number;
   // For done
   session_id?: string;
   total_tokens?: number;
@@ -870,6 +888,15 @@ export function useCoachChat(): UseCoachChatReturn {
                     confidence: chunk.metadata.confidence ?? 0,
                     refinedDescription: chunk.metadata.refined_description ?? '',
                     turn: chunk.metadata.turn,
+                    // New intent schema fields
+                    readinessState: chunk.metadata.readiness_state as IntentStatus['readinessState'],
+                    isConfirmation: chunk.metadata.is_confirmation,
+                    userConfirmedVision: chunk.metadata.user_confirmed_vision,
+                    clarificationQuestions: chunk.metadata.clarification_questions,
+                    missingInfo: chunk.metadata.missing_info,
+                    sceneElementsCount: chunk.metadata.scene_elements_count,
+                    displayTextsCount: chunk.metadata.display_texts_count,
+                    ambiguousCount: chunk.metadata.ambiguous_count,
                   };
                   setIsGenerationReady(intentStatus.isReady);
                   setConfidence(intentStatus.confidence);
@@ -1087,6 +1114,15 @@ export function useCoachChat(): UseCoachChatReturn {
                     confidence: chunk.metadata.confidence ?? 0,
                     refinedDescription: chunk.metadata.refined_description ?? '',
                     turn: chunk.metadata.turn,
+                    // New intent schema fields
+                    readinessState: chunk.metadata.readiness_state as IntentStatus['readinessState'],
+                    isConfirmation: chunk.metadata.is_confirmation,
+                    userConfirmedVision: chunk.metadata.user_confirmed_vision,
+                    clarificationQuestions: chunk.metadata.clarification_questions,
+                    missingInfo: chunk.metadata.missing_info,
+                    sceneElementsCount: chunk.metadata.scene_elements_count,
+                    displayTextsCount: chunk.metadata.display_texts_count,
+                    ambiguousCount: chunk.metadata.ambiguous_count,
                   };
                   setIsGenerationReady(intentStatus.isReady);
                   setConfidence(intentStatus.confidence);

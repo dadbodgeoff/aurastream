@@ -69,11 +69,7 @@ const UserIcon = ({ className }: { className?: string }) => (
 );
 
 const BotIcon = ({ className }: { className?: string }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <rect x="3" y="11" width="18" height="10" rx="2" />
-    <circle cx="12" cy="5" r="2" />
-    <path d="M12 7v4M7 15h.01M17 15h.01" />
-  </svg>
+  <span className={cn("text-xs font-bold", className)}>A</span>
 );
 
 // ============================================================================
@@ -160,8 +156,15 @@ function cleanContent(content: string): string {
   // Remove any ```prompt blocks (shouldn't happen, but safety)
   let cleaned = content.replace(/```prompt\n?[\s\S]*?```/g, '');
   
-  // Remove [INTENT_READY] markers (internal use only)
-  cleaned = cleaned.replace(/\[INTENT_READY\]/g, '');
+  // Remove [INTENT_READY] markers (internal use only) - case insensitive, with optional whitespace
+  cleaned = cleaned.replace(/\s*\[INTENT_READY\]\s*/gi, ' ');
+  
+  // Replace "✨ Ready!" + detailed prompt with simple confirmation
+  // Users shouldn't see the full generation prompt
+  const readyMatch = cleaned.match(/✨\s*Ready!\s*(.+)/s);
+  if (readyMatch) {
+    cleaned = cleaned.replace(/✨\s*Ready!\s*.+/s, "✨ Got it! I understand exactly what you want.");
+  }
   
   // Clean up extra whitespace
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
@@ -251,6 +254,11 @@ export function CoachMessage({ message, thinkingStage, reasoning, className }: C
           isUser ? 'text-right' : 'text-left'
         )}
       >
+        {/* AuraBot label for assistant messages */}
+        {!isUser && !showThinkingIndicator && (
+          <span className="text-xs font-medium text-accent-500 mb-1 block">AuraBot</span>
+        )}
+        
         {/* Show thinking indicator when streaming with no content */}
         {showThinkingIndicator ? (
           <ThinkingIndicator stage={thinkingStage} />

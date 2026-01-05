@@ -121,6 +121,12 @@ export interface SketchElement {
   opacity: number;
   color: string;
   strokeWidth: number;
+  /** Line style for strokes */
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  /** Horizontal flip */
+  flipX?: boolean;
+  /** Vertical flip */
+  flipY?: boolean;
 }
 
 /**

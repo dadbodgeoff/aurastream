@@ -31,6 +31,12 @@ export interface CoachPageContentProps {
   className?: string;
   /** Test ID for e2e testing */
   testId?: string;
+  /** Canvas snapshot URL from Canvas panel (for canvas → coach flow) */
+  canvasSnapshotUrl?: string;
+  /** Canvas snapshot description for AI context */
+  canvasSnapshotDescription?: string;
+  /** Initial asset type from canvas */
+  initialAssetType?: string;
 }
 
 /** Phase of the coach flow */
@@ -153,6 +159,9 @@ function LoadingState({ message = 'Loading...' }: LoadingStateProps) {
 export function CoachPageContent({
   className,
   testId = 'coach-page-content',
+  canvasSnapshotUrl,
+  canvasSnapshotDescription,
+  initialAssetType,
 }: CoachPageContentProps) {
   const user = useUser();
   const { data: usageStatus, isLoading: isLoadingUsage } = useUsageStatus();
@@ -276,6 +285,9 @@ export function CoachPageContent({
           <CoachContextForm
             onStartChat={handleStartChat}
             isLoading={isStartingSession}
+            initialAssetType={initialAssetType as any}
+            canvasSnapshotUrl={canvasSnapshotUrl}
+            canvasSnapshotDescription={canvasSnapshotDescription}
           />
         </div>
       ) : (
