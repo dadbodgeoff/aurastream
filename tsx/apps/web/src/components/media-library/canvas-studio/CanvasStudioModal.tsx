@@ -433,6 +433,7 @@ export function CanvasStudioModal({
     initialAssets,
     initialPlacements,
     initialSketchElements,
+    projectId: projectId || undefined,  // ENTERPRISE FIX: Pass projectId for proper reset on switch
     onSave,
     onClose,
     onExport,

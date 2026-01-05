@@ -34,6 +34,7 @@ interface UseCanvasStudioProps {
   initialAssets: MediaAsset[];
   initialPlacements?: AssetPlacement[];
   initialSketchElements?: AnySketchElement[];
+  projectId?: string;  // ENTERPRISE FIX: Add projectId to detect switches
   onSave: (state: CanvasProjectState) => void;
   onClose: () => void;
   onExport?: (dataUrl: string, blob: Blob) => void;
@@ -46,6 +47,7 @@ export function useCanvasStudio({
   initialAssets,
   initialPlacements,
   initialSketchElements,
+  projectId,  // ENTERPRISE FIX: Track project ID for proper reset
   onSave,
   onClose,
   onExport,
@@ -73,12 +75,33 @@ export function useCanvasStudio({
   // Track initialization - now tracks WHAT data we initialized with
   const initializedDataRef = useRef<string | null>(null);
   
+  // ENTERPRISE FIX: Track project ID to detect switches
+  const prevProjectIdRef = useRef<string | undefined>(undefined);
+  
   // Track if we're waiting for data to load
   // ENTERPRISE FIX: Start as false, only true after store is populated
   const [isInitialized, setIsInitialized] = useState(false);
   
   // Force re-render counter to ensure SketchCanvas picks up store changes
   const [, forceUpdate] = useState(0);
+  
+  // ENTERPRISE FIX: Reset refs when project ID changes
+  // This ensures clean slate when switching between projects
+  useEffect(() => {
+    if (projectId !== prevProjectIdRef.current && prevProjectIdRef.current !== undefined) {
+      console.log('[useCanvasStudio] Project ID changed, resetting initialization refs:', {
+        from: prevProjectIdRef.current,
+        to: projectId,
+      });
+      // Reset all initialization tracking
+      hasInitializedSyncRef.current = false;
+      initializedDataRef.current = null;
+      setIsInitialized(false);
+      // Reset the store to ensure clean slate
+      resetSketchStore();
+    }
+    prevProjectIdRef.current = projectId;
+  }, [projectId]);
   
   // ENTERPRISE FIX: Synchronously initialize store on first render if we have data
   // This prevents the race condition where canvas renders before store is populated

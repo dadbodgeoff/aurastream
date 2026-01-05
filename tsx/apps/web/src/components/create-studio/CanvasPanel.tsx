@@ -16,7 +16,7 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { CanvasStudioModal } from '@/components/media-library/CanvasStudioModal';
@@ -27,6 +27,7 @@ import {
   useUpdateCanvasProject,
   useDeleteCanvasProject,
 } from '@aurastream/api-client';
+import { resetSketchStore } from '@/components/media-library/sketch/useSketchStore';
 import type { AssetPlacement } from '@/components/media-library/placement/types';
 import type { AnySketchElement } from '@/components/media-library/canvas-export/types';
 import type { CanvasProjectState } from '@/components/media-library/canvas-studio/types';
@@ -257,6 +258,9 @@ export function CanvasPanel({
   const [selectedDimension, setSelectedDimension] = useState<DimensionOption | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [isNewProject, setIsNewProject] = useState(false);
+  
+  // ENTERPRISE FIX: Track previous project ID to detect switches
+  const prevProjectIdRef = useRef<string | null>(null);
 
   // API hooks
   const { data: projectsData, isLoading: isLoadingProjects } = useCanvasProjects({ limit: 20 });
@@ -269,6 +273,25 @@ export function CanvasPanel({
   const deleteProject = useDeleteCanvasProject();
 
   const projects = projectsData?.projects || [];
+  
+  // ENTERPRISE FIX: Reset sketch store when switching projects
+  // This ensures no state leaks between projects (text, drawings, etc.)
+  useEffect(() => {
+    // Detect project switch (including to/from new project)
+    const currentProjectKey = isNewProject ? 'new' : activeProjectId;
+    const prevProjectKey = prevProjectIdRef.current;
+    
+    if (currentProjectKey !== prevProjectKey && prevProjectKey !== null) {
+      console.log('[CanvasPanel] Project switch detected, resetting store:', {
+        from: prevProjectKey,
+        to: currentProjectKey,
+      });
+      // Reset the sketch store BEFORE new project data loads
+      resetSketchStore();
+    }
+    
+    prevProjectIdRef.current = currentProjectKey;
+  }, [activeProjectId, isNewProject]);
 
   // Handle starting a new project
   const handleNewProject = useCallback(() => {
@@ -562,6 +585,7 @@ export function CanvasPanel({
                 initialPlacements={initialPlacements as AssetPlacement[]}
                 initialSketchElements={initialSketchElements as AnySketchElement[]}
                 onSave={handleCanvasSave}
+                projectId={activeProjectId}
               />
             )}
           </motion.div>
