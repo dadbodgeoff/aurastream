@@ -2,11 +2,10 @@
 
 import { cn } from '@/lib/utils';
 import { CATEGORIES, TEMPLATES } from '../constants';
-import { ChevronRightIcon } from '../icons';
 import type { QuickTemplate, TemplateCategory } from '../types';
 
-// All templates are locked for "Coming Soon" launch
-const TEMPLATES_LOCKED = true;
+// Templates are now fully functional
+const TEMPLATES_LOCKED = false;
 
 // Lock icon component
 const LockIcon = () => (
