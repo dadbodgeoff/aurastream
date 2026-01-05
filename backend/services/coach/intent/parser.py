@@ -254,7 +254,7 @@ class IntentParser:
                 schema.user_confirmed_vision = True
                 schema.confirmation_turn = schema.turn_count
                 logger.info(f"Coach said [INTENT_READY] at turn {schema.turn_count}, marking vision as confirmed")
-        
+
         # Look for coach's summary patterns
         summary_patterns = [
             r"(?:✨\s*)?Ready[!:]\s+(.+?)(?:\s*\[INTENT_READY\]|$)",
@@ -275,7 +275,7 @@ class IntentParser:
 
                 # Extract elements from the summary
                 self._extract_from_text(summary, schema, source="coach_summary")
-                
+
                 # If we found a summary with [INTENT_READY], upgrade inferred elements to confirmed
                 if "[INTENT_READY]" in response and schema.turn_count >= 1:
                     for elem in schema.scene_elements:

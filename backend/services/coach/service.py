@@ -178,19 +178,19 @@ class CoachService:
         # Process canvas context if provided (compact JSON format)
         canvas_schema: Optional[CanvasSchema] = None
         canvas_clarification: Optional[str] = None
-        
+
         if canvas_context:
             # Classify canvas elements using the new system
             canvas_schema = classify_canvas_elements(canvas_context)
             canvas_schema.snapshot_url = canvas_snapshot_url
-            
+
             # Check if any elements need clarification
             canvas_clarification = canvas_schema.generate_clarification_message()
-            
+
             # Generate compact description for prompts if not provided
             if not canvas_snapshot_description:
                 canvas_snapshot_description = self._generate_canvas_description(canvas_schema)
-            
+
             logger.info(
                 f"Canvas classified: {len(canvas_schema.elements)} elements, "
                 f"{len(canvas_schema.get_ambiguous_elements())} ambiguous"
@@ -398,39 +398,39 @@ class CoachService:
             Compact description string for prompts
         """
         parts = []
-        
+
         # Base layer
         if canvas_schema.base_layer:
             parts.append(f"Background: {canvas_schema.base_layer.content}")
-        
+
         # Kept assets
-        kept = [e for e in canvas_schema.elements 
+        kept = [e for e in canvas_schema.elements
                 if e.intent.value == "keep_asset" and e != canvas_schema.base_layer]
         if kept:
             asset_names = [e.content for e in kept if e.content]
             if asset_names:
                 parts.append(f"Assets: {', '.join(asset_names)}")
-        
+
         # Display texts
         if canvas_schema.display_texts:
             texts = [f'"{e.content}"' for e in canvas_schema.display_texts if e.content]
             if texts:
                 parts.append(f"Text: {', '.join(texts)}")
-        
+
         # Render elements
         if canvas_schema.render_elements:
             renders = [e.render_description or e.content for e in canvas_schema.render_elements]
             renders = [r for r in renders if r]
             if renders:
                 parts.append(f"Render: {', '.join(renders)}")
-        
+
         # Ambiguous (needs clarification)
         ambiguous = canvas_schema.get_ambiguous_elements()
         if ambiguous:
             amb_texts = [e.content for e in ambiguous if e.content]
             if amb_texts:
                 parts.append(f"Unclear: {', '.join(amb_texts)}")
-        
+
         return " | ".join(parts) if parts else "Canvas design"
 
     async def continue_chat(
@@ -473,7 +473,7 @@ class CoachService:
         canvas_schema: Optional[CanvasSchema] = None
         if hasattr(session, 'canvas_schema') and session.canvas_schema:
             canvas_schema = CanvasSchema.from_dict(session.canvas_schema)
-            
+
             # Check if user message is a canvas clarification response
             if canvas_schema.get_ambiguous_elements():
                 canvas_schema = apply_clarification_response(canvas_schema, message)
@@ -520,14 +520,14 @@ class CoachService:
         # Get readiness from intent schema (NOT from [INTENT_READY] marker)
         readiness = intent_schema.get_readiness()
         is_ready = intent_schema.is_ready()
-        
+
         # For Canvas Studio sessions, also consider canvas_schema readiness
         # Canvas is ready when the coach has said [INTENT_READY]
         # We trust the LLM's judgment that the user's vision is clear
         if canvas_schema:
             llm_said_ready = self.extractor.check_intent_ready(full_response)
             canvas_ready = canvas_schema.is_ready()
-            
+
             # Canvas Studio: ready when LLM says ready (trusting the coach's judgment)
             # OR when canvas has no ambiguous elements AND user confirmed vision
             if llm_said_ready:
@@ -576,13 +576,13 @@ class CoachService:
         refined_description = intent_schema.to_generation_description()
         if not refined_description:
             refined_description = legacy_intent.to_generation_input()
-        
+
         # For Canvas Studio, COMBINE canvas description with user's transformation requests
         # The canvas description tells what's ON the canvas (layout reference)
         # The intent description tells what the user WANTS (transformations, changes)
         if canvas_schema and is_ready:
             canvas_prompt = canvas_schema.to_nano_banana_prompt()
-            
+
             # Build combined prompt with user requests as PRIMARY instructions
             if canvas_prompt:
                 # Extract user's actual requests from conversation history
@@ -596,25 +596,25 @@ class CoachService:
                             continue
                         # Only include actual user requests, not the verbose auto-description
                         user_requests.append(msg.content)
-                
+
                 # The coach summary is the refined understanding - this is the key part
                 coach_summary = intent_schema.last_coach_summary
-                
+
                 # Build a CONCISE prompt for Nano Banana
                 # Priority: Coach summary > User requests > Canvas layout
                 combined_parts = []
-                
+
                 # Coach's refined understanding is the PRIMARY instruction
                 if coach_summary:
                     combined_parts.append(f"CREATE THIS:\n{coach_summary}")
-                
+
                 # User's specific requests (if coach summary is missing)
                 elif user_requests:
                     combined_parts.append(f"USER WANTS:\n" + "\n".join(user_requests[-2:]))  # Last 2 only
-                
+
                 # Canvas layout as reference (keep it brief)
                 combined_parts.append(f"\nCANVAS REFERENCE:\n{canvas_prompt}")
-                
+
                 refined_description = "\n".join(combined_parts)
                 logger.info(f"Combined canvas + intent prompt, length={len(refined_description)}")
                 logger.info(f"[COACH PROMPT DEBUG] Coach summary: {coach_summary[:300] if coach_summary else 'NONE'}...")

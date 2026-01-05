@@ -21,10 +21,10 @@ from datetime import datetime
 # ============================================================================
 
 AssetTypeEnum = Literal[
-    "thumbnail", 
-    "overlay", 
-    "banner", 
-    "story_graphic", 
+    "thumbnail",
+    "overlay",
+    "banner",
+    "story_graphic",
     "clip_cover",
     # Twitch emotes
     "twitch_emote",
@@ -189,19 +189,19 @@ class BrandCustomization(BaseModel):
         default=None,
         description="Color selection (uses defaults if not specified)"
     )
-    
+
     # Typography selection
     typography: Optional[TypographySelection] = Field(
         default=None,
         description="Typography selection (uses headline if not specified)"
     )
-    
+
     # Voice/tone selection
     voice: Optional[VoiceSelection] = Field(
         default=None,
         description="Voice elements to include"
     )
-    
+
     # Logo options
     include_logo: bool = Field(
         default=False,
@@ -219,7 +219,7 @@ class BrandCustomization(BaseModel):
         default="medium",
         description="Size of logo (small=10%, medium=15%, large=20%)"
     )
-    
+
     # Style intensity
     brand_intensity: BrandIntensityEnum = Field(
         default="balanced",
