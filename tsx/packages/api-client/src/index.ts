@@ -1114,3 +1114,65 @@ export {
   useTrackCommunityHubUsage,
   communityHubAssetToMediaAsset,
 } from './hooks/useCommunityHub';
+
+// Alert Animation Studio type exports
+export type {
+  AnimationCategory,
+  ExportFormat as AnimationExportFormat,
+  JobStatus as AnimationJobStatus,
+  EntryType,
+  LoopType,
+  DepthType,
+  ParticleType,
+  SlideDirection,
+  TriggerType,
+  SpawnArea,
+  EntryAnimation,
+  LoopAnimation,
+  DepthEffect,
+  ParticleEffect,
+  AnimationConfig,
+  AnimationExport,
+  AnimationProject,
+  AnimationProjectList,
+  AnimationPreset,
+  DepthMapJob,
+  OBSBrowserSource,
+  ExportClientResponse,
+  ExportServerResponse,
+  ExportResponse,
+  CreateAnimationProjectRequest,
+  UpdateAnimationProjectRequest,
+  ExportAnimationRequest,
+  CreatePresetRequest,
+} from './types/alertAnimation';
+
+export {
+  transformAnimationProject,
+  transformAnimationConfig,
+  transformEntryAnimation,
+  transformLoopAnimation,
+  transformDepthEffect,
+  transformParticleEffect,
+  transformAnimationExport,
+  transformAnimationPreset,
+  transformDepthMapJob,
+  transformOBSBrowserSource,
+  toSnakeCaseAnimationConfig,
+} from './types/alertAnimation';
+
+// Alert Animation Studio hooks exports
+export {
+  alertAnimationKeys,
+  useAnimationProjects,
+  useAnimationProject,
+  useCreateAnimationProject,
+  useUpdateAnimationProject,
+  useDeleteAnimationProject,
+  useGenerateDepthMap,
+  useExportAnimation,
+  useOBSBrowserSource,
+  useAnimationPresets,
+  useCreatePreset,
+  useDeletePreset,
+} from './hooks/useAlertAnimations';
