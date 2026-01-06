@@ -72,6 +72,22 @@ const DIMENSION_OPTIONS: DimensionOption[] = [
     icon: '📺',
   },
   {
+    id: 'twitch_emote',
+    label: 'Twitch Emote',
+    description: '112×112 • Auto-creates 3 sizes',
+    width: 112,
+    height: 112,
+    icon: '💬',
+  },
+  {
+    id: 'tiktok_emote',
+    label: 'TikTok Emote',
+    description: '300×300 • Auto-creates 3 sizes',
+    width: 300,
+    height: 300,
+    icon: '🎵',
+  },
+  {
     id: 'twitch_banner',
     label: 'Twitch Banner',
     description: '1200×480 • Profile banner',

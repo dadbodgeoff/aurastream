@@ -141,6 +141,17 @@ export function hitTest(
 export type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se';
 
 /**
+ * Calculate handle radius based on canvas dimensions.
+ * Smaller canvases need proportionally smaller hit areas.
+ */
+export function getScaledHandleRadius(canvasWidth: number, canvasHeight: number): number {
+  const canvasSize = Math.min(canvasWidth, canvasHeight);
+  if (canvasSize <= 150) return 1.5;
+  if (canvasSize <= 400) return 2;
+  return 3;
+}
+
+/**
  * Check if click is on a resize handle for image elements
  */
 export function hitTestResizeHandle(

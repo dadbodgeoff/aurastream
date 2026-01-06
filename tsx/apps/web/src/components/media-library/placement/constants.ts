@@ -148,11 +148,43 @@ export function getRegionFromPosition(x: number, y: number): CanvasRegion {
 }
 
 /**
+ * Calculate default size percentage based on canvas dimensions.
+ * Smaller canvases need larger default sizes so images are visible.
+ */
+export function getDefaultSizeForCanvas(canvasDimensions: CanvasDimensions): number {
+  const canvasSize = Math.min(canvasDimensions.width, canvasDimensions.height);
+  
+  // Small canvases (emotes, badges): fill most of canvas
+  if (canvasSize <= 150) return 80;
+  // Medium canvases (panels, small graphics): half canvas
+  if (canvasSize <= 400) return 50;
+  // Large canvases (thumbnails, banners): standard 20%
+  return 20;
+}
+
+/**
+ * Check if canvas is square (1:1 aspect ratio)
+ */
+export function isSquareCanvas(canvasDimensions: CanvasDimensions): boolean {
+  return canvasDimensions.width === canvasDimensions.height;
+}
+
+/**
+ * Check if canvas is small (emotes, badges, etc.)
+ */
+export function isSmallCanvas(canvasDimensions: CanvasDimensions): boolean {
+  return Math.min(canvasDimensions.width, canvasDimensions.height) <= 150;
+}
+
+/**
  * Create default placement for an asset
  * 
  * IMPORTANT: New placements always start with useOriginalUrl: true
  * This ensures project isolation - each project starts fresh and users
  * must explicitly choose to use the processed (bg-removed) version.
+ * 
+ * For small square canvases (emotes), images fill the canvas and don't maintain
+ * aspect ratio by default - this allows any image to be used as an emote base.
  */
 export function createDefaultPlacement(
   asset: MediaAsset,
@@ -163,17 +195,32 @@ export function createDefaultPlacement(
   const offsetX = (index % 3) * 25;
   const offsetY = Math.floor(index / 3) * 25;
   
+  // Scale default size based on canvas - smaller canvases get larger default %
+  const defaultSizePercent = getDefaultSizeForCanvas(canvasDimensions);
+  
+  // For small square canvases (emotes, badges), fill the canvas completely
+  // and don't maintain aspect ratio - user wants to use this image as emote base
+  const isSmallSquare = isSmallCanvas(canvasDimensions) && isSquareCanvas(canvasDimensions);
+  
+  // For emotes: center at 50,50 with 100% size, no aspect ratio lock
+  // For other canvases: use staggered positioning with default size
+  const position = isSmallSquare && index === 0
+    ? { x: 50, y: 50, anchor: 'center' as const }
+    : {
+        x: Math.min(DEFAULT_PLACEMENT.position.x + offsetX, 90),
+        y: Math.min(DEFAULT_PLACEMENT.position.y + offsetY, 90),
+        anchor: DEFAULT_PLACEMENT.position.anchor,
+      };
+  
+  const size = isSmallSquare && index === 0
+    ? { width: 100, height: 100, unit: 'percent' as const, maintainAspectRatio: false }
+    : { width: defaultSizePercent, height: defaultSizePercent, unit: 'percent' as const, maintainAspectRatio: true };
+  
   return {
     assetId: asset.id,
     asset,
-    position: {
-      x: Math.min(DEFAULT_PLACEMENT.position.x + offsetX, 90),
-      y: Math.min(DEFAULT_PLACEMENT.position.y + offsetY, 90),
-      anchor: DEFAULT_PLACEMENT.position.anchor,
-    },
-    size: {
-      ...DEFAULT_PLACEMENT.size,
-    },
+    position,
+    size,
     zIndex: index + 1,
     rotation: DEFAULT_PLACEMENT.rotation,
     opacity: DEFAULT_PLACEMENT.opacity,

@@ -67,6 +67,7 @@ export function PlacementControls({
           assetId: placement.asset.id,
         });
         // Update the asset with the new processed URL
+        // For community assets, the processedUrl comes from the override response
         onAssetUpdated?.({
           ...placement.asset,
           processedUrl: result.processedUrl,
@@ -75,7 +76,12 @@ export function PlacementControls({
         // Switch to using the processed version in this project
         onUpdate({ useOriginalUrl: false });
       } else {
-        // Fallback to global removal (legacy behavior)
+        // Fallback to global removal (legacy behavior) - only works for user's own assets
+        // Community assets require a projectId
+        if (placement.asset.id.startsWith('community_')) {
+          console.error('Cannot remove background from community asset without a project context');
+          return;
+        }
         const updated = await removeBackground.mutateAsync(placement.asset.id);
         onAssetUpdated?.({
           ...placement.asset,

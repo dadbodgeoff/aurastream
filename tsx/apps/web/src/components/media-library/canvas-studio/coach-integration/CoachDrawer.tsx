@@ -139,6 +139,7 @@ function mapAssetTypeForGeneration(canvasAssetType: string): string {
     youtube_thumbnail: 'thumbnail',
     youtube_banner: 'banner',
     twitch_emote: 'twitch_emote',
+    tiktok_emote: 'tiktok_emote',
     twitch_banner: 'banner',
     twitch_badge: 'twitch_badge',
     twitch_panel: 'twitch_panel',

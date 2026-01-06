@@ -18,6 +18,11 @@ export interface ProjectAssetOverride {
   assetId: string;
   userId: string;
   useProcessedUrl: boolean;
+  /** 
+   * URL to user-processed version of the asset (e.g., bg-removed community asset).
+   * Only used when useProcessedUrl = true and the source asset doesn't have its own processedUrl.
+   */
+  processedUrl: string | null;
   customCrop: { x: number; y: number; width: number; height: number } | null;
   customFilters: Record<string, number> | null;
   createdAt: string;
@@ -83,6 +88,7 @@ function transformOverride(data: any): ProjectAssetOverride {
     assetId: data.asset_id,
     userId: data.user_id,
     useProcessedUrl: data.use_processed_url ?? false,
+    processedUrl: data.processed_url ?? null,
     customCrop: data.custom_crop,
     customFilters: data.custom_filters,
     createdAt: data.created_at,
@@ -358,6 +364,11 @@ export function useRemoveBackgroundInProject() {
 /**
  * Helper to determine which URL to use for an asset in a project context.
  * 
+ * Priority:
+ * 1. If override says use processed AND override has its own processedUrl (community assets), use that
+ * 2. If override says use processed AND asset has processedUrl, use asset's processedUrl
+ * 3. Otherwise, use original URL
+ * 
  * @param asset - The MediaAsset object
  * @param overrides - Map of assetId -> ProjectAssetOverride
  * @returns The URL to use (processed or original)
@@ -370,9 +381,15 @@ export function getEffectiveAssetUrl(
   
   const override = overrides.get(asset.id);
   
-  // If override says use processed, and processed URL exists
-  if (override?.useProcessedUrl && asset.hasBackgroundRemoved && asset.processedUrl) {
-    return asset.processedUrl;
+  if (override?.useProcessedUrl) {
+    // First check if the override itself has a processed URL (for community assets)
+    if (override.processedUrl) {
+      return override.processedUrl;
+    }
+    // Then check if the asset has a processed URL
+    if (asset.hasBackgroundRemoved && asset.processedUrl) {
+      return asset.processedUrl;
+    }
   }
   
   // Default to original

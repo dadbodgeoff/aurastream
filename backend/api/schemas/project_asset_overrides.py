@@ -17,6 +17,7 @@ class ProjectAssetOverride(BaseModel):
     asset_id: str
     user_id: str
     use_processed_url: bool = False
+    processed_url: Optional[str] = None  # For community assets - stores user's processed version
     custom_crop: Optional[dict[str, Any]] = None
     custom_filters: Optional[dict[str, Any]] = None
     created_at: datetime

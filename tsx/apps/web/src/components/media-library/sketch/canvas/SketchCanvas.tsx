@@ -27,7 +27,7 @@ export function SketchCanvas({
   const [textInput, setTextInput] = useState<{ x: number; y: number; value: string } | null>(null);
   
   const {
-    elements,
+    elements: allElements,
     tempElement,
     activeTool,
     text: textSettings,
@@ -43,11 +43,16 @@ export function SketchCanvas({
     sendBackward,
   } = useSketchStore();
 
+  // Filter out image elements - they're rendered by PlacementCanvas (DOM layer)
+  // SketchCanvas only handles drawings, text, shapes, etc.
+  const elements = allElements.filter(el => el.type !== 'image');
+
   // Debug: Log elements on each render
   console.log('[SketchCanvas] Rendering with elements:', {
     count: elements.length,
     types: elements.map(el => el.type),
     ids: elements.map(el => el.id?.substring(0, 8)),
+    filteredOutImages: allElements.length - elements.length,
   });
 
   // Get next z-index

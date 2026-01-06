@@ -58,6 +58,15 @@ export function PlacementCanvas({
   // Calculate canvas display size (fit within container while maintaining aspect ratio)
   const aspectRatio = dimensions.width / dimensions.height;
   
+  // Calculate handle sizes based on canvas dimensions
+  // Smaller canvases need proportionally smaller handles
+  const handleScale = useMemo(() => {
+    const canvasSize = Math.min(dimensions.width, dimensions.height);
+    if (canvasSize <= 150) return 'small';
+    if (canvasSize <= 400) return 'medium';
+    return 'large';
+  }, [dimensions]);
+  
   // Snap position to grid
   const snapToGrid = useCallback((value: number): number => {
     if (!SNAP_SETTINGS.enabled) return value;
@@ -340,32 +349,46 @@ export function PlacementCanvas({
                     draggable={false}
                   />
                   
-                  {/* Resize Handles (when selected) - smaller */}
+                  {/* Resize Handles (when selected) - scaled based on canvas size */}
                   {isSelected && (
                     <>
-                      {/* Corner handles - smaller */}
+                      {/* Corner handles - scaled */}
                       {['nw', 'ne', 'sw', 'se'].map((handle) => (
                         <div
                           key={handle}
                           className={cn(
-                            'absolute w-2 h-2 bg-interactive-500 rounded-full border border-white shadow cursor-nwse-resize',
-                            handle === 'nw' && 'top-0 left-0 -translate-x-1/2 -translate-y-1/2',
+                            'absolute bg-interactive-500 rounded-full border border-white shadow',
+                            // Size based on canvas scale
+                            handleScale === 'small' && 'w-1.5 h-1.5',
+                            handleScale === 'medium' && 'w-1.5 h-1.5',
+                            handleScale === 'large' && 'w-2 h-2',
+                            // Position
+                            handle === 'nw' && 'top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize',
                             handle === 'ne' && 'top-0 right-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize',
                             handle === 'sw' && 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize',
-                            handle === 'se' && 'bottom-0 right-0 translate-x-1/2 translate-y-1/2'
+                            handle === 'se' && 'bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize'
                           )}
                           onMouseDown={(e) => handleAssetMouseDown(e, placement, handle)}
                         />
                       ))}
                       
-                      {/* Edge handles - smaller */}
+                      {/* Edge handles - scaled */}
                       {['n', 'e', 's', 'w'].map((handle) => (
                         <div
                           key={handle}
                           className={cn(
                             'absolute bg-interactive-500/60 rounded-sm',
-                            (handle === 'n' || handle === 's') && 'left-1/2 -translate-x-1/2 w-6 h-1.5 cursor-ns-resize',
-                            (handle === 'e' || handle === 'w') && 'top-1/2 -translate-y-1/2 w-1.5 h-6 cursor-ew-resize',
+                            // Horizontal edges (n, s)
+                            (handle === 'n' || handle === 's') && 'left-1/2 -translate-x-1/2 cursor-ns-resize',
+                            (handle === 'n' || handle === 's') && handleScale === 'small' && 'w-4 h-1',
+                            (handle === 'n' || handle === 's') && handleScale === 'medium' && 'w-5 h-1',
+                            (handle === 'n' || handle === 's') && handleScale === 'large' && 'w-6 h-1.5',
+                            // Vertical edges (e, w)
+                            (handle === 'e' || handle === 'w') && 'top-1/2 -translate-y-1/2 cursor-ew-resize',
+                            (handle === 'e' || handle === 'w') && handleScale === 'small' && 'w-1 h-4',
+                            (handle === 'e' || handle === 'w') && handleScale === 'medium' && 'w-1 h-5',
+                            (handle === 'e' || handle === 'w') && handleScale === 'large' && 'w-1.5 h-6',
+                            // Position
                             handle === 'n' && 'top-0 -translate-y-1/2',
                             handle === 's' && 'bottom-0 translate-y-1/2',
                             handle === 'e' && 'right-0 translate-x-1/2',

@@ -87,6 +87,7 @@ INTEL_LOCK_TIMEOUT = 1800
 TRACKED_GAMES = [
     {"key": "fortnite", "name": "Fortnite"},
     {"key": "warzone", "name": "Warzone"},
+    {"key": "call_of_duty", "name": "Call of Duty"},
     {"key": "valorant", "name": "Valorant"},
     {"key": "apex_legends", "name": "Apex Legends"},
     {"key": "gta", "name": "GTA"},

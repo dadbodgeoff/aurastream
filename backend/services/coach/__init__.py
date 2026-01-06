@@ -99,6 +99,25 @@ from backend.services.coach.analytics.service import CoachAnalyticsService, get_
 # LLM Client (for advanced usage)
 from backend.services.coach.llm import CoachLLMClient, get_llm_client
 
+# Asset Type Configuration Registry
+from backend.services.coach.asset_types import (
+    AssetCategory,
+    ClassificationMode,
+    PromptTemplate,
+    AssetTypeConfig,
+    ASSET_TYPE_CONFIGS,
+    get_asset_config,
+    get_asset_tips,
+    get_quality_prefix,
+    get_display_name,
+    is_emote_type,
+    needs_simple_classification,
+    get_emote_sizes,
+    supports_text,
+    supports_complex_scenes,
+    get_questions_for_asset,
+)
+
 # Backwards compatibility aliases
 PromptCoachService = CoachService  # Legacy name
 
@@ -162,4 +181,20 @@ __all__ = [
     # LLM
     "CoachLLMClient",
     "get_llm_client",
+    # Asset Type Configuration
+    "AssetCategory",
+    "ClassificationMode",
+    "PromptTemplate",
+    "AssetTypeConfig",
+    "ASSET_TYPE_CONFIGS",
+    "get_asset_config",
+    "get_asset_tips",
+    "get_quality_prefix",
+    "get_display_name",
+    "is_emote_type",
+    "needs_simple_classification",
+    "get_emote_sizes",
+    "supports_text",
+    "supports_complex_scenes",
+    "get_questions_for_asset",
 ]

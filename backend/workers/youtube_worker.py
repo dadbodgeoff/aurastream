@@ -69,10 +69,11 @@ CATEGORIES: List[TrendCategory] = ["gaming", "entertainment", "music", "educatio
 
 # Games to fetch with search (guaranteed coverage)
 # Each search costs 100 units + 1 unit for video details = 101 units
-# 8 games × 101 units = 808 units/day
+# 9 games × 101 units = 909 units/day
 GAMES_TO_FETCH = [
     {"key": "fortnite", "query": "fortnite gameplay", "display": "Fortnite"},
     {"key": "warzone", "query": "warzone gameplay", "display": "Warzone"},
+    {"key": "call_of_duty", "query": "call of duty gameplay", "display": "Call of Duty"},
     {"key": "arc_raiders", "query": "arc raiders gameplay", "display": "Arc Raiders"},
     {"key": "valorant", "query": "valorant gameplay", "display": "Valorant"},
     {"key": "apex_legends", "query": "apex legends gameplay", "display": "Apex Legends"},

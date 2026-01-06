@@ -181,7 +181,8 @@ class CoachService:
 
         if canvas_context:
             # Classify canvas elements using the new system
-            canvas_schema = classify_canvas_elements(canvas_context)
+            # Pass asset_type for classification mode selection (emotes use simple mode)
+            canvas_schema = classify_canvas_elements(canvas_context, asset_type)
             canvas_schema.snapshot_url = canvas_snapshot_url
 
             # Check if any elements need clarification

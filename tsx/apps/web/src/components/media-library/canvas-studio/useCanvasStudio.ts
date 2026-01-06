@@ -183,10 +183,25 @@ export function useCanvasStudio({
     [placements, selectedPlacementId]
   );
 
-  // Sync assets when initialAssets changes
+  // Sync assets when initialAssets changes (only on meaningful changes)
+  // ENTERPRISE FIX: Use a ref to track if we've already initialized to prevent
+  // resetting user's work when initialAssets gets a new reference
+  const hasInitializedAssetsRef = useRef(false);
   useEffect(() => {
-    setAssets(initialAssets);
+    // Only sync on first open or when initialAssets actually has content
+    // Don't reset if user has already added/modified assets
+    if (!hasInitializedAssetsRef.current && initialAssets.length > 0) {
+      setAssets(initialAssets);
+      hasInitializedAssetsRef.current = true;
+    }
   }, [initialAssets]);
+  
+  // Reset the ref when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      hasInitializedAssetsRef.current = false;
+    }
+  }, [isOpen]);
 
   // Initialize sketch elements when modal opens or data changes
   // ENTERPRISE FIX: This effect handles data arriving AFTER initial render (API fetch)

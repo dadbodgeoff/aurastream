@@ -1,5 +1,9 @@
 /**
  * Image Element Renderer
+ * 
+ * Renders images in the SVG layer. Selection handles are NOT rendered here -
+ * they are handled by PlacementCanvas using DOM elements for consistent sizing
+ * regardless of canvas dimensions.
  */
 
 import { cn } from '@/lib/utils';
@@ -28,46 +32,14 @@ export function renderImage(
         width={imgW}
         height={imgH}
         opacity={element.opacity / 100}
-        preserveAspectRatio={element.maintainAspectRatio ? 'xMidYMid meet' : 'none'}
+        preserveAspectRatio="none"
         style={{ 
           transform: `rotate(${element.rotation}deg)`, 
           transformOrigin: `${imgX}px ${imgY}px`,
         }}
         className={cn(isSelected && 'filter drop-shadow-[0_0_4px_rgba(33,128,141,0.8)]')}
       />
-      {/* Selection border and handles when selected */}
-      {isSelected && (
-        <>
-          {/* Selection border */}
-          <rect
-            x={imgX - imgW / 2}
-            y={imgY - imgH / 2}
-            width={imgW}
-            height={imgH}
-            fill="none"
-            stroke="#21808D"
-            strokeWidth={2}
-            strokeDasharray="4 2"
-          />
-          {/* Corner handles */}
-          {[
-            { cx: imgX - imgW / 2, cy: imgY - imgH / 2 },
-            { cx: imgX + imgW / 2, cy: imgY - imgH / 2 },
-            { cx: imgX - imgW / 2, cy: imgY + imgH / 2 },
-            { cx: imgX + imgW / 2, cy: imgY + imgH / 2 },
-          ].map((pos, i) => (
-            <circle
-              key={i}
-              cx={pos.cx}
-              cy={pos.cy}
-              r={6}
-              fill="#21808D"
-              stroke="white"
-              strokeWidth={2}
-            />
-          ))}
-        </>
-      )}
+      {/* Selection handles are rendered by PlacementCanvas (DOM layer) not here */}
     </g>
   );
 }

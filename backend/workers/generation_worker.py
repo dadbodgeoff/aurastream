@@ -91,6 +91,9 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 # Twitch emote sizes required for upload (largest to smallest)
 TWITCH_EMOTE_SIZES = [112, 56, 28]
 
+# TikTok emote sizes required for upload (largest to smallest)
+TIKTOK_EMOTE_SIZES = [300, 200, 100]
+
 
 async def _store_sse_progress(job_id: str, progress: int, message: str = "") -> None:
     """
@@ -152,6 +155,11 @@ async def _store_sse_progress(job_id: str, progress: int, message: str = "") -> 
 def is_twitch_emote(asset_type: str) -> bool:
     """Check if asset type is a Twitch emote that needs multi-size processing."""
     return asset_type in {"twitch_emote", "twitch_emote_112"}
+
+
+def is_tiktok_emote(asset_type: str) -> bool:
+    """Check if asset type is a TikTok emote that needs multi-size processing."""
+    return asset_type in {"tiktok_emote", "tiktok_emote_300"}
 
 
 async def download_media_assets(
@@ -345,6 +353,89 @@ async def process_twitch_emote_sizes(
         })
 
         logger.info(f"Created emote asset {size}x{size}: asset_id={asset.id}")
+
+    return created_assets
+
+
+async def process_tiktok_emote_sizes(
+    image_data: bytes,
+    user_id: str,
+    job_id: str,
+    generation_service,
+    storage_service,
+) -> List[dict]:
+    """
+    Process a TikTok emote into all three required sizes (300, 200, 100).
+    
+    Steps:
+    1. Remove background using rembg (in thread pool)
+    2. Resize to each TikTok size using Lanczos (in thread pool)
+    3. Upload each size to storage
+    4. Create asset records for each size
+    
+    All CPU-intensive PIL/rembg operations run in thread pool executor
+    to avoid blocking the async event loop.
+    
+    Args:
+        image_data: Raw image bytes from AI generation
+        user_id: User ID for storage path
+        job_id: Job ID for storage path and asset linking
+        generation_service: Service for creating asset records
+        storage_service: Service for uploading to storage
+        
+    Returns:
+        List of created asset dicts with id, url, width, height
+    """
+    logger.info(f"Processing TikTok emote (background removal + resize): job_id={job_id}")
+
+    # Run CPU-intensive processing in thread pool
+    processed_sizes = await run_cpu_bound(_process_emote_sync, image_data, TIKTOK_EMOTE_SIZES)
+
+    created_assets = []
+
+    # Upload and create records for each size
+    for size, png_bytes in processed_sizes:
+        logger.info(f"Uploading TikTok emote size {size}x{size}: job_id={job_id}")
+
+        # Determine asset type for this size
+        asset_type = f"tiktok_emote_{size}"
+
+        # Upload to storage
+        upload_result = await storage_service.upload_asset(
+            user_id=user_id,
+            job_id=job_id,
+            image_data=png_bytes,
+            content_type="image/png",
+            suffix=f"_{size}x{size}"  # Add size suffix to filename
+        )
+
+        # Verify upload succeeded with expected size
+        if upload_result.file_size != len(png_bytes):
+            logger.error(f"Upload size mismatch for TikTok emote {size}x{size}: expected={len(png_bytes)}, got={upload_result.file_size}")
+            raise GenerationError(f"Upload verification failed for TikTok emote {size}x{size} - size mismatch")
+
+        # Create asset record
+        asset = await generation_service.create_asset(
+            job_id=job_id,
+            user_id=user_id,
+            asset_type=asset_type,
+            url=upload_result.url,
+            storage_path=upload_result.path,
+            width=size,
+            height=size,
+            file_size=len(png_bytes),
+            is_public=False
+        )
+
+        created_assets.append({
+            "id": asset.id,
+            "url": upload_result.url,
+            "width": size,
+            "height": size,
+            "asset_type": asset_type,
+        })
+
+        logger.info(f"Created TikTok emote asset {size}x{size}: asset_id={asset.id}")
 
     return created_assets
 
@@ -1056,7 +1147,7 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
         # The old PIL-based compositor has been removed.
 
         # Step 6 & 7: Process and upload assets
-        # For Twitch emotes, create all 3 required sizes (112, 56, 28)
+        # For Twitch/TikTok emotes, create all 3 required sizes
         await generation_service.update_job_status(job_id=job_id, status=JobStatus.PROCESSING, progress=70)
         await _store_sse_progress(job_id, 70, "Uploading to storage...")
 
@@ -1076,7 +1167,7 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
             primary_asset = created_assets[0]  # 112x112 is first
             asset_id = primary_asset["id"]
 
-            logger.info(f"Created {len(created_assets)} emote sizes: job_id={job_id}")
+            logger.info(f"Created {len(created_assets)} Twitch emote sizes: job_id={job_id}")
 
             # Increment usage counter once for the emote (counts as 1 generation)
             # This is done separately for emotes since process_twitch_emote_sizes
@@ -1085,9 +1176,9 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
                 from backend.database.supabase_client import get_supabase_client
                 db = get_supabase_client()
                 db.rpc("increment_user_usage", {"p_user_id": user_id}).execute()
-                logger.info(f"Incremented usage counter for emote: user_id={user_id}")
+                logger.info(f"Incremented usage counter for Twitch emote: user_id={user_id}")
             except Exception as e:
-                logger.warning(f"Failed to increment usage counter for emote: {e}")
+                logger.warning(f"Failed to increment usage counter for Twitch emote: {e}")
 
             # Link all assets to coach session if applicable
             coach_session_id = job_params.get("coach_session_id")
@@ -1105,7 +1196,54 @@ async def process_generation_job(job_id: str, user_id: str) -> dict:
                             "new_value": asset_info["id"]
                         }).execute()
 
-                    logger.info(f"Linked emote assets to coach session: session_id={coach_session_id}")
+                    logger.info(f"Linked Twitch emote assets to coach session: session_id={coach_session_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to link assets to coach session: {e}")
+
+        elif is_tiktok_emote(asset_type):
+            # Process TikTok emote into all 3 sizes with background removal
+            logger.info(f"Processing TikTok emote multi-size: job_id={job_id}")
+
+            created_assets = await process_tiktok_emote_sizes(
+                image_data=image_data,
+                user_id=user_id,
+                job_id=job_id,
+                generation_service=generation_service,
+                storage_service=storage_service,
+            )
+
+            # Use the largest (300x300) as the primary asset for response
+            primary_asset = created_assets[0]  # 300x300 is first
+            asset_id = primary_asset["id"]
+
+            logger.info(f"Created {len(created_assets)} TikTok emote sizes: job_id={job_id}")
+
+            # Increment usage counter once for the emote (counts as 1 generation)
+            try:
+                from backend.database.supabase_client import get_supabase_client
+                db = get_supabase_client()
+                db.rpc("increment_user_usage", {"p_user_id": user_id}).execute()
+                logger.info(f"Incremented usage counter for TikTok emote: user_id={user_id}")
+            except Exception as e:
+                logger.warning(f"Failed to increment usage counter for TikTok emote: {e}")
+
+            # Link all assets to coach session if applicable
+            coach_session_id = job_params.get("coach_session_id")
+            if coach_session_id:
+                try:
+                    from backend.database.supabase_client import get_supabase_client
+                    db = get_supabase_client()
+
+                    for asset_info in created_assets:
+                        db.table("assets").update({"coach_session_id": coach_session_id}).eq("id", asset_info["id"]).execute()
+                        db.rpc("array_append_unique", {
+                            "table_name": "coach_sessions",
+                            "column_name": "generated_asset_ids",
+                            "row_id": coach_session_id,
+                            "new_value": asset_info["id"]
+                        }).execute()
+
+                    logger.info(f"Linked TikTok emote assets to coach session: session_id={coach_session_id}")
                 except Exception as e:
                     logger.warning(f"Failed to link assets to coach session: {e}")
         else:

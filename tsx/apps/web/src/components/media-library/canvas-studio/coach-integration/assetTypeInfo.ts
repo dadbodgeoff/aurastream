@@ -42,17 +42,37 @@ export const ASSET_TYPE_INFO: Record<string, AssetTypeInfo> = {
   
   twitch_emote: {
     displayName: 'Twitch Emote',
-    description: 'Chat emote for Twitch channel',
+    description: 'Chat emote for Twitch channel (auto-creates 112, 56, 28px sizes)',
     tips: [
-      'Must work at 28x28, 56x56, and 112x112 pixels',
-      'Simple shapes with bold outlines',
-      'Single clear emotion or action',
-      'Avoid fine details that disappear at small sizes',
+      'Keep it simple - emotes are viewed at tiny sizes',
+      'Use bold colors and high contrast',
+      'Exaggerate expressions for visibility',
+      'Avoid fine details that disappear at 28px',
+      'Test readability at smallest size',
     ],
     considerations: [
       'Viewed primarily in chat at tiny sizes',
       'Should be instantly recognizable',
-      'Transparent background required',
+      'Transparent background auto-applied',
+      'Creates 3 sizes: 112×112, 56×56, 28×28',
+    ],
+  },
+  
+  tiktok_emote: {
+    displayName: 'TikTok Emote',
+    description: 'TikTok emote (auto-creates 300, 200, 100px sizes)',
+    tips: [
+      'TikTok emotes can have more detail than Twitch',
+      'Use vibrant, eye-catching colors',
+      'Expressions and reactions work best',
+      'Consider how it looks on dark backgrounds',
+      'Bold outlines help visibility',
+    ],
+    considerations: [
+      'Larger than Twitch emotes - more detail possible',
+      'Transparent background auto-applied',
+      'Creates 3 sizes: 300×300, 200×200, 100×100',
+      'Used in TikTok comments and reactions',
     ],
   },
   

@@ -9,6 +9,9 @@ Design Principles:
 2. Compact JSON format, not verbose prose
 3. Single-pass clarification for all ambiguous items
 4. Structured output for Nano Banana
+
+Asset-type-specific behavior is driven by the asset_types.py registry,
+enabling different classification modes for emotes vs thumbnails.
 """
 
 import re
@@ -16,6 +19,15 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any, Literal, Tuple
 from enum import Enum
+
+from ..asset_types import (
+    get_asset_config,
+    get_quality_prefix,
+    needs_simple_classification,
+    supports_text,
+    supports_complex_scenes,
+    is_emote_type,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,27 +73,27 @@ class ClassifiedElement:
     """A canvas element with its classified intent."""
     element_id: str
     element_type: str  # image, text, arrow, rectangle, etc.
-    
+
     # Original data
     content: Optional[str] = None  # Text content or asset name
     position: Optional[Tuple[float, float]] = None  # (x, y) percentage
     size: Optional[Tuple[float, float]] = None  # (width, height) percentage
-    
+
     # Classification
     intent: ElementIntent = ElementIntent.AMBIGUOUS
     confidence: float = 0.5
-    
+
     # Clarification
     needs_clarification: bool = False
     clarification_question: Optional[str] = None
     user_response: Optional[str] = None
-    
+
     # For render intents
     render_description: Optional[str] = None
-    
+
     # Position
     region: Optional[PositionRegion] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "element_id": self.element_id,
@@ -97,7 +109,7 @@ class ClassifiedElement:
             "render_description": self.render_description,
             "region": self.region.value if self.region else None,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ClassifiedElement":
         return cls(
@@ -119,93 +131,78 @@ class ClassifiedElement:
 @dataclass
 class CanvasIntentSchema:
     """Complete canvas interpretation with all classified elements."""
-    
+
     # Canvas metadata
     canvas_type: str  # youtube_thumbnail, twitch_banner, etc.
     dimensions: Tuple[int, int]  # (width, height)
     snapshot_url: Optional[str] = None
-    
+
     # Classified elements
     elements: List[ClassifiedElement] = field(default_factory=list)
-    
+
     # Output categories (populated after classification)
     base_layer: Optional[ClassifiedElement] = None
     display_texts: List[ClassifiedElement] = field(default_factory=list)
     render_elements: List[ClassifiedElement] = field(default_factory=list)
     style_instructions: List[str] = field(default_factory=list)
     ignored_elements: List[str] = field(default_factory=list)
-    
+
     # State
     all_clarified: bool = False
-    
+
     def get_ambiguous_elements(self) -> List[ClassifiedElement]:
         """Get elements that need clarification."""
         return [e for e in self.elements if e.needs_clarification and not e.user_response]
-    
+
     def is_ready(self) -> bool:
         """Check if all ambiguous elements have been clarified."""
         return len(self.get_ambiguous_elements()) == 0
-    
+
     def generate_clarification_message(self) -> Optional[str]:
         """Generate a compact clarification message for ambiguous elements."""
         ambiguous = self.get_ambiguous_elements()
         if not ambiguous:
             return None
-        
+
         questions = []
         for i, elem in enumerate(ambiguous, 1):
             if elem.clarification_question:
                 questions.append(f"{i}. {elem.clarification_question}")
-        
+
         if not questions:
             return None
-        
+
         return "Quick check:\n" + "\n".join(questions)
-    
+
     def to_nano_banana_prompt(self) -> str:
         """Generate compact prompt for Nano Banana with quality prefix."""
-        # Quality prefix - sets expectations for studio-level output
-        asset_type_quality = {
-            "youtube_thumbnail": "4K studio-quality YouTube gaming thumbnail",
-            "thumbnail": "4K studio-quality gaming thumbnail",
-            "twitch_banner": "Professional Twitch channel banner",
-            "twitch_emote": "Crisp high-detail Twitch emote",
-            "twitch_badge": "Clean professional Twitch badge",
-            "twitch_panel": "Polished Twitch panel graphic",
-            "twitch_offline": "Professional Twitch offline screen",
-            "overlay": "Clean broadcast-ready stream overlay",
-            "banner": "Professional gaming banner",
-            "story_graphic": "Eye-catching vertical story graphic",
-        }
-        
-        quality_prefix = asset_type_quality.get(
-            self.canvas_type, 
-            f"Professional {self.canvas_type.replace('_', ' ')}"
-        )
-        
+        # Get quality prefix from asset type registry
+        quality_prefix = get_quality_prefix(self.canvas_type)
+
         lines = [f"{quality_prefix}, {self.dimensions[0]}x{self.dimensions[1]}:"]
-        
+
         # Base layer
         if self.base_layer:
             lines.append(f"- BG: {self.base_layer.content} (keep)")
-        
-        # Display texts
-        for elem in self.display_texts:
-            region = elem.region.value if elem.region else "center"
-            lines.append(f'- Text "{elem.content}" {region}')
-        
+
+        # Display texts (skip for emotes - they don't have text)
+        if not is_emote_type(self.canvas_type):
+            for elem in self.display_texts:
+                region = elem.region.value if elem.region else "center"
+                lines.append(f'- Text "{elem.content}" {region}')
+
         # Render elements
         for elem in self.render_elements:
             region = elem.region.value if elem.region else "center"
             desc = elem.render_description or elem.content
             lines.append(f"- Render: {desc}, {region}")
-        
+
         # Style
         if self.style_instructions:
             lines.append(f"- Style: {', '.join(self.style_instructions)}")
-        
+
         return "\n".join(lines)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "canvas_type": self.canvas_type,
@@ -219,7 +216,7 @@ class CanvasIntentSchema:
             "ignored_elements": self.ignored_elements,
             "all_clarified": self.all_clarified,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "CanvasIntentSchema":
         return cls(
@@ -245,7 +242,7 @@ def pos_to_region(x: float, y: float) -> PositionRegion:
     """Convert percentage position to human-readable region."""
     col = "left" if x < 33 else "right" if x > 66 else "center"
     row = "top" if y < 33 else "bottom" if y > 66 else "center"
-    
+
     if row == "center" and col == "center":
         return PositionRegion.CENTER
     if row == "center":
@@ -291,7 +288,7 @@ def classify_text_element(content: str) -> Tuple[ElementIntent, float, Optional[
     """
     content_lower = content.lower().strip()
     content_stripped = content.strip()
-    
+
     # High confidence: ALL CAPS with punctuation = title
     # BUT still ask about styling preferences
     for pattern in TITLE_PATTERNS:
@@ -299,12 +296,12 @@ def classify_text_element(content: str) -> Tuple[ElementIntent, float, Optional[
             # Title detected - ask about styling preferences
             question = f'Title "{content_stripped}" detected. How should it look? (e.g., bold with glow, neon outline, 3D effect, or keep simple?)'
             return (ElementIntent.DISPLAY_TEXT, 0.85, question)  # Lower confidence to trigger clarification
-    
+
     # High confidence: Imperative instruction verbs
     for pattern in INSTRUCTION_PATTERNS:
         if re.search(pattern, content_lower):
             return (ElementIntent.INSTRUCTION, 0.9, None)
-    
+
     # Medium confidence: "[thing] here" pattern
     for pattern in PLACEMENT_HINT_PATTERNS:
         if re.search(pattern, content_lower):
@@ -312,7 +309,7 @@ def classify_text_element(content: str) -> Tuple[ElementIntent, float, Optional[
             thing = re.sub(r"\s*(here|there)$", "", content_stripped, flags=re.IGNORECASE).strip()
             question = f'"{content_stripped}" → render {thing} as a visual, or display as text? If rendering, what size/position?'
             return (ElementIntent.PLACEMENT_HINT, 0.6, question)
-    
+
     # Medium confidence: Descriptive sentence (likely render instruction)
     if " " in content_stripped and len(content_stripped) > 20:
         # Check if it describes a scene
@@ -320,12 +317,12 @@ def classify_text_element(content: str) -> Tuple[ElementIntent, float, Optional[
         if any(word in content_lower for word in scene_words):
             question = f'"{content_stripped}" → render this scene or display as text? If rendering, specify size (small/medium/large) and position.'
             return (ElementIntent.RENDER_SCENE, 0.6, question)
-    
+
     # Short text without clear signals - likely display text but ask about styling
     if len(content_stripped) < 30 and not any(c.islower() for c in content_stripped[:3]):
         question = f'Text "{content_stripped}" - how should it be styled? (bold, outline, glow, color preference?)'
         return (ElementIntent.DISPLAY_TEXT, 0.75, question)
-    
+
     # Ambiguous - need clarification
     question = f'"{content_stripped}" → is this a title (display as text), instruction (don\'t show), or scene to render? Please specify styling if text.'
     return (ElementIntent.AMBIGUOUS, 0.5, question)
@@ -336,56 +333,81 @@ def classify_image_element(
     size: Optional[Tuple[float, float]],
     position: Optional[Tuple[float, float]],
     asset_name: Optional[str] = None,
+    simple_mode: bool = False,
 ) -> Tuple[ElementIntent, float, Optional[str]]:
     """
     Classify an image/asset element's intent.
     
-    ENHANCED: Now asks about sizing, positioning, and effects for non-background assets.
-    """
+    Args:
+        asset_type: Type of asset (background, character, object, etc.)
+        size: (width, height) as percentage of canvas
+        position: (x, y) as percentage of canvas
+        asset_name: Human-readable name of the asset
+        simple_mode: If True, skip detailed questions (for emotes)
     
+    Returns:
+        (intent, confidence, clarification_question)
+    
+    In simple mode (emotes), we auto-classify everything as KEEP_ASSET
+    without asking detailed questions about sizing/effects.
+    """
+
     # Full-size background - no questions needed
     if asset_type == "background" or (size and size[0] >= 90 and size[1] >= 90):
         return (ElementIntent.KEEP_ASSET, 1.0, None)
-    
+
+    # Simple mode: auto-classify without questions
+    if simple_mode:
+        return (ElementIntent.KEEP_ASSET, 0.95, None)
+
     # Character or object - user placed intentionally, but ask about sizing/effects
     if asset_type in ["character", "object", "game_skin"]:
         name_str = f'"{asset_name}"' if asset_name else "this character/object"
         question = f'{name_str} - current size looks good, or adjust? Any effects wanted? (glow, shadow, outline?)'
         return (ElementIntent.KEEP_ASSET, 0.75, question)  # Lower confidence to trigger question
-    
+
     # Small corner placement might be reference only
     if size and size[0] < 15 and size[1] < 15:
         if position and (position[0] < 10 or position[0] > 90):
             return (ElementIntent.AMBIGUOUS, 0.6, "Keep this small asset visible or just for reference?")
-    
+
     # Medium-sized assets - ask about positioning and effects
     if size and (15 <= size[0] <= 50 or 15 <= size[1] <= 50):
         name_str = f'"{asset_name}"' if asset_name else "this asset"
         question = f'{name_str} - size/position good? Want any effects? (glow, shadow, action pose enhancement?)'
         return (ElementIntent.KEEP_ASSET, 0.75, question)
-    
+
     # Default: keep asset but ask about enhancements
     name_str = f'"{asset_name}"' if asset_name else "this asset"
     question = f'{name_str} - any adjustments needed? (size, position, effects like glow/shadow?)'
     return (ElementIntent.KEEP_ASSET, 0.8, question)
 
 
-def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
+def classify_canvas_elements(canvas_data: Dict[str, Any], asset_type: Optional[str] = None) -> CanvasIntentSchema:
     """
     Classify all elements in a canvas context.
     
+    Uses asset type configuration to determine classification mode:
+    - FULL: Full classification with text/scene detection (thumbnails)
+    - SIMPLE: Skip text/scene questions, focus on single subject (emotes)
+    
     Args:
         canvas_data: Compact canvas context with assets, texts, drawings
+        asset_type: Optional asset type override (uses canvas_data if not provided)
         
     Returns:
         CanvasIntentSchema with classified elements
     """
+    canvas_type = asset_type or canvas_data.get("canvas", {}).get("type", "thumbnail")
+    use_simple_mode = needs_simple_classification(canvas_type)
+    asset_supports_text = supports_text(canvas_type)
+
     schema = CanvasIntentSchema(
-        canvas_type=canvas_data.get("canvas", {}).get("type", "thumbnail"),
+        canvas_type=canvas_type,
         dimensions=tuple(canvas_data.get("canvas", {}).get("size", [1280, 720])),
         snapshot_url=canvas_data.get("snapshot_url"),
     )
-    
+
     # Classify assets
     for asset in canvas_data.get("assets", []):
         pos = None
@@ -395,7 +417,7 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
                 pos = (x, y)
             except (ValueError, AttributeError):
                 pass
-        
+
         size = None
         if asset.get("size"):
             try:
@@ -403,14 +425,15 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
                 size = (w, h)
             except (ValueError, AttributeError):
                 pass
-        
+
         intent, confidence, question = classify_image_element(
             asset.get("type", "object"),
             size,
             pos,
             asset.get("name"),  # Pass asset name for better clarification questions
+            use_simple_mode,  # Pass classification mode
         )
-        
+
         elem = ClassifiedElement(
             element_id=asset.get("id", f"asset_{len(schema.elements)}"),
             element_type="image",
@@ -419,17 +442,17 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
             size=size,
             intent=intent,
             confidence=confidence,
-            needs_clarification=confidence < 0.8,
-            clarification_question=question,
+            needs_clarification=confidence < 0.8 and not use_simple_mode,  # Skip clarification in simple mode
+            clarification_question=question if not use_simple_mode else None,
             region=pos_to_region(*pos) if pos else PositionRegion.FULL,
         )
         schema.elements.append(elem)
-        
+
         # Track base layer
         if intent == ElementIntent.KEEP_ASSET and asset.get("type") == "background":
             schema.base_layer = elem
-    
-    # Classify text elements
+
+    # Classify text elements (skip detailed questions for emotes)
     for text in canvas_data.get("texts", []):
         pos = None
         if text.get("pos"):
@@ -438,10 +461,17 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
                 pos = (x, y)
             except (ValueError, AttributeError):
                 pass
-        
+
         content = text.get("content", "")
-        intent, confidence, question = classify_text_element(content)
-        
+
+        if use_simple_mode:
+            # Simple mode: treat all text as instructions/reference, not display
+            intent = ElementIntent.INSTRUCTION
+            confidence = 0.9
+            question = None
+        else:
+            intent, confidence, question = classify_text_element(content)
+
         elem = ClassifiedElement(
             element_id=text.get("id", f"text_{len(schema.elements)}"),
             element_type="text",
@@ -449,14 +479,14 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
             position=pos,
             intent=intent,
             confidence=confidence,
-            needs_clarification=confidence < 0.8,
-            clarification_question=question,
+            needs_clarification=confidence < 0.8 and asset_supports_text,
+            clarification_question=question if asset_supports_text else None,
             region=pos_to_region(*pos) if pos else PositionRegion.CENTER,
         )
         schema.elements.append(elem)
-        
+
         # Categorize by intent
-        if intent == ElementIntent.DISPLAY_TEXT:
+        if intent == ElementIntent.DISPLAY_TEXT and asset_supports_text:
             schema.display_texts.append(elem)
         elif intent == ElementIntent.INSTRUCTION:
             schema.style_instructions.append(content)
@@ -464,8 +494,8 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
         elif intent == ElementIntent.RENDER_SCENE:
             elem.render_description = content
             schema.render_elements.append(elem)
-    
-    # Classify drawings
+
+    # Classify drawings (simplified for emotes)
     for drawing in canvas_data.get("drawings", []):
         if drawing.get("type") == "arrow":
             # Arrows are placement hints
@@ -476,7 +506,7 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
                     to_pos = (x, y)
                 except (ValueError, AttributeError):
                     pass
-            
+
             elem = ClassifiedElement(
                 element_id=drawing.get("id", f"draw_{len(schema.elements)}"),
                 element_type="arrow",
@@ -486,11 +516,11 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
                 region=pos_to_region(*to_pos) if to_pos else None,
             )
             schema.elements.append(elem)
-        
+
         elif drawing.get("type") in ["rectangle", "circle"]:
             filled = drawing.get("filled", False)
-            if filled:
-                # Filled shapes might be decorative or regions
+            if filled and not use_simple_mode:
+                # Filled shapes might be decorative or regions (only ask in full mode)
                 elem = ClassifiedElement(
                     element_id=drawing.get("id", f"draw_{len(schema.elements)}"),
                     element_type=drawing["type"],
@@ -500,18 +530,18 @@ def classify_canvas_elements(canvas_data: Dict[str, Any]) -> CanvasIntentSchema:
                     clarification_question="Keep this shape or use as placement area?",
                 )
             else:
-                # Outline shapes are region markers
+                # Outline shapes are region markers (or ignore in simple mode)
                 elem = ClassifiedElement(
                     element_id=drawing.get("id", f"draw_{len(schema.elements)}"),
                     element_type=drawing["type"],
-                    intent=ElementIntent.REGION_MARKER,
+                    intent=ElementIntent.REGION_MARKER if not use_simple_mode else ElementIntent.INSTRUCTION,
                     confidence=0.85,
                 )
             schema.elements.append(elem)
-    
+
     # Check if all clarified
     schema.all_clarified = schema.is_ready()
-    
+
     return schema
 
 
@@ -530,20 +560,20 @@ def apply_clarification_response(
     ambiguous = schema.get_ambiguous_elements()
     if not ambiguous:
         return schema
-    
+
     response_lower = response.lower().strip()
-    
+
     # Parse numbered responses: "1 place, 2 render"
     numbered_pattern = r"(\d+)\s*(place|render|text|display|instruction|ignore)"
     numbered_matches = re.findall(numbered_pattern, response_lower)
-    
+
     if numbered_matches:
         for num_str, action in numbered_matches:
             idx = int(num_str) - 1
             if 0 <= idx < len(ambiguous):
                 elem = ambiguous[idx]
                 elem.user_response = action
-                
+
                 if action in ["place", "render"]:
                     elem.intent = ElementIntent.RENDER_SCENE
                     # Extract thing to render from content
@@ -558,14 +588,14 @@ def apply_clarification_response(
                     elem.intent = ElementIntent.INSTRUCTION
                     if elem.content:
                         schema.ignored_elements.append(elem.content)
-                
+
                 elem.needs_clarification = False
-    
+
     # Single element yes/no
     elif len(ambiguous) == 1 and response_lower in ["yes", "no", "y", "n"]:
         elem = ambiguous[0]
         elem.user_response = response_lower
-        
+
         # "yes" typically means the first option (place/render)
         if response_lower in ["yes", "y"]:
             if elem.intent == ElementIntent.PLACEMENT_HINT:
@@ -577,16 +607,16 @@ def apply_clarification_response(
         else:
             elem.intent = ElementIntent.DISPLAY_TEXT
             schema.display_texts.append(elem)
-        
+
         elem.needs_clarification = False
-    
+
     # Descriptive response - try to match keywords
     else:
         for elem in ambiguous:
             if elem.content:
                 content_words = set(elem.content.lower().split())
                 response_words = set(response_lower.split())
-                
+
                 # Check for overlap
                 if content_words & response_words:
                     # Look for action keywords near the match
@@ -597,13 +627,13 @@ def apply_clarification_response(
                     elif any(w in response_lower for w in ["text", "display", "show", "title"]):
                         elem.intent = ElementIntent.DISPLAY_TEXT
                         schema.display_texts.append(elem)
-                    
+
                     elem.user_response = response
                     elem.needs_clarification = False
-    
+
     # Update all_clarified status
     schema.all_clarified = schema.is_ready()
-    
+
     return schema
 
 

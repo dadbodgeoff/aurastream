@@ -19,10 +19,17 @@ GAMING_CATEGORIES: Dict[str, Dict] = {
     },
     "warzone": {
         "name": "Call of Duty: Warzone",
-        "keywords": ["warzone", "call of duty", "cod", "modern warfare", "black ops"],
+        "keywords": ["warzone", "modern warfare", "black ops"],
         "search_queries": ["warzone gameplay", "warzone highlights", "warzone win"],
         "twitch_game_id": "512710",
         "color_theme": "#FF6B00",  # Orange
+    },
+    "call_of_duty": {
+        "name": "Call of Duty",
+        "keywords": ["call of duty", "cod", "mw3", "bo6", "black ops 6"],
+        "search_queries": ["call of duty gameplay", "cod highlights", "call of duty multiplayer"],
+        "twitch_game_id": "512710",
+        "color_theme": "#1B5E20",  # Dark Green (military)
     },
     "arc_raiders": {
         "name": "Arc Raiders",
