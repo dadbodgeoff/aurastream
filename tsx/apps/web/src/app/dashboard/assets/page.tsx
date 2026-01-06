@@ -28,6 +28,7 @@ import { AssetGridSkeleton } from '@/components/ui/skeletons';
 import { AsyncErrorBoundary } from '@/components/ErrorBoundary';
 import { toast } from '@/components/ui/Toast';
 import { downloadAsset, getAssetFilename } from '@/utils/download';
+import { AlertAnimationStudio } from '@/components/alert-animation-studio';
 import type { ViewMode } from '@/components/dashboard';
 import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
@@ -77,6 +78,16 @@ function AssetsPageContent() {
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [previewAsset, setPreviewAsset] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; type: 'single' | 'bulk' } | null>(null);
+  
+  // Animation Studio state
+  const [animationStudioAsset, setAnimationStudioAsset] = useState<{
+    id: string;
+    url: string;
+    name: string;
+  } | null>(null);
+  
+  // Check if user can animate (Pro or Studio tier)
+  const canAnimate = user?.subscriptionTier === 'pro' || user?.subscriptionTier === 'studio';
 
   // Data fetching
   const { data: assetsData, isLoading: assetsLoading, error: assetsError, refetch: refetchAssets } = useAssets({
@@ -151,6 +162,16 @@ function AssetsPageContent() {
       onSuccess: () => toast.success('Download started'),
       onError: (error) => toast.error(`Download failed: ${error.message}`),
       onShowIOSInstructions: () => toast.info('Long-press the image and tap "Add to Photos" to save'),
+    });
+  }, []);
+
+  // Handle animate - open Animation Studio
+  const handleAnimate = useCallback((asset: any) => {
+    const assetName = asset.asset_type?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Asset';
+    setAnimationStudioAsset({
+      id: asset.id,
+      url: asset.url,
+      name: assetName,
     });
   }, []);
 
@@ -295,10 +316,12 @@ function AssetsPageContent() {
               selected={selectedAssets.has(asset.id)}
               selectable={!clickToDownload}
               clickToDownload={clickToDownload}
+              canAnimate={canAnimate}
               onSelect={toggleAssetSelection}
               onClick={() => openPreview(asset)}
               onDownload={() => handleDownload(asset)}
               onDelete={() => setDeleteConfirm({ id: asset.id, type: 'single' })}
+              onAnimate={() => handleAnimate(asset)}
             />
           ))}
         </div>
@@ -364,6 +387,15 @@ function AssetsPageContent() {
         confirmLabel="Delete"
         variant="danger"
       />
+
+      {/* Animation Studio Modal */}
+      {animationStudioAsset && (
+        <AlertAnimationStudio
+          isOpen={!!animationStudioAsset}
+          onClose={() => setAnimationStudioAsset(null)}
+          sourceAsset={animationStudioAsset}
+        />
+      )}
     </PageContainer>
   );
 }

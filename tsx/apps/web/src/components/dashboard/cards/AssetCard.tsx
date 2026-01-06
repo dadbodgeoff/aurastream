@@ -7,6 +7,17 @@ import { useLongPress } from '@aurastream/shared';
 import { ContextMenu } from '@/components/ui/ContextMenu';
 import { DownloadIcon, TrashIcon, EyeIcon, EyeOffIcon, CheckIcon } from '../icons';
 
+// Sparkles icon for Animate button
+function SparklesIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+      <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" />
+      <path d="M5 19l.5 1.5L7 21l-1.5.5L5 23l-.5-1.5L3 21l1.5-.5L5 19z" />
+      <path d="M19 5l.5 1.5L21 7l-1.5.5L19 9l-.5-1.5L17 7l1.5-.5L19 5z" />
+    </svg>
+  );
+}
+
 export interface AssetCardProps {
   id: string;
   url: string;
@@ -20,11 +31,15 @@ export interface AssetCardProps {
   selectable?: boolean;
   /** When true, clicking the card triggers download instead of onClick */
   clickToDownload?: boolean;
+  /** Whether the user can animate (Pro/Studio tier) */
+  canAnimate?: boolean;
   onSelect?: (id: string) => void;
   onClick?: () => void;
   onDownload?: () => void;
   onDelete?: () => void;
   onToggleVisibility?: () => void;
+  /** Handler for opening Animation Studio */
+  onAnimate?: () => void;
   className?: string;
 }
 
@@ -71,11 +86,13 @@ export function AssetCard({
   selected = false,
   selectable = false,
   clickToDownload = false,
+  canAnimate = false,
   onSelect,
   onClick,
   onDownload,
   onDelete,
   onToggleVisibility,
+  onAnimate,
   className,
 }: AssetCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -114,6 +131,12 @@ export function AssetCard({
 
   // Build context menu items based on available handlers
   const contextMenuItems = [
+    ...(onAnimate && canAnimate ? [{
+      id: 'animate',
+      label: 'Animate',
+      icon: <SparklesIcon className="w-4 h-4" />,
+      onClick: () => { onAnimate(); handleContextMenuClose(); },
+    }] : []),
     ...(onDownload ? [{
       id: 'download',
       label: 'Download',
@@ -214,6 +237,15 @@ export function AssetCard({
             ) : (
               /* Standard mode: action buttons at bottom */
               <div className="flex gap-1">
+                {onAnimate && canAnimate && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAnimate(); }}
+                    className="p-2 bg-purple-500/30 hover:bg-purple-500/50 rounded-lg text-white transition-colors"
+                    title="Animate"
+                  >
+                    <SparklesIcon className="w-4 h-4" />
+                  </button>
+                )}
                 {onDownload && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onDownload(); }}
