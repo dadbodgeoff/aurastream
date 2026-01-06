@@ -333,11 +333,156 @@ class JWTService:
             raise TokenInvalidError(f"Invalid token: {str(e)}")
 
 
+# ============================================================================
+# OBS Token Functions (standalone for Alert Animation Studio)
+# ============================================================================
+
+DEFAULT_OBS_TOKEN_EXPIRE_DAYS = 30
+
+
+class OBSTokenPayload(BaseModel):
+    """
+    Pydantic model for OBS browser source token payload.
+    
+    Attributes:
+        sub: User ID (subject)
+        project_id: Animation project ID
+        type: Token type ("obs")
+        exp: Expiration timestamp (Unix epoch)
+        iat: Issued at timestamp (Unix epoch)
+        jti: JWT ID for revocation tracking
+    """
+    sub: str = Field(..., description="User ID (subject)")
+    project_id: str = Field(..., description="Animation project ID")
+    type: str = Field(..., description="Token type: 'obs'")
+    exp: int = Field(..., description="Expiration timestamp")
+    iat: int = Field(..., description="Issued at timestamp")
+    jti: str = Field(..., description="JWT ID for revocation")
+
+
+def create_obs_token(
+    project_id: str,
+    user_id: str,
+    expires_days: int = DEFAULT_OBS_TOKEN_EXPIRE_DAYS,
+) -> str:
+    """
+    Create a long-lived JWT token for OBS browser source access.
+    
+    OBS tokens are designed for browser sources that need to access
+    animation projects without requiring user re-authentication.
+    They are scoped to a specific project and user.
+    
+    Args:
+        project_id: Animation project UUID
+        user_id: User UUID who owns the project
+        expires_days: Token lifetime in days (default: 30)
+    
+    Returns:
+        Encoded JWT token string
+    
+    Example:
+        token = create_obs_token(
+            project_id="proj-123",
+            user_id="user-456"
+        )
+        # Use in OBS browser source URL:
+        # https://app.aurastream.io/obs/alert/{project_id}?token={token}
+    """
+    from backend.core.config import settings
+    
+    secret_key = getattr(settings, "JWT_SECRET_KEY", settings.SECRET_KEY)
+    
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(days=expires_days)
+    
+    payload = {
+        "sub": user_id,
+        "project_id": project_id,
+        "type": "obs",
+        "exp": int(expire.timestamp()),
+        "iat": int(now.timestamp()),
+        "jti": str(uuid.uuid4()),
+    }
+    
+    return jwt.encode(payload, secret_key, algorithm=DEFAULT_ALGORITHM)
+
+
+def decode_obs_token(token: str) -> OBSTokenPayload:
+    """
+    Decode and validate an OBS browser source token.
+    
+    Verifies the token signature, expiration, and ensures it's an OBS token.
+    
+    Args:
+        token: JWT OBS token string
+    
+    Returns:
+        OBSTokenPayload with decoded token data
+    
+    Raises:
+        TokenExpiredError: If the token has expired
+        TokenInvalidError: If the token is malformed, has invalid signature,
+                          or is not an OBS token
+    
+    Example:
+        try:
+            payload = decode_obs_token(token)
+            # Verify project_id matches requested project
+            if payload.project_id != requested_project_id:
+                raise HTTPException(403, "Token not valid for this project")
+        except TokenExpiredError:
+            # Token expired - user needs to regenerate from dashboard
+            pass
+    """
+    from backend.core.config import settings
+    
+    secret_key = getattr(settings, "JWT_SECRET_KEY", settings.SECRET_KEY)
+    
+    try:
+        payload = jwt.decode(
+            token,
+            secret_key,
+            algorithms=[DEFAULT_ALGORITHM]
+        )
+        
+        # Validate token type
+        if payload.get("type") != "obs":
+            raise TokenInvalidError("Token is not an OBS token")
+        
+        # Validate required claims
+        required_claims = ["sub", "project_id", "type", "exp", "iat", "jti"]
+        for claim in required_claims:
+            if claim not in payload:
+                raise TokenInvalidError(f"Token missing required claim: {claim}")
+        
+        return OBSTokenPayload(**payload)
+        
+    except ExpiredSignatureError:
+        try:
+            expired_payload = jwt.decode(
+                token,
+                secret_key,
+                algorithms=[DEFAULT_ALGORITHM],
+                options={"verify_exp": False}
+            )
+            expired_at = datetime.fromtimestamp(expired_payload.get("exp", 0), tz=timezone.utc)
+            raise TokenExpiredError(expired_at=expired_at)
+        except JWTError:
+            raise TokenExpiredError()
+    
+    except JWTError as e:
+        raise TokenInvalidError(f"Invalid token: {str(e)}")
+
+
 # Export for easy importing
 __all__ = [
     "JWTService",
     "TokenPayload",
+    "OBSTokenPayload",
     "DEFAULT_ALGORITHM",
     "DEFAULT_ACCESS_TOKEN_EXPIRE_HOURS",
     "DEFAULT_REFRESH_TOKEN_EXPIRE_DAYS",
+    "DEFAULT_OBS_TOKEN_EXPIRE_DAYS",
+    "create_obs_token",
+    "decode_obs_token",
 ]

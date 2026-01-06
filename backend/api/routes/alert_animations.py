@@ -45,7 +45,7 @@ QUEUE_NAME = "alert_animation"
 
 def _check_pro_tier(user: TokenPayload) -> None:
     """Verify user has Pro or Studio subscription."""
-    if user.subscription_tier not in ("pro", "studio"):
+    if user.tier not in ("pro", "studio"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={
@@ -677,3 +677,72 @@ async def delete_preset(
         .execute()
     
     return None
+
+
+# ============================================================================
+# OBS Public Endpoint (Token-based auth, no JWT Bearer)
+# ============================================================================
+
+@router.get("/obs/{project_id}", response_model=AnimationProjectResponse)
+async def get_project_for_obs(
+    project_id: UUID,
+    token: str = Query(..., description="OBS access token"),
+):
+    """
+    Get animation project data for OBS browser source.
+    
+    This endpoint uses OBS-specific token authentication instead of
+    standard Bearer JWT. The token is generated via GET /{project_id}/obs-url.
+    
+    No subscription check - token already validates access.
+    """
+    from backend.services.jwt_service import decode_obs_token
+    from backend.services.exceptions import TokenExpiredError, TokenInvalidError
+    
+    # Validate OBS token
+    try:
+        payload = decode_obs_token(token)
+    except TokenExpiredError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "TOKEN_EXPIRED",
+                "message": "OBS token has expired. Generate a new URL from your dashboard.",
+            },
+        )
+    except TokenInvalidError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "TOKEN_INVALID",
+                "message": str(e),
+            },
+        )
+    
+    # Verify token is for this project
+    if payload.project_id != str(project_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "TOKEN_PROJECT_MISMATCH",
+                "message": "Token is not valid for this project",
+            },
+        )
+    
+    supabase = get_supabase_client()
+    
+    # Get project (verify user ownership via token's user_id)
+    response = supabase.table("alert_animation_projects") \
+        .select("*") \
+        .eq("id", str(project_id)) \
+        .eq("user_id", payload.sub) \
+        .single() \
+        .execute()
+    
+    if not response.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Animation project not found",
+        )
+    
+    return _transform_project(response.data)
