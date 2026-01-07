@@ -17,13 +17,12 @@ from typing import Optional, Dict, Any, AsyncGenerator
 from dataclasses import dataclass
 
 from backend.services.coach.models import CoachSession, CoachMessage
-from backend.services.coach.session_manager import (
+from backend.services.coach.session import (
     SessionManager,
     get_session_manager,
-    SessionNotFoundError,
 )
-from backend.services.coach.llm_client import CoachLLMClient, get_llm_client
-from backend.services.coach.intent_extractor import IntentExtractor, CreativeIntent
+from backend.services.coach.llm import CoachLLMClient, get_llm_client
+from backend.services.coach.intent import IntentExtractor, CreativeIntent
 
 
 logger = logging.getLogger(__name__)
