@@ -1,8 +1,8 @@
 /**
  * Pulse Animation
  *
- * Subtle breathing scale effect.
- * Creates a living, organic feel.
+ * Rhythmic heartbeat-like scale effect.
+ * Uses double-beat pattern like an actual heartbeat.
  */
 
 import type { AnimationTransform, AnimationContext } from '../core/types';
@@ -10,12 +10,9 @@ import type { PulseConfig } from './types';
 
 /**
  * Apply pulse animation.
- *
- * @param config Animation configuration
- * @param context Runtime context
- * @param transform Current transform state
- * @param loopT Loop time (seconds since loop started)
- * @returns Updated transform
+ * 
+ * Creates a heartbeat-like double pulse pattern.
+ * More dynamic than simple sine wave scaling.
  */
 export function pulse(
   config: PulseConfig,
@@ -24,15 +21,34 @@ export function pulse(
   loopT: number
 ): AnimationTransform {
   const frequency = config.frequency ?? 0.8;
-  const scaleMin = config.scaleMin ?? 0.97;
-  const scaleMax = config.scaleMax ?? 1.03;
+  const scaleMin = config.scaleMin ?? 0.98;
+  const scaleMax = config.scaleMax ?? 1.04;
 
-  // Calculate oscillation (0 to 1)
-  const osc = Math.sin(loopT * frequency * Math.PI * 2);
-  const normalizedOsc = (osc + 1) / 2; // Convert from [-1,1] to [0,1]
+  // Create heartbeat-like double pulse pattern
+  // Each "beat" has two peaks close together, then a rest
+  const cycleTime = loopT * frequency;
+  const cyclePhase = cycleTime % 1; // 0 to 1 within each cycle
+  
+  let pulseValue: number;
+  
+  if (cyclePhase < 0.15) {
+    // First beat (quick rise and fall)
+    const t = cyclePhase / 0.15;
+    pulseValue = Math.sin(t * Math.PI);
+  } else if (cyclePhase < 0.2) {
+    // Brief pause
+    pulseValue = 0;
+  } else if (cyclePhase < 0.35) {
+    // Second beat (slightly smaller)
+    const t = (cyclePhase - 0.2) / 0.15;
+    pulseValue = Math.sin(t * Math.PI) * 0.7;
+  } else {
+    // Rest period (gradual return to baseline with slight undershoot)
+    const t = (cyclePhase - 0.35) / 0.65;
+    pulseValue = Math.sin(t * Math.PI * 0.5) * -0.1;
+  }
 
-  // Interpolate between min and max scale
-  const pulseScale = scaleMin + (scaleMax - scaleMin) * normalizedOsc;
+  const pulseScale = scaleMin + (scaleMax - scaleMin) * (0.5 + pulseValue * 0.5);
 
   return {
     ...transform,

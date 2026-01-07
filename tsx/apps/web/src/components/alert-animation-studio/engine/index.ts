@@ -197,6 +197,49 @@ export {
 } from './context';
 
 // ============================================================================
+// Canvas Bounds System
+// ============================================================================
+
+export {
+  // Computation
+  computeBounds,
+  getSafeZoneMargins,
+  generateConstraints,
+  generateParticleConstraints,
+  pixelToNormalized,
+  normalizedToPixel,
+  scaleByFactor,
+  isInSafeZone,
+  
+  // Constraining
+  constrainTransform,
+  constrainParticleTransform,
+  isTransformInBounds,
+  getEntryPosition,
+  getExitPosition,
+  getMaxSafeAmplitude,
+  scaleAmplitudeToFit,
+  getParticleSpawnBounds,
+  shouldCullParticle,
+  
+  // Constants
+  CANVAS_PRESETS,
+  SAFE_ZONE_PRESETS,
+  DEFAULT_BOUNDS_CONFIG,
+  
+  // Types
+  type CanvasPreset,
+  type CanvasDimensions,
+  type SafeZoneMargins,
+  type SafeZonePreset,
+  type CanvasBoundsConfig,
+  type ComputedBounds,
+  type AnimationConstraints,
+  type AnchorPoint,
+  type ElementPlacement,
+} from './bounds';
+
+// ============================================================================
 // Version & Feature Flags
 // ============================================================================
 

@@ -1,8 +1,8 @@
 /**
  * Float Animation
  *
- * Gentle hover/bob motion using sine waves.
- * Creates a floating, weightless feel.
+ * Gentle hover/bob motion with organic feel.
+ * Uses layered sine waves for natural, non-mechanical movement.
  */
 
 import type { AnimationTransform, AnimationContext } from '../core/types';
@@ -11,12 +11,9 @@ import { degToRad } from '../core/types';
 
 /**
  * Apply float animation.
- *
- * @param config Animation configuration
- * @param context Runtime context
- * @param transform Current transform state
- * @param loopT Loop time (seconds since loop started)
- * @returns Updated transform
+ * 
+ * Creates a weightless, floating feel like a balloon or underwater object.
+ * Uses multiple layered frequencies for organic motion.
  */
 export function float(
   config: FloatConfig,
@@ -24,15 +21,28 @@ export function float(
   transform: AnimationTransform,
   loopT: number
 ): AnimationTransform {
-  const frequency = config.frequency ?? 0.5;
-  const amplitudeY = (config.amplitudeY ?? 8) / 100;
-  const amplitudeX = (config.amplitudeX ?? 2) / 100;
+  const frequency = config.frequency ?? 0.4;
+  const amplitudeY = (config.amplitudeY ?? 3) / 100;
+  const amplitudeX = (config.amplitudeX ?? 1) / 100;
   const phaseOffset = degToRad(config.phaseOffset ?? 0);
 
-  // Calculate oscillation using sine/cosine for smooth motion
+  // Primary wave
   const phase = loopT * frequency * Math.PI * 2 + phaseOffset;
-  const oscY = Math.sin(phase);
-  const oscX = Math.cos(phase);
+  
+  // Layer multiple frequencies for organic feel (not just sin(t))
+  // Primary: slow main bob
+  const primaryY = Math.sin(phase) * 0.7;
+  // Secondary: faster subtle variation
+  const secondaryY = Math.sin(phase * 2.3 + 0.5) * 0.2;
+  // Tertiary: very subtle micro-movement
+  const tertiaryY = Math.sin(phase * 4.7 + 1.2) * 0.1;
+  
+  // X movement is figure-8 like, not just cosine
+  const primaryX = Math.sin(phase * 0.5) * 0.6;
+  const secondaryX = Math.cos(phase * 1.1) * 0.4;
+
+  const oscY = primaryY + secondaryY + tertiaryY;
+  const oscX = primaryX + secondaryX;
 
   return {
     ...transform,

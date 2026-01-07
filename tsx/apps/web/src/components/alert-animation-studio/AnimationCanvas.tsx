@@ -22,6 +22,15 @@ import {
   depthParallaxVertexShader,
   depthParallaxFragmentShader,
 } from './shaders/depthParallax';
+import { WebGLParticleOverlay } from './engine/particles';
+
+// Bounds system for streaming-standard canvas sizes
+import {
+  computeBounds,
+  constrainTransform,
+  type ComputedBounds,
+  type CanvasPreset,
+} from './engine/bounds';
 
 interface AnimationCanvasProps {
   sourceUrl: string;
@@ -40,6 +49,10 @@ interface AnimationCanvasProps {
   audioAnalysis?: import('./engine/audio/types').AudioAnalysis | null;
   /** V2: Audio reactive mappings */
   audioMappings?: import('./engine/audio/types').AudioReactiveMapping[];
+  /** Canvas preset for bounds (default: 1080p) */
+  canvasPreset?: import('./engine/bounds').CanvasPreset;
+  /** Whether to enforce bounds constraints */
+  enforceBounds?: boolean;
 }
 
 export function AnimationCanvas({
@@ -56,6 +69,8 @@ export function AnimationCanvas({
   timelineValues,
   audioAnalysis,
   audioMappings,
+  canvasPreset = '1080p',
+  enforceBounds = true,
 }: AnimationCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const internalCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -73,6 +88,9 @@ export function AnimationCanvas({
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [depthLoaded, setDepthLoaded] = useState(false);
+
+  // Compute bounds for the canvas preset
+  const canvasBounds = computeBounds({ preset: canvasPreset, enforceBounds });
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; offsetX: number; offsetY: number } | null>(null);
@@ -386,7 +404,9 @@ export function AnimationCanvas({
           false,
           timelineValues,
           audioAnalysis,
-          audioMappings
+          audioMappings,
+          canvasBounds,
+          enforceBounds
         );
         renderer.render(scene, camera);
       }
@@ -436,7 +456,9 @@ export function AnimationCanvas({
           false,
           timelineValues,
           audioAnalysis,
-          audioMappings
+          audioMappings,
+          canvasBounds,
+          enforceBounds
         );
       }
 
@@ -492,7 +514,9 @@ export function AnimationCanvas({
           false,
           timelineValues,
           audioAnalysis,
-          audioMappings
+          audioMappings,
+          canvasBounds,
+          enforceBounds
         );
         rendererRef.current.render(sceneRef.current, cameraRef.current);
       }
@@ -612,9 +636,14 @@ export function AnimationCanvas({
         </div>
       )}
 
-      {/* Particle overlay */}
+      {/* Particle overlay - WebGL with proper SDF shapes */}
       {config.particles && (
-        <ParticleOverlay config={config.particles} isPlaying={isPlaying} />
+        <WebGLParticleOverlay 
+          config={config.particles as import('./engine/animations/particles/types').ParticleEffectConfig} 
+          isPlaying={isPlaying}
+          width={containerRef.current?.clientWidth ?? 512}
+          height={containerRef.current?.clientHeight ?? 512}
+        />
       )}
     </div>
   );
@@ -640,6 +669,25 @@ import type {
   AudioReactiveMapping,
 } from './engine/audio/types';
 
+// Enterprise animation system
+import {
+  createEnterpriseState,
+  applyEnterpriseEntry,
+  applyEnterpriseLoop,
+  isOrchestratorReady,
+  type EnterpriseAnimationState,
+} from './engine/enterprise';
+
+// Global enterprise state (singleton for the canvas)
+let enterpriseState: EnterpriseAnimationState | null = null;
+
+function getEnterpriseState(): EnterpriseAnimationState {
+  if (!enterpriseState) {
+    enterpriseState = createEnterpriseState('enterprise');
+  }
+  return enterpriseState;
+}
+
 function applyAnimationState(
   mesh: THREE.Mesh,
   material: THREE.ShaderMaterial,
@@ -653,7 +701,9 @@ function applyAnimationState(
   isHovering: boolean = false,
   timelineValues?: Record<string, number>,
   audioAnalysis?: AudioAnalysis | null,
-  audioMappings?: AudioReactiveMapping[]
+  audioMappings?: AudioReactiveMapping[],
+  bounds?: ComputedBounds | null,
+  shouldEnforceBounds: boolean = true
 ): void {
   const t = timeMs / config.durationMs;
   
@@ -663,9 +713,29 @@ function applyAnimationState(
   // When not playing, show the "resting" state (after entry animation completes)
   const showRestingState = !isPlaying && timeMs === 0;
   
+  // Get enterprise state for enhanced animations
+  const enterprise = getEnterpriseState();
+  const useEnterprise = isOrchestratorReady(enterprise);
+  
   // Check if we should use V2 pipeline (when timeline or audio data is available)
   const useV2Pipeline = (timelineValues && Object.keys(timelineValues).length > 0) || 
                         (audioAnalysis && audioMappings && audioMappings.length > 0);
+  
+  // Build animation context
+  const context: AnimationContext = {
+    t,
+    timeMs,
+    durationMs: config.durationMs,
+    deltaTime: 0.016,
+    isPlaying,
+    mesh,
+    material,
+    canvasWidth,
+    canvasHeight,
+    mouseX,
+    mouseY,
+    isHovering,
+  };
   
   if (useV2Pipeline) {
     // Apply timeline values directly to transform if available
@@ -731,69 +801,126 @@ function applyAnimationState(
       }
     }
     
-    // Still apply entry/loop animations on top
-    const context: AnimationContext = {
-      t,
-      timeMs,
-      durationMs: config.durationMs,
-      deltaTime: 0.016,
-      isPlaying,
-      mesh,
-      material,
-      canvasWidth,
-      canvasHeight,
-      mouseX,
-      mouseY,
-      isHovering,
-    };
-    
-    // Apply entry animation
+    // Apply entry animation with enterprise enhancements
     if (config.entry && !showRestingState) {
       const entryConfig = config.entry as EntryAnimationConfig;
+      const entryDuration = entryConfig.durationMs ?? 500;
+      const entryProgress = Math.min(timeMs / entryDuration, 1);
+      
+      // Base entry animation
       transform = applyEntryAnimation(entryConfig, context, transform);
+      
+      // Enterprise enhancements (anticipation, overshoot, squash/stretch)
+      if (useEnterprise && entryProgress < 1) {
+        transform = applyEnterpriseEntry(enterprise, 'main', transform, context, entryProgress);
+      }
     }
     
-    // Apply loop animation (after entry completes)
+    // Apply loop animation with enterprise enhancements
     const entryDuration = config.entry?.durationMs ?? 0;
     const entryNormalized = entryDuration / config.durationMs;
     
     if (config.loop && t > entryNormalized) {
       const loopT = (t - entryNormalized) / (1 - entryNormalized);
       const loopConfig = config.loop as LoopAnimationConfig;
+      
+      // Base loop animation
       transform = applyLoopAnimation(loopConfig, context, transform, loopT);
+      
+      // Enterprise enhancements (layered frequencies, noise, micro-jitter)
+      if (useEnterprise) {
+        // Extract amplitude based on loop type
+        let baseAmplitudeX = 10;
+        let baseAmplitudeY = 10;
+        const baseFrequency = loopConfig.frequency ?? 1;
+        
+        if (loopConfig.type === 'float') {
+          const floatConfig = loopConfig as { amplitudeX?: number; amplitudeY?: number };
+          baseAmplitudeX = floatConfig.amplitudeX ?? 2;
+          baseAmplitudeY = floatConfig.amplitudeY ?? 8;
+        } else if (loopConfig.type === 'shake') {
+          const shakeConfig = loopConfig as { shakeIntensity?: number };
+          baseAmplitudeX = baseAmplitudeY = shakeConfig.shakeIntensity ?? 5;
+        } else if (loopConfig.type === 'wiggle') {
+          const wiggleConfig = loopConfig as { angleMax?: number };
+          baseAmplitudeX = baseAmplitudeY = wiggleConfig.angleMax ?? 3;
+        }
+        
+        transform = applyEnterpriseLoop(
+          enterprise,
+          'main',
+          transform,
+          context,
+          baseAmplitudeX,
+          baseAmplitudeY,
+          baseFrequency
+        );
+      }
     }
   } else {
-    // Fallback to legacy animation system
-    const context: AnimationContext = {
-      t,
-      timeMs,
-      durationMs: config.durationMs,
-      deltaTime: 0.016,
-      isPlaying,
-      mesh,
-      material,
-      canvasWidth,
-      canvasHeight,
-      mouseX,
-      mouseY,
-      isHovering,
-    };
+    // Legacy animation system with enterprise enhancements
     
     // Apply entry animation
     if (config.entry && !showRestingState) {
       const entryConfig = config.entry as EntryAnimationConfig;
+      const entryDuration = entryConfig.durationMs ?? 500;
+      const entryProgress = Math.min(timeMs / entryDuration, 1);
+      
+      // Base entry animation
       transform = applyEntryAnimation(entryConfig, context, transform);
+      
+      // Enterprise enhancements
+      if (useEnterprise && entryProgress < 1) {
+        transform = applyEnterpriseEntry(enterprise, 'main', transform, context, entryProgress);
+      }
     }
     
-    // Apply loop animation (after entry completes)
+    // Apply loop animation
     const entryDuration = config.entry?.durationMs ?? 0;
     const entryNormalized = entryDuration / config.durationMs;
     
     if (config.loop && t > entryNormalized) {
       const loopT = (t - entryNormalized) / (1 - entryNormalized);
       const loopConfig = config.loop as LoopAnimationConfig;
+      
+      // Base loop animation
       transform = applyLoopAnimation(loopConfig, context, transform, loopT);
+      
+      // Enterprise enhancements
+      if (useEnterprise) {
+        // Extract amplitude based on loop type
+        let baseAmplitudeX = 10;
+        let baseAmplitudeY = 10;
+        const baseFrequency = loopConfig.frequency ?? 1;
+        
+        if (loopConfig.type === 'float') {
+          const floatConfig = loopConfig as { amplitudeX?: number; amplitudeY?: number };
+          baseAmplitudeX = floatConfig.amplitudeX ?? 2;
+          baseAmplitudeY = floatConfig.amplitudeY ?? 8;
+        } else if (loopConfig.type === 'shake') {
+          const shakeConfig = loopConfig as { shakeIntensity?: number };
+          baseAmplitudeX = baseAmplitudeY = shakeConfig.shakeIntensity ?? 5;
+        } else if (loopConfig.type === 'wiggle') {
+          const wiggleConfig = loopConfig as { angleMax?: number };
+          baseAmplitudeX = baseAmplitudeY = wiggleConfig.angleMax ?? 3;
+        }
+        
+        transform = applyEnterpriseLoop(
+          enterprise,
+          'main',
+          transform,
+          context,
+          baseAmplitudeX,
+          baseAmplitudeY,
+          baseFrequency
+        );
+      }
     }
+  }
+  
+  // Apply bounds constraining if enabled
+  if (bounds && shouldEnforceBounds) {
+    transform = constrainTransform(transform, bounds);
   }
   
   // Apply final transforms to mesh
@@ -803,90 +930,4 @@ function applyAnimationState(
   material.uniforms.uOpacity.value = transform.opacity;
 }
 
-// ============================================================================
-// Particle Overlay (CSS-based for now, can upgrade to Three.js particles)
-// ============================================================================
-
-interface ParticleOverlayProps {
-  config: AnimationConfig['particles'];
-  isPlaying: boolean;
-}
-
-function ParticleOverlay({ config, isPlaying }: ParticleOverlayProps) {
-  if (!config) return null;
-
-  const count = Math.min(config.count ?? 20, 50);
-  const particles = Array.from({ length: count }, (_, i) => i);
-
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden z-20">
-      {particles.map((i) => (
-        <Particle
-          key={i}
-          type={config.type}
-          color={config.color ?? '#ffd700'}
-          colors={config.colors}
-          index={i}
-          isPlaying={isPlaying}
-          lifetimeMs={config.lifetimeMs ?? 2000}
-          gravity={config.gravity}
-          speed={config.speed ?? 1}
-        />
-      ))}
-    </div>
-  );
-}
-
-interface ParticleProps {
-  type: string;
-  color: string;
-  colors?: string[];
-  index: number;
-  isPlaying: boolean;
-  lifetimeMs: number;
-  gravity?: number;
-  speed: number;
-}
-
-function Particle({ type, color, colors, index, isPlaying, lifetimeMs, speed }: ParticleProps) {
-  const delay = index * 0.08;
-  const duration = (lifetimeMs / 1000) * (0.8 + Math.random() * 0.4);
-  const left = Math.random() * 100;
-  const size = 6 + Math.random() * 10;
-  const particleColor = colors ? colors[index % colors.length] : color;
-
-  const getEmoji = () => {
-    switch (type) {
-      case 'hearts': return '💕';
-      case 'confetti': return '🎊';
-      case 'fire': return '🔥';
-      case 'sparkles': return '✨';
-      case 'pixels': return '▪️';
-      default: return '✨';
-    }
-  };
-
-  const animationClass = type === 'confetti' 
-    ? 'animate-confetti-fall' 
-    : type === 'fire' 
-    ? 'animate-fire-rise' 
-    : 'animate-float-up';
-
-  return (
-    <span
-      className={`absolute ${isPlaying ? animationClass : ''}`}
-      style={{
-        left: `${left}%`,
-        bottom: type === 'fire' ? '10%' : '-20px',
-        fontSize: `${size}px`,
-        animationDelay: `${delay}s`,
-        animationDuration: `${duration / speed}s`,
-        opacity: isPlaying ? 1 : 0,
-        color: particleColor,
-        filter: type === 'sparkles' ? `drop-shadow(0 0 4px ${particleColor})` : undefined,
-      }}
-    >
-      {getEmoji()}
-    </span>
-  );
-}
+// CSS particle overlay removed - now using WebGL SDF shapes via WebGLParticleOverlay
