@@ -24,14 +24,14 @@ import type {
   StartProfileCreatorRequest,
 } from '@aurastream/api-client';
 import { StyleSelector } from './StyleSelector';
-import { GenerationOptions } from './GenerationOptions';
 
 interface ProfileCreatorCoreProps {
   canCreate: boolean;
   onComplete: () => void;
 }
 
-type Step = 'type' | 'style' | 'chat' | 'generate' | 'generating' | 'complete';
+// Simplified steps - no separate generate options step
+type Step = 'type' | 'style' | 'chat' | 'complete';
 
 interface ChatMessage {
   id: string;
@@ -74,7 +74,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const [confidence, setConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Generation state
+  // Generation state - now inline in chat
+  const [isGenerating, setIsGenerating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationStatus, setGenerationStatus] = useState<'idle' | 'queued' | 'processing' | 'completed' | 'failed'>('idle');
@@ -96,7 +97,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, generatedAsset, isGenerating]);
 
   useEffect(() => {
     if (step === 'chat') inputRef.current?.focus();
@@ -122,7 +123,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
   // Poll job status with race condition guards
   const pollJobStatus = useCallback(async (currentJobId: string) => {
-    // Guard: Don't poll if unmounted, not polling, or job ID changed
     if (!isMountedRef.current || !isPollingRef.current || currentJobIdRef.current !== currentJobId) {
       return;
     }
@@ -130,58 +130,43 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const accessToken = apiClient.getAccessToken();
     
-    console.log('[ProfileCreator] Polling job status:', currentJobId);
-    
     try {
       const response = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
-        cache: 'no-store',  // Prevent browser caching of job status
+        cache: 'no-store',
       });
       
-      // Check again after async operation
       if (!isMountedRef.current || !isPollingRef.current || currentJobIdRef.current !== currentJobId) {
         return;
       }
       
       if (!response.ok) {
-        console.error('[ProfileCreator] Job status fetch failed:', response.status);
         throw new Error('Failed to fetch job status');
       }
       
       const job = await response.json();
-      console.log('[ProfileCreator] Job status:', job.status, 'Progress:', job.progress);
-      
-      // Check mount status before state updates
       if (!isMountedRef.current) return;
       
       setGenerationProgress(job.progress || 0);
       setGenerationStatus(job.status);
       
       if (job.status === 'completed') {
-        console.log('[ProfileCreator] Job completed, fetching assets...');
         isPollingRef.current = false;
         
-        // Fetch the generated asset
         const assetsResponse = await fetch(`${apiBase}/api/v1/jobs/${currentJobId}/assets`, {
           headers: { 'Authorization': `Bearer ${accessToken}` },
-          cache: 'no-store',  // Prevent browser caching of assets
+          cache: 'no-store',
         });
         
         if (!isMountedRef.current) return;
         
-        console.log('[ProfileCreator] Assets response status:', assetsResponse.status);
-        
         if (assetsResponse.ok) {
           const assets = await assetsResponse.json();
-          console.log('[ProfileCreator] Assets received:', assets);
           
           if (!isMountedRef.current) return;
           
           if (assets && assets.length > 0) {
             const asset = assets[0];
-            console.log('[ProfileCreator] Setting generated asset:', asset);
-            
-            // Add cache-busting timestamp to prevent browser from showing cached old image
             const cacheBustedUrl = `${asset.url}${asset.url.includes('?') ? '&' : '?'}t=${Date.now()}`;
             
             setGeneratedAsset({
@@ -191,46 +176,38 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
               width: asset.width,
               height: asset.height,
             });
-            // Track generation completed
             trackGenerationCompleted(asset.asset_type || asset.assetType, currentJobId);
+            setIsGenerating(false);
             setStep('complete');
             onComplete();
           } else {
-            console.error('[ProfileCreator] No assets returned');
             setError('Generation completed but no assets found');
-            setStep('generate');
+            setIsGenerating(false);
           }
         } else {
-          console.error('[ProfileCreator] Failed to fetch assets:', assetsResponse.status);
           setError('Failed to fetch generated asset');
-          setStep('generate');
+          setIsGenerating(false);
         }
-        return; // Stop polling
+        return;
       }
       
       if (job.status === 'failed') {
-        console.error('[ProfileCreator] Job failed:', job.error_message);
         isPollingRef.current = false;
-        // Track generation failed
         trackGenerationFailed(creationType || 'unknown', job.error_message || 'Unknown error', currentJobId);
         setError(job.error_message || 'Generation failed');
-        setStep('generate'); // Go back to options
-        return; // Stop polling
+        setIsGenerating(false);
+        return;
       }
       
-      // Continue polling for queued/processing status
       if (isMountedRef.current && isPollingRef.current && currentJobIdRef.current === currentJobId) {
-        console.log('[ProfileCreator] Continuing to poll...');
         pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 1500);
       }
     } catch (err) {
-      console.error('[ProfileCreator] Polling error:', err);
-      // Continue polling on error (with longer delay) if still valid
       if (isMountedRef.current && isPollingRef.current && currentJobIdRef.current === currentJobId) {
         pollIntervalRef.current = setTimeout(() => pollJobStatus(currentJobId), 3000);
       }
     }
-  }, [onComplete]);
+  }, [onComplete, creationType, trackGenerationCompleted, trackGenerationFailed]);
 
   const handleTypeSelect = (type: CreationType) => {
     setCreationType(type);
@@ -244,7 +221,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const startSession = useCallback(async () => {
     if (!creationType || !canCreate) return;
     
-    // Abort any existing stream
     if (streamControllerRef.current) {
       streamControllerRef.current.abort();
     }
@@ -268,7 +244,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
     setMessages([{ id: messageId, role: 'assistant', content: '', isStreaming: true }]);
 
-    // Create ResilientEventSource
     const source = new ResilientEventSource({
       url: getStartSessionUrl(),
       method: 'POST',
@@ -301,7 +276,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       },
       onError: (err) => {
         if (!isMountedRef.current) return;
-        console.error('Failed to start session:', err);
         setError(err.message || 'Failed to start session');
         setIsStreaming(false);
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
@@ -329,7 +303,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
     source.connect().catch((err) => {
       if (!isMountedRef.current) return;
-      console.error('Failed to start session:', err);
       setError(err.message || 'Failed to start session');
       setIsStreaming(false);
     });
@@ -338,7 +311,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   const sendMessage = useCallback(async () => {
     if (!sessionId || !inputValue.trim() || isStreaming) return;
 
-    // Abort any existing stream
     if (streamControllerRef.current) {
       streamControllerRef.current.abort();
     }
@@ -362,7 +334,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
     const accessToken = apiClient.getAccessToken();
 
-    // Create ResilientEventSource
     const source = new ResilientEventSource({
       url: getContinueSessionUrl(sessionId),
       method: 'POST',
@@ -393,7 +364,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       },
       onError: (err) => {
         if (!isMountedRef.current) return;
-        console.error('Failed to send message:', err);
         setError(err.message || 'Failed to send message');
         setIsStreaming(false);
         setMessages(prev => prev.map(m => m.id === messageId ? { ...m, isStreaming: false } : m));
@@ -421,28 +391,16 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
 
     source.connect().catch((err) => {
       if (!isMountedRef.current) return;
-      console.error('Failed to send message:', err);
       setError(err.message || 'Failed to send message');
       setIsStreaming(false);
     });
   }, [sessionId, inputValue, isStreaming]);
 
-  const handleGenerate = () => { if (isReady) setStep('generate'); };
-
-  const executeGeneration = async (options: {
-    outputSize: 'small' | 'medium' | 'large';
-    outputFormat: 'png' | 'webp';
-    background: 'transparent' | 'solid' | 'gradient';
-    backgroundColor?: string;
-  }) => {
-    if (!sessionId) {
-      console.error('[ProfileCreator] No session ID for generation');
-      return;
-    }
+  // Generate inline with default options (medium/512px, png, transparent)
+  const handleGenerateNow = useCallback(async () => {
+    if (!sessionId || !isReady || isGenerating) return;
     
-    console.log('[ProfileCreator] Starting generation with options:', options);
-    
-    // Stop any existing polling before starting new generation
+    // Stop any existing polling
     isPollingRef.current = false;
     if (pollIntervalRef.current) {
       clearTimeout(pollIntervalRef.current);
@@ -452,36 +410,39 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setError(null);
     setGenerationProgress(0);
     setGenerationStatus('queued');
-    setGeneratedAsset(null); // Clear any previous asset
-    setStep('generating');
+    setGeneratedAsset(null);
+    setIsGenerating(true);
     
     try {
-      const result = await generateMutation.mutateAsync({ sessionId, options });
-      console.log('[ProfileCreator] Generation started, job ID:', result.jobId);
+      // Use default options: medium size (512px), png, transparent background
+      const result = await generateMutation.mutateAsync({ 
+        sessionId, 
+        options: {
+          outputSize: 'medium',
+          outputFormat: 'png',
+          background: 'transparent',
+        }
+      });
       
       if (!isMountedRef.current) return;
       
-      // Track generation started
       trackGenerationStarted(creationType || 'unknown', result.jobId);
       
       setJobId(result.jobId);
       currentJobIdRef.current = result.jobId;
       isPollingRef.current = true;
       
-      // Start polling for job status after a short delay
       pollIntervalRef.current = setTimeout(() => {
-        console.log('[ProfileCreator] Starting polling for job:', result.jobId);
         pollJobStatus(result.jobId);
       }, 1500);
-    } catch (error) {
-      console.error('[ProfileCreator] Generation failed:', error);
+    } catch (err) {
       if (!isMountedRef.current) return;
       
-      setError(error instanceof Error ? error.message : 'Generation failed');
+      setError(err instanceof Error ? err.message : 'Generation failed');
       setGenerationStatus('failed');
-      setStep('generate');
+      setIsGenerating(false);
     }
-  };
+  }, [sessionId, isReady, isGenerating, generateMutation, creationType, trackGenerationStarted, pollJobStatus]);
 
   const handleDownload = () => {
     if (!generatedAsset) return;
@@ -492,7 +453,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
   };
 
   const handleReset = () => {
-    // Stop polling first
     isPollingRef.current = false;
     currentJobIdRef.current = null;
     if (pollIntervalRef.current) {
@@ -500,7 +460,6 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
       pollIntervalRef.current = null;
     }
     
-    // Abort any active stream
     if (streamControllerRef.current) {
       streamControllerRef.current.abort();
       streamControllerRef.current = null;
@@ -523,6 +482,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
     setGeneratedAsset(null);
     setIsReconnecting(false);
     setReconnectAttempt(0);
+    setIsGenerating(false);
     accumulatedContentRef.current = '';
   };
 
@@ -619,11 +579,11 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
           </motion.div>
         )}
 
-        {/* Step 3: Chat */}
+        {/* Step 3: Chat with inline generation */}
         {step === 'chat' && (
           <motion.div key="chat" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
             {/* Chat messages */}
-            <div className="h-[280px] overflow-y-auto bg-background-surface rounded-lg border border-border-subtle p-3 space-y-2.5">
+            <div className="h-[320px] overflow-y-auto bg-background-surface rounded-lg border border-border-subtle p-3 space-y-2.5">
               {/* Loading state when no messages yet */}
               {messages.length === 0 && isStreaming && !error && (
                 <div className="flex items-center gap-2 text-text-tertiary">
@@ -641,7 +601,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 </div>
               )}
               {/* Error state */}
-              {error && (
+              {error && !isGenerating && (
                 <div className="p-3 bg-error-muted/10 border border-error-muted/30 rounded-lg">
                   <p className="text-error-muted text-xs">{error}</p>
                   <button 
@@ -663,11 +623,50 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                   </div>
                 </div>
               ))}
+              
+              {/* Inline generation progress */}
+              {isGenerating && (
+                <div className="p-3 bg-background-elevated rounded-lg border border-border-subtle">
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10">
+                      <svg className="w-full h-full" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-background-surface" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" className="text-interactive-600" strokeDasharray={`${generationProgress * 2.51} 251`} transform="rotate(-90 50 50)" />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-micro font-bold text-text-primary">{generationProgress}%</span>
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-text-primary">Creating your {creationType === 'profile_picture' ? 'profile picture' : 'logo'}...</p>
+                      <p className="text-micro text-text-tertiary">
+                        {generationProgress < 30 ? 'Starting generation...' : 
+                         generationProgress < 60 ? 'AI is creating your masterpiece...' : 
+                         generationProgress < 90 ? 'Applying finishing touches...' : 'Almost there...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Generation error */}
+              {error && isGenerating && (
+                <div className="p-3 bg-error-muted/10 border border-error-muted/30 rounded-lg">
+                  <p className="text-error-muted text-xs">{error}</p>
+                  <button 
+                    onClick={() => { setError(null); setIsGenerating(false); }}
+                    className="mt-2 text-xs text-interactive-400 hover:text-interactive-300"
+                  >
+                    Try again
+                  </button>
+                </div>
+              )}
+              
               <div ref={chatEndRef} />
             </div>
 
-            {/* Ready indicator */}
-            {isReady && (
+            {/* Ready indicator with Generate Now button */}
+            {isReady && !isGenerating && !generatedAsset && (
               <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-2.5 bg-success-muted/10 border border-success-muted/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-6 h-6 bg-success-muted/20 rounded-full flex items-center justify-center">
@@ -675,16 +674,23 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-success-muted text-xs font-medium">Ready to generate!</p>
-                    <p className="text-micro text-text-tertiary truncate">{refinedDescription?.slice(0, 80)}...</p>
+                    <p className="text-micro text-text-tertiary truncate">{refinedDescription?.slice(0, 60)}...</p>
                   </div>
-                  <button onClick={handleGenerate} className="px-3 py-1.5 bg-success-muted hover:bg-success-muted/80 text-white text-xs font-medium rounded-lg transition-colors">
-                    Generate
+                  <button 
+                    onClick={handleGenerateNow} 
+                    disabled={isGenerating}
+                    className="px-3 py-1.5 bg-success-muted hover:bg-success-muted/80 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Generate Now
+                    </div>
                   </button>
                 </div>
               </motion.div>
             )}
 
-            {/* Input */}
+            {/* Input - disabled during generation */}
             <div className="flex gap-2">
               <input
                 ref={inputRef}
@@ -692,13 +698,13 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="Describe what you want or ask for changes..."
-                disabled={isStreaming}
+                placeholder={isGenerating ? "Generating..." : "Describe what you want or ask for changes..."}
+                disabled={isStreaming || isGenerating}
                 className="flex-1 px-2.5 py-2 text-xs bg-background-base border border-border-subtle rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-interactive-600 disabled:opacity-50"
               />
               <button
                 onClick={sendMessage}
-                disabled={isStreaming || !inputValue.trim()}
+                disabled={isStreaming || !inputValue.trim() || isGenerating}
                 className="px-3 py-2 bg-interactive-600 hover:bg-interactive-500 disabled:bg-background-elevated disabled:text-text-muted text-white rounded-lg transition-colors"
               >
                 {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -714,47 +720,7 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
           </motion.div>
         )}
 
-        {/* Step 4: Generation Options */}
-        {step === 'generate' && (
-          <motion.div key="generate" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            <GenerationOptions
-              refinedDescription={refinedDescription || ''}
-              isGenerating={generateMutation.isPending}
-              onGenerate={executeGeneration}
-              onBack={() => setStep('chat')}
-            />
-          </motion.div>
-        )}
-
-        {/* Step 5: Generating (inline progress) */}
-        {step === 'generating' && (
-          <motion.div key="generating" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 relative">
-                <svg className="w-full h-full animate-spin" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" className="text-background-elevated" />
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" className="text-interactive-600" strokeDasharray={`${generationProgress * 2.51} 251`} transform="rotate(-90 50 50)" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-sm font-bold text-text-primary">{generationProgress}%</span>
-                </div>
-              </div>
-              <h2 className="text-base font-semibold text-text-primary mb-1">Creating Your {creationType === 'profile_picture' ? 'Profile Picture' : 'Logo'}</h2>
-              <p className="text-xs text-text-secondary animate-pulse">
-                {generationProgress < 30 ? 'Starting generation...' : 
-                 generationProgress < 60 ? 'AI is creating your masterpiece...' : 
-                 generationProgress < 90 ? 'Applying finishing touches...' : 'Almost there...'}
-              </p>
-            </div>
-            
-            {/* Progress bar */}
-            <div className="w-full bg-background-elevated rounded-full h-1.5 overflow-hidden">
-              <div className="h-full bg-interactive-600 rounded-full transition-all duration-500" style={{ width: `${generationProgress}%` }} />
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 6: Complete (show asset inline) */}
+        {/* Step 4: Complete - show generated asset */}
         {step === 'complete' && generatedAsset && (
           <motion.div key="complete" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4">
             {/* Success header */}
@@ -779,6 +745,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
               <span>{generatedAsset.width}×{generatedAsset.height}</span>
               <span>•</span>
               <span>{creationType === 'profile_picture' ? 'Profile Picture' : 'Streamer Logo'}</span>
+              <span>•</span>
+              <span className="text-success-muted">Saved to library</span>
             </div>
 
             {/* Action buttons */}
