@@ -31,7 +31,8 @@ export type EventType =
   | 'generation_completed'
   | 'generation_failed'
   | 'brand_kit_created'
-  | 'asset_downloaded';
+  | 'asset_downloaded'
+  | 'animation_studio_opened';
 
 // =============================================================================
 // Filtering

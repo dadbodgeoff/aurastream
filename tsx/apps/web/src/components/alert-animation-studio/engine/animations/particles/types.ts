@@ -6,6 +6,9 @@
 
 import type { ParticleEffectType, SpawnArea } from '../core/types';
 
+// Re-export types needed by other modules
+export type { ParticleEffectType, SpawnArea } from '../core/types';
+
 // ============================================================================
 // Particle Instance
 // ============================================================================

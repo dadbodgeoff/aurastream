@@ -9,16 +9,19 @@
 // Types
 // ============================================================================
 
-/**
- * Extended AudioContext with vendor prefixes for older browsers.
- */
-type AudioContextConstructor = typeof AudioContext | typeof webkitAudioContext;
+// Declare webkitAudioContext for older Safari browsers
+declare const webkitAudioContext: typeof AudioContext | undefined;
 
 declare global {
   interface Window {
     webkitAudioContext?: typeof AudioContext;
   }
 }
+
+/**
+ * Extended AudioContext with vendor prefixes for older browsers.
+ */
+type AudioContextConstructor = typeof AudioContext;
 
 // ============================================================================
 // Singleton State

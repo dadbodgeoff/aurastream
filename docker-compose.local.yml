@@ -107,7 +107,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: aurastream-twitch-worker
     environment:
       - APP_ENV=production
       - REDIS_URL=redis://aurastream-redis:6379

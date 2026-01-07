@@ -53,10 +53,10 @@ export class AudioAnalyzer {
   private audioElement: HTMLAudioElement | null = null;
   private mediaStream: MediaStream | null = null;
 
-  // Analysis data
-  private fftData: Float32Array = new Float32Array(0);
-  private waveformData: Float32Array = new Float32Array(0);
-  private previousFFT: Float32Array = new Float32Array(0);
+  // Analysis data - explicitly typed for Web Audio API compatibility
+  private fftData: Float32Array<ArrayBuffer> = new Float32Array(0);
+  private waveformData: Float32Array<ArrayBuffer> = new Float32Array(0);
+  private previousFFT: Float32Array<ArrayBuffer> = new Float32Array(0);
   private bands: FrequencyBand[] = createAllFrequencyBands();
 
   // Beat detection
