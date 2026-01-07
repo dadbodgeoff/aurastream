@@ -190,7 +190,8 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
               queryClient.invalidateQueries({ queryKey: ['profile-creator', 'access'] }),
             ]);
             setIsGenerating(false);
-            setStep('complete');
+            // Don't jump to complete step - show inline in chat instead
+            // User can click "Create Another" to reset or "View in Library" to see all assets
             onComplete();
           } else {
             setError('Generation completed but no assets found');
@@ -672,6 +673,59 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
                     Try again
                   </button>
                 </div>
+              )}
+              
+              {/* Inline generated asset preview */}
+              {generatedAsset && !isGenerating && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="p-3 bg-background-elevated rounded-lg border border-success-muted/30"
+                >
+                  {/* Success header */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 bg-success-muted/20 rounded-full flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5 text-success-muted" />
+                    </div>
+                    <span className="text-xs font-medium text-success-muted">
+                      Your {creationType === 'profile_picture' ? 'profile picture' : 'logo'} is ready!
+                    </span>
+                  </div>
+                  
+                  {/* Asset preview */}
+                  <div className="relative rounded-lg overflow-hidden bg-background-surface mb-3">
+                    <img
+                      src={generatedAsset.url}
+                      alt={`Generated ${creationType}`}
+                      className="w-full h-auto max-h-[200px] object-contain mx-auto"
+                    />
+                  </div>
+                  
+                  {/* Asset info */}
+                  <div className="flex items-center justify-center gap-2 text-micro text-text-muted mb-3">
+                    <span>{generatedAsset.width}×{generatedAsset.height}</span>
+                    <span>•</span>
+                    <span className="text-success-muted">Saved to library</span>
+                  </div>
+                  
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleDownload}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-interactive-600 hover:bg-interactive-500 text-white text-xs font-medium rounded-lg transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-background-surface hover:bg-background-base text-text-primary text-xs font-medium rounded-lg border border-border-subtle transition-colors"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Create Another
+                    </button>
+                  </div>
+                </motion.div>
               )}
               
               <div ref={chatEndRef} />
