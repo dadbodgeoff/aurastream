@@ -427,6 +427,47 @@ services:
       start_period: 30s
 
   # =============================================================================
+  # Alert Animation Worker - Depth map generation and animation exports
+  # =============================================================================
+  
+  aurastream-alert-animation-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://aurastream-redis:6379
+      - PYTHONPATH=/app/backend
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+    env_file:
+      - ./backend/.env
+    volumes:
+      - aurastream_alert_animation_cache:/app/.cache
+    depends_on:
+      aurastream-redis:
+        condition: service_healthy
+      aurastream-api:
+        condition: service_healthy
+    command: rq worker --url redis://aurastream-redis:6379 alert_animation
+    networks:
+      - aurastream-net
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =============================================================================
   # Next.js Frontend - Port 3000 (LOCAL - points to localhost:8001)
   # =============================================================================
   
@@ -461,3 +502,5 @@ networks:
 volumes:
   aurastream_redis_data:
     name: aurastream_redis_data
+  aurastream_alert_animation_cache:
+    name: aurastream_alert_animation_cache

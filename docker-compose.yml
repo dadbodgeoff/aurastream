@@ -328,6 +328,38 @@ services:
         reservations:
           memory: 64M
 
+  # Alert Animation Worker - Processes depth map generation and animation exports
+  # Uses Depth Anything V2 for depth maps, FFmpeg for server-side exports
+  alert-animation-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - APP_ENV=development
+      - REDIS_URL=redis://redis:6379
+      - PYTHONPATH=/app/backend
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app/backend
+      - alert-animation-cache:/app/.cache
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: rq worker --url redis://redis:6379 alert_animation
+    networks:
+      - aurastream
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1536M
+        reservations:
+          memory: 512M
+
   # =============================================================================
   # Frontend Services
   # =============================================================================
@@ -363,6 +395,7 @@ networks:
 
 volumes:
   redis_data:
+  alert-animation-cache:
 
 # =============================================================================
 # E2E Validation (Optional - run with: docker compose run e2e-validate)

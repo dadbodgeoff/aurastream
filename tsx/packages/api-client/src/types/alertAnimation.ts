@@ -13,13 +13,13 @@ export type AnimationCategory = 'entry' | 'loop' | 'depth' | 'particles';
 export type ExportFormat = 'webm' | 'gif' | 'apng';
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
-export type EntryType = 'pop_in' | 'slide_in' | 'fade_in' | 'burst' | 'glitch' | 'bounce';
-export type LoopType = 'float' | 'pulse' | 'glow' | 'wiggle' | 'rgb_glow';
-export type DepthType = 'parallax' | 'tilt' | 'pop_out';
-export type ParticleType = 'sparkles' | 'confetti' | 'fire' | 'hearts' | 'pixels';
+export type EntryType = 'pop_in' | 'slide_in' | 'fade_in' | 'burst' | 'glitch' | 'bounce' | 'spin_in' | 'drop_in';
+export type LoopType = 'float' | 'pulse' | 'glow' | 'wiggle' | 'rgb_glow' | 'breathe' | 'shake' | 'swing';
+export type DepthType = 'parallax' | 'tilt' | 'pop_out' | 'float_3d';
+export type ParticleType = 'sparkles' | 'confetti' | 'fire' | 'hearts' | 'pixels' | 'snow' | 'bubbles' | 'stars';
 
 export type SlideDirection = 'left' | 'right' | 'top' | 'bottom';
-export type TriggerType = 'mouse' | 'on_enter' | 'always';
+export type TriggerType = 'mouse' | 'on_enter' | 'always' | 'auto';
 export type SpawnArea = 'around' | 'above' | 'below' | 'center';
 
 // ============================================================================
@@ -39,6 +39,14 @@ export interface EntryAnimation {
   glitchIntensity?: number;
   bounces?: number;
   height?: number;
+  // spin_in specific
+  rotations?: number;
+  // drop_in specific
+  dropHeight?: number;
+  // glitch specific
+  seed?: number;
+  rgbSplit?: boolean;
+  scanlines?: boolean;
 }
 
 export interface LoopAnimation {
@@ -63,6 +71,10 @@ export interface LoopAnimation {
   // RGB Glow
   speed?: number;
   saturation?: number;
+  // Shake
+  shakeIntensity?: number;
+  // Swing
+  swingAngle?: number;
 }
 
 export interface DepthEffect {
@@ -139,6 +151,7 @@ export interface AnimationProject {
   sourceUrl: string;
   depthMapUrl: string | null;
   depthMapGeneratedAt: string | null;
+  transparentSourceUrl: string | null;
   animationConfig: AnimationConfig;
   exportFormat: ExportFormat;
   exportWidth: number;
@@ -249,6 +262,7 @@ export function transformAnimationProject(data: any): AnimationProject {
     sourceUrl: data.source_url,
     depthMapUrl: data.depth_map_url,
     depthMapGeneratedAt: data.depth_map_generated_at,
+    transparentSourceUrl: data.transparent_source_url,
     animationConfig: transformAnimationConfig(data.animation_config),
     exportFormat: data.export_format,
     exportWidth: data.export_width,
@@ -299,6 +313,11 @@ export function transformEntryAnimation(data: any): EntryAnimation {
     glitchIntensity: data.glitch_intensity,
     bounces: data.bounces,
     height: data.height,
+    rotations: data.rotations,
+    dropHeight: data.drop_height,
+    seed: data.seed,
+    rgbSplit: data.rgb_split,
+    scanlines: data.scanlines,
   };
 }
 
@@ -320,6 +339,8 @@ export function transformLoopAnimation(data: any): LoopAnimation {
     decay: data.decay,
     speed: data.speed,
     saturation: data.saturation,
+    shakeIntensity: data.shake_intensity,
+    swingAngle: data.swing_angle,
   };
 }
 
@@ -383,10 +404,29 @@ export function transformAnimationPreset(data: any): AnimationPreset {
     name: data.name,
     description: data.description,
     category: data.category,
-    config: data.config,
+    config: transformPresetConfig(data.config, data.category),
     previewUrl: data.preview_url,
     icon: data.icon,
   };
+}
+
+/**
+ * Transform preset config from snake_case to camelCase based on category
+ */
+function transformPresetConfig(config: any, category: string): Record<string, unknown> {
+  if (!config) return {};
+  
+  // Generic snake_case to camelCase converter
+  const toCamelCase = (str: string) => 
+    str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  
+  const transformed: Record<string, unknown> = {};
+  
+  for (const [key, value] of Object.entries(config)) {
+    transformed[toCamelCase(key)] = value;
+  }
+  
+  return transformed;
 }
 
 export function transformDepthMapJob(data: any): DepthMapJob {
@@ -406,6 +446,84 @@ export function transformOBSBrowserSource(data: any): OBSBrowserSource {
     width: data.width,
     height: data.height,
     instructions: data.instructions,
+  };
+}
+
+// ============================================================================
+// AI Animation Suggestions Types
+// ============================================================================
+
+export type StreamEventType =
+  | 'new_subscriber'
+  | 'raid'
+  | 'donation_small'
+  | 'donation_medium'
+  | 'donation_large'
+  | 'new_follower'
+  | 'milestone'
+  | 'bits'
+  | 'gift_sub';
+
+export interface AnimationSuggestion {
+  vibe: string;
+  recommendedPreset: string;
+  recommendedEvent: StreamEventType | null;
+  config: AnimationConfig;
+  reasoning: string;
+  alternatives: string[];
+}
+
+export interface AnimationSuggestionResponse {
+  assetId: string;
+  suggestions: AnimationSuggestion | null;
+  generatedAt: string | null;
+}
+
+export interface StreamEventPreset {
+  id: string;
+  eventType: StreamEventType;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  recommendedDurationMs: number;
+  animationConfig: AnimationConfig;
+  userId: string | null;
+}
+
+export interface StreamEventPresetsList {
+  presets: StreamEventPreset[];
+}
+
+// Transform functions for suggestions
+export function transformAnimationSuggestion(data: any): AnimationSuggestion {
+  return {
+    vibe: data.vibe,
+    recommendedPreset: data.recommended_preset,
+    recommendedEvent: data.recommended_event,
+    config: transformAnimationConfig(data.config),
+    reasoning: data.reasoning,
+    alternatives: data.alternatives || [],
+  };
+}
+
+export function transformAnimationSuggestionResponse(data: any): AnimationSuggestionResponse {
+  return {
+    assetId: data.asset_id,
+    suggestions: data.suggestions ? transformAnimationSuggestion(data.suggestions) : null,
+    generatedAt: data.generated_at,
+  };
+}
+
+export function transformStreamEventPreset(data: any): StreamEventPreset {
+  return {
+    id: data.id,
+    eventType: data.event_type,
+    name: data.name,
+    description: data.description,
+    icon: data.icon,
+    recommendedDurationMs: data.recommended_duration_ms,
+    animationConfig: transformAnimationConfig(data.animation_config),
+    userId: data.user_id,
   };
 }
 
@@ -439,6 +557,11 @@ function toSnakeCaseEntry(entry: EntryAnimation): any {
     glitch_intensity: entry.glitchIntensity,
     bounces: entry.bounces,
     height: entry.height,
+    rotations: entry.rotations,
+    drop_height: entry.dropHeight,
+    seed: entry.seed,
+    rgb_split: entry.rgbSplit,
+    scanlines: entry.scanlines,
   };
 }
 
@@ -460,6 +583,8 @@ function toSnakeCaseLoop(loop: LoopAnimation): any {
     decay: loop.decay,
     speed: loop.speed,
     saturation: loop.saturation,
+    shake_intensity: loop.shakeIntensity,
+    swing_angle: loop.swingAngle,
   };
 }
 

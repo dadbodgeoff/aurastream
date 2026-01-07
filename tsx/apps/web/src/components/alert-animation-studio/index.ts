@@ -6,6 +6,7 @@
  */
 
 export { AlertAnimationStudio } from './AlertAnimationStudio';
+export { AlertAnimationStudioV2 } from './AlertAnimationStudioV2';
 export { PresetSelector } from './PresetSelector';
 export { TimelineControls } from './TimelineControls';
 export { ExportPanel } from './ExportPanel';

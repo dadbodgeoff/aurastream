@@ -388,9 +388,9 @@ def create_obs_token(
         # Use in OBS browser source URL:
         # https://app.aurastream.io/obs/alert/{project_id}?token={token}
     """
-    from backend.core.config import settings
+    import os
     
-    secret_key = getattr(settings, "JWT_SECRET_KEY", settings.SECRET_KEY)
+    secret_key = os.environ.get("JWT_SECRET_KEY") or os.environ.get("SECRET_KEY", "dev-secret-key")
     
     now = datetime.now(timezone.utc)
     expire = now + timedelta(days=expires_days)
@@ -434,9 +434,9 @@ def decode_obs_token(token: str) -> OBSTokenPayload:
             # Token expired - user needs to regenerate from dashboard
             pass
     """
-    from backend.core.config import settings
+    import os
     
-    secret_key = getattr(settings, "JWT_SECRET_KEY", settings.SECRET_KEY)
+    secret_key = os.environ.get("JWT_SECRET_KEY") or os.environ.get("SECRET_KEY", "dev-secret-key")
     
     try:
         payload = jwt.decode(

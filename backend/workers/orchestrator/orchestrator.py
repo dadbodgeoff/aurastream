@@ -2,7 +2,7 @@
 Enterprise-Grade Head Orchestrator for AuraStream Workers.
 
 The Head Orchestrator is the conductor of the worker symphony - it ensures
-all 14 workers operate in harmony, handles failures gracefully, and keeps
+all 15 workers operate in harmony, handles failures gracefully, and keeps
 the system running no matter what.
 
 Architecture:
@@ -19,7 +19,7 @@ Architecture:
     │  └───────────────────────────────────────────────────────────┘ │
     └─────────────────────────────────────────────────────────────────┘
 
-The 14 Workers Managed:
+The 15 Workers Managed:
     DATA COLLECTION (3):
         1. youtube_worker - YouTube trending/games data (30min/daily)
         2. twitch_streams_worker - Twitch stream data (15min)
@@ -32,21 +32,22 @@ The 14 Workers Managed:
     AGGREGATION (1 with 2 modes):
         6. intel_aggregation_worker - Hourly + Daily rollup
     
-    GENERATION (2 - RQ Queue based):
+    GENERATION (3 - RQ Queue based):
         7. generation_worker - Asset generation (on-demand)
         8. twitch_worker - Twitch asset generation (on-demand)
+        9. alert_animation_worker - Depth maps + animation exports (on-demand)
     
     REPORTING (1):
-        9. playbook_worker - Algorithmic playbook (4hr)
+        10. playbook_worker - Algorithmic playbook (4hr)
     
     MAINTENANCE (3):
-        10. analytics_flush_worker - Redis→PostgreSQL (hourly)
-        11. coach_cleanup_worker - Session cleanup (hourly)
-        12. clip_radar_recap_worker - Daily compression (daily)
+        11. analytics_flush_worker - Redis→PostgreSQL (hourly)
+        12. coach_cleanup_worker - Session cleanup (hourly)
+        13. clip_radar_recap_worker - Daily compression (daily)
     
     META (2):
-        13. intel/orchestrator - Sub-orchestrator for intel
-        14. graceful_shutdown - Utility module
+        14. intel/orchestrator - Sub-orchestrator for intel
+        15. graceful_shutdown - Utility module
 
 Usage:
     from backend.workers.orchestrator import get_orchestrator
@@ -354,7 +355,7 @@ class HeadOrchestrator:
         )
         
         # =====================================================================
-        # GENERATION WORKERS (2 - RQ Queue based)
+        # GENERATION WORKERS (3 - RQ Queue based)
         # =====================================================================
         
         # 7. Generation Worker - On-demand via RQ
@@ -375,6 +376,16 @@ class HeadOrchestrator:
             timeout_seconds=600,
             expected_duration_ms=60000,
             priority=JobPriority.CRITICAL,
+        )
+        
+        # 9. Alert Animation Worker - On-demand via RQ (depth maps + exports)
+        self._workers["alert_animation_worker"] = WorkerConfig(
+            name="alert_animation_worker",
+            worker_type=WorkerType.GENERATION,
+            execution_mode=WorkerExecutionMode.ON_DEMAND,
+            timeout_seconds=300,
+            expected_duration_ms=10000,  # Depth maps are fast (~2-3s)
+            priority=JobPriority.HIGH,
         )
         
         # =====================================================================

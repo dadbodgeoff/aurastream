@@ -19,10 +19,10 @@ AnimationCategory = Literal["entry", "loop", "depth", "particles"]
 ExportFormat = Literal["webm", "gif", "apng"]
 JobStatus = Literal["queued", "processing", "completed", "failed"]
 
-EntryType = Literal["pop_in", "slide_in", "fade_in", "burst", "glitch", "bounce"]
-LoopType = Literal["float", "pulse", "glow", "wiggle", "rgb_glow"]
-DepthType = Literal["parallax", "tilt", "pop_out"]
-ParticleType = Literal["sparkles", "confetti", "fire", "hearts", "pixels"]
+EntryType = Literal["pop_in", "slide_in", "fade_in", "burst", "glitch", "bounce", "spin_in", "drop_in"]
+LoopType = Literal["float", "pulse", "glow", "wiggle", "rgb_glow", "breathe", "shake", "swing"]
+DepthType = Literal["parallax", "tilt", "pop_out", "float_3d"]
+ParticleType = Literal["sparkles", "confetti", "fire", "hearts", "pixels", "snow", "bubbles", "stars"]
 
 SlideDirection = Literal["left", "right", "top", "bottom"]
 TriggerType = Literal["mouse", "on_enter", "always"]
@@ -48,6 +48,14 @@ class EntryAnimation(BaseModel):
     glitch_intensity: Optional[float] = Field(None, ge=0, le=1)
     bounces: Optional[int] = Field(None, ge=1, le=10)
     height: Optional[float] = Field(None, ge=0, le=200)
+    # spin_in specific
+    rotations: Optional[int] = Field(None, ge=1, le=10)
+    # drop_in specific
+    drop_height: Optional[float] = Field(None, ge=0, le=200)
+    # glitch specific (deterministic)
+    seed: Optional[int] = Field(None, ge=0)
+    rgb_split: Optional[bool] = None
+    scanlines: Optional[bool] = None
 
 
 class LoopAnimation(BaseModel):
@@ -78,6 +86,12 @@ class LoopAnimation(BaseModel):
     # RGB Glow-specific
     speed: Optional[float] = Field(None, ge=0.1, le=10)
     saturation: Optional[float] = Field(None, ge=0, le=1)
+    
+    # Shake-specific
+    shake_intensity: Optional[float] = Field(None, ge=0, le=100)
+    
+    # Swing-specific
+    swing_angle: Optional[float] = Field(None, ge=0, le=45)
 
 
 class DepthEffect(BaseModel):
@@ -206,6 +220,7 @@ class AnimationProjectResponse(BaseModel):
     source_url: str
     depth_map_url: Optional[str] = None
     depth_map_generated_at: Optional[datetime] = None
+    transparent_source_url: Optional[str] = None
     animation_config: AnimationConfig
     export_format: ExportFormat
     export_width: int
@@ -249,6 +264,16 @@ class DepthMapJobResponse(BaseModel):
     estimated_seconds: Optional[int] = None
 
 
+class BackgroundRemovalJobResponse(BaseModel):
+    """Background removal job status."""
+    job_id: str
+    status: JobStatus
+    progress: Optional[int] = None
+    transparent_source_url: Optional[str] = None
+    error_message: Optional[str] = None
+    estimated_seconds: Optional[int] = None
+
+
 class OBSBrowserSourceResponse(BaseModel):
     """OBS browser source configuration."""
     url: str
@@ -271,3 +296,47 @@ class ExportServerResponse(BaseModel):
     export_mode: Literal["server"] = "server"
     job_id: str
     status: JobStatus
+
+
+# ============================================================================
+# AI Animation Suggestions
+# ============================================================================
+
+StreamEventType = Literal[
+    "new_subscriber", "raid", "donation_small", "donation_medium",
+    "donation_large", "new_follower", "milestone", "bits", "gift_sub"
+]
+
+
+class AnimationSuggestion(BaseModel):
+    """AI-generated animation suggestion for an asset."""
+    vibe: str = Field(..., description="Detected vibe/mood of the asset (e.g., 'cute', 'aggressive', 'chill')")
+    recommended_preset: str = Field(..., description="Name of the recommended animation preset")
+    recommended_event: Optional[StreamEventType] = Field(None, description="Best matching stream event type")
+    config: AnimationConfig = Field(..., description="Full animation configuration")
+    reasoning: str = Field(..., description="Brief explanation of why this animation fits")
+    alternatives: List[str] = Field(default_factory=list, description="Alternative preset names to try")
+
+
+class AnimationSuggestionResponse(BaseModel):
+    """Response containing animation suggestions for an asset."""
+    asset_id: str
+    suggestions: Optional[AnimationSuggestion] = None
+    generated_at: Optional[datetime] = None
+
+
+class StreamEventPresetResponse(BaseModel):
+    """Stream event preset configuration."""
+    id: str
+    event_type: StreamEventType
+    name: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    recommended_duration_ms: int
+    animation_config: AnimationConfig
+    user_id: Optional[str] = None
+
+
+class StreamEventPresetsListResponse(BaseModel):
+    """List of stream event presets."""
+    presets: List[StreamEventPresetResponse]

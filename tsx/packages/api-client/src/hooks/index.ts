@@ -232,3 +232,25 @@ export {
   useTrackCommunityHubUsage,
   communityHubAssetToMediaAsset,
 } from './useCommunityHub';
+
+// Alert Animation Studio hooks
+export {
+  alertAnimationKeys,
+  suggestionKeys,
+  eventPresetKeys,
+  useAnimationProjects,
+  useAnimationProject,
+  useCreateAnimationProject,
+  useUpdateAnimationProject,
+  useDeleteAnimationProject,
+  useGenerateDepthMap,
+  useExportAnimation,
+  useOBSBrowserSource,
+  useAnimationPresets,
+  useCreatePreset,
+  useDeletePreset,
+  useAnimationSuggestions,
+  useRegenerateAnimationSuggestions,
+  useStreamEventPresets,
+  useStreamEventPreset,
+} from './useAlertAnimations';

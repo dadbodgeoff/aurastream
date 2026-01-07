@@ -186,12 +186,13 @@ async def _process_export_job(
 
 
 # RQ job wrappers (sync)
-def depth_map_job(job_id: str, project_id: str, user_id: str, source_url: str):
+def depth_map_job(*, job_id: str, project_id: str, user_id: str, source_url: str):
     """RQ-compatible sync wrapper for depth map generation."""
     return run_async(_process_depth_map_job(job_id, project_id, user_id, source_url))
 
 
 def export_job(
+    *,
     job_id: str,
     project_id: str,
     user_id: str,
@@ -209,6 +210,94 @@ def export_job(
         job_id, project_id, user_id, source_url, depth_map_url,
         animation_config, format, width, height, fps, duration_ms
     ))
+
+
+async def _process_remove_background_job(
+    job_id: str,
+    project_id: str,
+    user_id: str,
+    source_url: str,
+) -> dict:
+    """
+    Process background removal job using rembg.
+    
+    1. Download source image
+    2. Remove background with U2Net
+    3. Upload transparent PNG
+    4. Update project record
+    """
+    logger.info(f"Processing background removal job {job_id} for project {project_id}")
+    
+    try:
+        import httpx
+        from io import BytesIO
+        from PIL import Image
+        from rembg import remove
+        from backend.services.storage_service import get_storage_service
+        from backend.database.supabase_client import get_supabase_client
+        
+        await _store_sse_progress(job_id, 10, "Downloading image...")
+        
+        # Download source image
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(source_url)
+            response.raise_for_status()
+            image_data = response.content
+        
+        await _store_sse_progress(job_id, 30, "Removing background...")
+        
+        # Remove background (runs in thread pool since rembg is sync)
+        loop = asyncio.get_event_loop()
+        
+        def _remove_bg():
+            input_image = Image.open(BytesIO(image_data))
+            output_image = remove(input_image)
+            
+            # Convert to PNG bytes
+            output_buffer = BytesIO()
+            output_image.save(output_buffer, format="PNG")
+            return output_buffer.getvalue()
+        
+        transparent_bytes = await loop.run_in_executor(None, _remove_bg)
+        
+        await _store_sse_progress(job_id, 70, "Uploading result...")
+        
+        # Upload to storage
+        storage = get_storage_service()
+        storage_path = f"{user_id}/animations/{project_id}/transparent_source.png"
+        result = await storage.upload_raw(
+            path=storage_path,
+            data=transparent_bytes,
+            content_type="image/png",
+        )
+        
+        await _store_sse_progress(job_id, 90, "Updating project...")
+        
+        # Update project record
+        supabase = get_supabase_client()
+        supabase.table("alert_animation_projects").update({
+            "transparent_source_url": result.url,
+            "source_url": result.url,  # Replace source with transparent version
+        }).eq("id", project_id).execute()
+        
+        await _store_sse_progress(job_id, 100, "Complete!")
+        
+        logger.info(f"Background removal job {job_id} completed successfully")
+        
+        return {
+            "status": "completed",
+            "transparent_url": result.url,
+        }
+        
+    except Exception as e:
+        logger.error(f"Background removal job {job_id} failed: {e}")
+        await _store_sse_progress(job_id, -1, f"Error: {str(e)}")
+        raise
+
+
+def remove_background_job(*, job_id: str, project_id: str, user_id: str, source_url: str):
+    """RQ-compatible sync wrapper for background removal."""
+    return run_async(_process_remove_background_job(job_id, project_id, user_id, source_url))
 
 
 if __name__ == "__main__":

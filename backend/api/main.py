@@ -408,6 +408,8 @@ def create_app() -> FastAPI:
     from backend.api.routes.canvas_projects import router as canvas_projects_router
     from backend.api.routes.project_asset_overrides import router as project_asset_overrides_router
     from backend.api.routes.community_hub import router as community_hub_router
+    from backend.api.routes.alert_animations import router as alert_animations_router
+    from backend.api.routes.alert_relay import router as alert_relay_router
     
     app.include_router(auth_router, prefix="/api/v1/auth", tags=["Authentication"])
     app.include_router(oauth_router, prefix="/api/v1/auth/oauth", tags=["OAuth"])
@@ -453,6 +455,8 @@ def create_app() -> FastAPI:
     app.include_router(canvas_projects_router, prefix="/api/v1", tags=["Canvas Projects"])
     app.include_router(project_asset_overrides_router, prefix="/api/v1", tags=["Project Asset Overrides"])
     app.include_router(community_hub_router, prefix="/api/v1", tags=["Community Hub"])
+    app.include_router(alert_animations_router, prefix="/api/v1", tags=["Alert Animation Studio"])
+    app.include_router(alert_relay_router, prefix="/api/v1", tags=["Alert Relay SSE"])
     
     # Prometheus metrics endpoint (if enabled)
     if METRICS_ENABLED:

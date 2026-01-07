@@ -22,6 +22,9 @@ python-multipart>=0.0.6
 aiohttp>=3.9.0
 httpx>=0.26.0
 
+# SSE (Server-Sent Events)
+sse-starlette>=1.6.0
+
 # Payments
 stripe>=7.0.0
 
@@ -29,6 +32,11 @@ stripe>=7.0.0
 # NOTE: Use google-genai (new SDK), NOT google-generativeai (old SDK)
 # The import is: from google import genai
 google-genai>=1.0.0
+
+# Depth Estimation (for Alert Animation Studio)
+transformers>=4.36.0
+torch>=2.1.0
+accelerate>=0.25.0
 
 # Image Processing
 Pillow>=10.0.0

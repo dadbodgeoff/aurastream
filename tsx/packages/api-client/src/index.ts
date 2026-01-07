@@ -1175,4 +1175,29 @@ export {
   useAnimationPresets,
   useCreatePreset,
   useDeletePreset,
+  // AI Animation Suggestions
+  suggestionKeys,
+  useAnimationSuggestions,
+  useRegenerateAnimationSuggestions,
+  // Stream Event Presets
+  eventPresetKeys,
+  useStreamEventPresets,
+  useStreamEventPreset,
+  // Background Removal
+  useRemoveBackground as useRemoveAnimationBackground,
 } from './hooks/useAlertAnimations';
+
+// AI Animation Suggestions type exports
+export type {
+  StreamEventType,
+  AnimationSuggestion,
+  AnimationSuggestionResponse,
+  StreamEventPreset,
+  StreamEventPresetsList,
+} from './types/alertAnimation';
+
+export {
+  transformAnimationSuggestion,
+  transformAnimationSuggestionResponse,
+  transformStreamEventPreset,
+} from './types/alertAnimation';

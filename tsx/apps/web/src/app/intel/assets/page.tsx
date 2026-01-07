@@ -32,7 +32,7 @@ import { AssetsEmptyState } from '@/components/empty-states';
 import { AssetGridSkeleton } from '@/components/ui/skeletons';
 import { toast } from '@/components/ui/Toast';
 import { downloadAsset, getAssetFilename } from '@/utils/download';
-import { AlertAnimationStudio } from '@/components/alert-animation-studio';
+import { AlertAnimationStudioV2 } from '@/components/alert-animation-studio';
 import type { ViewMode } from '@/components/dashboard';
 import type { SubscriptionTier } from '@aurastream/api-client';
 import { cn } from '@/lib/utils';
@@ -359,7 +359,7 @@ export default function IntelAssetsPage() {
 
       {/* Animation Studio Modal */}
       {animationStudioAsset && (
-        <AlertAnimationStudio
+        <AlertAnimationStudioV2
           isOpen={!!animationStudioAsset}
           onClose={() => setAnimationStudioAsset(null)}
           sourceAsset={animationStudioAsset}

@@ -5,6 +5,7 @@
 import type {
   AnimationConfig,
   AnimationPreset,
+  AnimationSuggestion,
   EntryAnimation,
   LoopAnimation,
   DepthEffect,
@@ -32,6 +33,8 @@ export interface AnimationCanvasProps {
 export interface PresetSelectorProps {
   config: AnimationConfig;
   onChange: (config: AnimationConfig) => void;
+  suggestion?: AnimationSuggestion | null;
+  onApplySuggestion?: (suggestion: AnimationSuggestion) => void;
 }
 
 export interface PresetCategoryProps {

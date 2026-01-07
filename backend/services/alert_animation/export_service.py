@@ -8,6 +8,8 @@ Most exports happen client-side using MediaRecorder API.
 import asyncio
 import logging
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 from typing import Optional
 from PIL import Image
@@ -15,9 +17,19 @@ import numpy as np
 import math
 
 from backend.services.storage_service import get_storage_service
-from backend.core.async_executor import run_in_executor
 
 logger = logging.getLogger(__name__)
+
+# Thread pool for CPU-bound operations
+_executor = ThreadPoolExecutor(max_workers=2)
+
+
+async def run_in_executor(func, *args, **kwargs):
+    """Run a sync function in a thread pool executor."""
+    loop = asyncio.get_event_loop()
+    if kwargs:
+        func = partial(func, **kwargs)
+    return await loop.run_in_executor(_executor, func, *args)
 
 
 class AnimationExportService:
@@ -190,7 +202,7 @@ class AnimationExportService:
                     img = img.resize(new_size, Image.Resampling.LANCZOS)
         
         elif entry_type == "fade_in":
-            opacity = int(255 * eased_t)
+            # Apply opacity fade using alpha channel
             if img.mode == "RGBA":
                 r, g, b, a = img.split()
                 a = a.point(lambda x: int(x * eased_t))
@@ -311,3 +323,238 @@ def get_export_service() -> AnimationExportService:
     if _export_service is None:
         _export_service = AnimationExportService()
     return _export_service
+
+
+def generate_obs_html_blob(
+    alert_id: str,
+    alert_name: str,
+    animation_config: dict,
+    source_url: str,
+    depth_map_url: Optional[str],
+    width: int,
+    height: int,
+    debug: bool = False,
+) -> str:
+    """
+    Generate self-contained HTML blob for OBS Browser Source.
+    
+    The generated HTML includes:
+    - Embedded animation configuration
+    - Minimal animation engine (placeholder - real implementation would bundle full engine)
+    - SSE connection for receiving triggers
+    - Debug overlay (optional)
+    
+    Args:
+        alert_id: Unique identifier for the alert
+        alert_name: Display name for the alert
+        animation_config: Full animation configuration dict
+        source_url: URL to the source image
+        depth_map_url: Optional URL to the depth map
+        width: Canvas width in pixels
+        height: Canvas height in pixels
+        debug: Whether to include debug overlay
+        
+    Returns:
+        str: Complete HTML document as a string
+    """
+    import json
+    
+    config_json = json.dumps({
+        "alertId": alert_id,
+        "alertName": alert_name,
+        "width": width,
+        "height": height,
+        "sourceUrl": source_url,
+        "depthMapUrl": depth_map_url,
+        "animationConfig": animation_config,
+    }, indent=2)
+    
+    # Escape for embedding in HTML
+    config_json_escaped = config_json.replace("</", "<\\/")
+    
+    debug_overlay = ""
+    if debug:
+        debug_overlay = """
+    <div class="debug">
+      <div id="debug-status">Debug Mode</div>
+      <div id="debug-fps">FPS: --</div>
+    </div>
+    <style>
+      .debug {
+        position: fixed;
+        bottom: 4px;
+        right: 4px;
+        font: 10px monospace;
+        color: rgba(255,255,255,0.5);
+        text-align: right;
+      }
+    </style>"""
+    
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width={width}, height={height}">
+  <title>{alert_name} - AuraStream Alert</title>
+  <style>
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    html, body {{
+      width: {width}px;
+      height: {height}px;
+      overflow: hidden;
+      background: transparent;
+    }}
+    #canvas {{
+      width: 100%;
+      height: 100%;
+      display: block;
+    }}
+    #alert-container {{
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }}
+    #alert-container.visible {{
+      opacity: 1;
+    }}
+    #alert-image {{
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }}
+  </style>
+</head>
+<body>
+  <canvas id="canvas" width="{width}" height="{height}"></canvas>
+  <div id="alert-container">
+    <img id="alert-image" src="{source_url}" alt="{alert_name}">
+  </div>
+  {debug_overlay}
+  
+  <script>
+    // AuraStream Alert Engine - Embedded Version
+    // Generated: {alert_id}
+    
+    const CONFIG = {config_json_escaped};
+    
+    class AlertEngine {{
+      constructor(config) {{
+        this.config = config;
+        this.canvas = null;
+        this.ctx = null;
+        this.isPlaying = false;
+        this.animationFrame = null;
+      }}
+      
+      init(canvasId) {{
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) {{
+          console.error('[AuraStream] Canvas not found:', canvasId);
+          return false;
+        }}
+        this.ctx = this.canvas.getContext('2d');
+        console.log('[AuraStream] Engine initialized for:', this.config.alertId);
+        return true;
+      }}
+      
+      async trigger() {{
+        if (this.isPlaying) {{
+          console.log('[AuraStream] Already playing, ignoring trigger');
+          return;
+        }}
+        
+        console.log('[AuraStream] Alert triggered!');
+        this.isPlaying = true;
+        
+        const container = document.getElementById('alert-container');
+        container.classList.add('visible');
+        
+        // Play animation based on config
+        const duration = this.config.animationConfig?.duration_ms || 3000;
+        
+        // Simple animation loop
+        const startTime = performance.now();
+        const animate = (currentTime) => {{
+          const elapsed = currentTime - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          
+          // Apply entry animation (simplified)
+          const entry = this.config.animationConfig?.entry;
+          if (entry && progress < 0.3) {{
+            const entryProgress = progress / 0.3;
+            const scale = entry.scale_from + (1 - entry.scale_from) * this.easeOut(entryProgress);
+            container.style.transform = `scale(${{scale}})`;
+          }} else {{
+            container.style.transform = 'scale(1)';
+          }}
+          
+          // Apply loop animation (simplified)
+          const loop = this.config.animationConfig?.loop;
+          if (loop && progress >= 0.3) {{
+            const loopProgress = (progress - 0.3) / 0.7;
+            const frequency = loop.frequency || 1;
+            const osc = Math.sin(loopProgress * frequency * Math.PI * 2);
+            
+            if (loop.type === 'pulse') {{
+              const scaleMin = loop.scale_min || 0.97;
+              const scaleMax = loop.scale_max || 1.03;
+              const scale = scaleMin + (scaleMax - scaleMin) * (osc + 1) / 2;
+              container.style.transform = `scale(${{scale}})`;
+            }} else if (loop.type === 'float') {{
+              const ampY = loop.amplitude_y || 10;
+              container.style.transform = `translateY(${{osc * ampY}}px)`;
+            }}
+          }}
+          
+          if (progress < 1) {{
+            this.animationFrame = requestAnimationFrame(animate);
+          }} else {{
+            this.stop();
+          }}
+        }};
+        
+        this.animationFrame = requestAnimationFrame(animate);
+      }}
+      
+      stop() {{
+        if (this.animationFrame) {{
+          cancelAnimationFrame(this.animationFrame);
+          this.animationFrame = null;
+        }}
+        
+        const container = document.getElementById('alert-container');
+        container.classList.remove('visible');
+        container.style.transform = '';
+        
+        this.isPlaying = false;
+        console.log('[AuraStream] Alert finished');
+      }}
+      
+      easeOut(t) {{
+        return 1 - Math.pow(1 - t, 2);
+      }}
+    }}
+    
+    // Initialize engine
+    const engine = new AlertEngine(CONFIG);
+    engine.init('canvas');
+    
+    // Expose for testing
+    window.testAlert = () => engine.trigger();
+    window.stopAlert = () => engine.stop();
+    window.alertEngine = engine;
+    
+    console.log('[AuraStream] Alert ready:', CONFIG.alertId);
+    console.log('[AuraStream] Test with: testAlert()');
+  </script>
+</body>
+</html>'''
+    
+    return html

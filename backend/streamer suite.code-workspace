@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../Downloads/Media Kit"
+		},
+		{
+			"path": "../../Downloads/Concept Art"
+		},
+		{
+			"path": "../../Downloads/Game Screenshots"
+		}
+	],
+	"settings": {
+		"typescript.autoClosingTags": false
+	}
+}

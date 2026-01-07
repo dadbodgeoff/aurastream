@@ -94,6 +94,10 @@ const config: Config = {
         'scale-in': 'scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'shimmer': 'shimmer 2s linear infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+        // Alert Animation Studio particle animations
+        'float-up': 'float-up 3s ease-out infinite',
+        'confetti-fall': 'confetti-fall 3s ease-out infinite',
+        'fire-rise': 'fire-rise 1.5s ease-out infinite',
       },
       keyframes: {
         'fade-in': {
@@ -131,6 +135,21 @@ const config: Config = {
         'pulse-glow': {
           '0%, 100%': { boxShadow: '0 0 20px rgba(33, 128, 141, 0.3)' },
           '50%': { boxShadow: '0 0 40px rgba(33, 128, 141, 0.5)' },
+        },
+        // Alert Animation Studio particle keyframes
+        'float-up': {
+          '0%': { transform: 'translateY(0) translateX(0) scale(1)', opacity: '1' },
+          '50%': { transform: 'translateY(-150px) translateX(20px) scale(0.8)', opacity: '0.8' },
+          '100%': { transform: 'translateY(-300px) translateX(-10px) scale(0.5)', opacity: '0' },
+        },
+        'confetti-fall': {
+          '0%': { transform: 'translateY(-100px) rotate(0deg)', opacity: '1' },
+          '100%': { transform: 'translateY(400px) rotate(720deg)', opacity: '0' },
+        },
+        'fire-rise': {
+          '0%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+          '50%': { transform: 'translateY(-80px) scale(1.2)', opacity: '0.7' },
+          '100%': { transform: 'translateY(-150px) scale(0.3)', opacity: '0' },
         },
       },
     },

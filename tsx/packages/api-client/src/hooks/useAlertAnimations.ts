@@ -18,10 +18,14 @@ import {
   UpdateAnimationProjectRequest,
   ExportAnimationRequest,
   CreatePresetRequest,
+  AnimationSuggestionResponse,
+  StreamEventPreset,
   transformAnimationProject,
   transformAnimationPreset,
   transformDepthMapJob,
   transformOBSBrowserSource,
+  transformAnimationSuggestionResponse,
+  transformStreamEventPreset,
   toSnakeCaseAnimationConfig,
 } from '../types/alertAnimation';
 
@@ -439,6 +443,186 @@ export function useDeletePreset() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: alertAnimationKeys.presets() });
+    },
+  });
+}
+
+// ============================================================================
+// Animation Suggestions Hooks
+// ============================================================================
+
+export const suggestionKeys = {
+  all: ['animationSuggestions'] as const,
+  detail: (assetId: string) => [...suggestionKeys.all, assetId] as const,
+};
+
+/**
+ * Get AI-generated animation suggestions for an asset.
+ */
+export function useAnimationSuggestions(assetId: string | undefined) {
+  return useQuery({
+    queryKey: suggestionKeys.detail(assetId || ''),
+    queryFn: async (): Promise<AnimationSuggestionResponse> => {
+      if (!assetId) throw new Error('Asset ID required');
+
+      const token = apiClient.getAccessToken();
+      const response = await fetch(`${API_BASE}/alert-animations/suggestions/${assetId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail?.message || 'Failed to fetch animation suggestions');
+      }
+
+      const data = await response.json();
+      return transformAnimationSuggestionResponse(data);
+    },
+    enabled: !!assetId,
+    staleTime: 1000 * 60 * 30, // Cache for 30 minutes
+  });
+}
+
+/**
+ * Regenerate animation suggestions for an asset.
+ */
+export function useRegenerateAnimationSuggestions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (assetId: string): Promise<AnimationSuggestionResponse> => {
+      const token = apiClient.getAccessToken();
+
+      const response = await fetch(
+        `${API_BASE}/alert-animations/suggestions/${assetId}/regenerate`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail?.message || 'Failed to regenerate suggestions');
+      }
+
+      const data = await response.json();
+      return transformAnimationSuggestionResponse(data);
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(suggestionKeys.detail(data.assetId), data);
+    },
+  });
+}
+
+// ============================================================================
+// Stream Event Presets Hooks
+// ============================================================================
+
+export const eventPresetKeys = {
+  all: ['streamEventPresets'] as const,
+  list: () => [...eventPresetKeys.all, 'list'] as const,
+  byType: (eventType: string) => [...eventPresetKeys.all, eventType] as const,
+};
+
+/**
+ * List all stream event presets.
+ */
+export function useStreamEventPresets(eventType?: string) {
+  return useQuery({
+    queryKey: eventType ? eventPresetKeys.byType(eventType) : eventPresetKeys.list(),
+    queryFn: async (): Promise<StreamEventPreset[]> => {
+      const token = apiClient.getAccessToken();
+      const url = eventType
+        ? `${API_BASE}/alert-animations/event-presets?event_type=${eventType}`
+        : `${API_BASE}/alert-animations/event-presets`;
+
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail?.message || 'Failed to fetch event presets');
+      }
+
+      const data = await response.json();
+      return data.presets.map(transformStreamEventPreset);
+    },
+  });
+}
+
+/**
+ * Get a specific stream event preset by type.
+ */
+export function useStreamEventPreset(eventType: string | undefined) {
+  return useQuery({
+    queryKey: eventPresetKeys.byType(eventType || ''),
+    queryFn: async (): Promise<StreamEventPreset> => {
+      if (!eventType) throw new Error('Event type required');
+
+      const token = apiClient.getAccessToken();
+      const response = await fetch(
+        `${API_BASE}/alert-animations/event-presets/${eventType}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail?.message || 'Failed to fetch event preset');
+      }
+
+      const data = await response.json();
+      return transformStreamEventPreset(data);
+    },
+    enabled: !!eventType,
+  });
+}
+
+// ============================================================================
+// Background Removal Hook
+// ============================================================================
+
+export interface RemoveBackgroundResponse {
+  jobId: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  transparentSourceUrl?: string;
+}
+
+/**
+ * Remove background from animation project source image using rembg.
+ */
+export function useRemoveBackground() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (projectId: string): Promise<RemoveBackgroundResponse> => {
+      const token = apiClient.getAccessToken();
+
+      const response = await fetch(
+        `${API_BASE}/alert-animations/${projectId}/remove-background`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.detail?.message || 'Failed to remove background');
+      }
+
+      const data = await response.json();
+      return {
+        jobId: data.job_id,
+        status: data.status,
+        transparentSourceUrl: data.transparent_source_url,
+      };
+    },
+    onSuccess: (_, projectId) => {
+      queryClient.invalidateQueries({ queryKey: alertAnimationKeys.detail(projectId) });
     },
   });
 }
