@@ -181,9 +181,11 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
               height: asset.height,
             });
             trackGenerationCompleted(asset.asset_type || asset.assetType, currentJobId);
-            // Invalidate asset queries so the library updates
+            // Invalidate all relevant queries so galleries update
             queryClient.invalidateQueries({ queryKey: assetKeys.all });
             queryClient.invalidateQueries({ queryKey: creatorMediaKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['profile-creator', 'gallery'] });
+            queryClient.invalidateQueries({ queryKey: ['profile-creator', 'access'] });
             setIsGenerating(false);
             setStep('complete');
             onComplete();
