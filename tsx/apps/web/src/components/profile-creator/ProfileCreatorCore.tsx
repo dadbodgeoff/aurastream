@@ -182,10 +182,13 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
             });
             trackGenerationCompleted(asset.asset_type || asset.assetType, currentJobId);
             // Invalidate all relevant queries so galleries update
-            queryClient.invalidateQueries({ queryKey: assetKeys.all });
-            queryClient.invalidateQueries({ queryKey: creatorMediaKeys.all });
-            queryClient.invalidateQueries({ queryKey: ['profile-creator', 'gallery'] });
-            queryClient.invalidateQueries({ queryKey: ['profile-creator', 'access'] });
+            // Use await to ensure data is refetched before switching tabs
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: assetKeys.all }),
+              queryClient.invalidateQueries({ queryKey: creatorMediaKeys.all }),
+              queryClient.invalidateQueries({ queryKey: ['profile-creator', 'gallery'] }),
+              queryClient.invalidateQueries({ queryKey: ['profile-creator', 'access'] }),
+            ]);
             setIsGenerating(false);
             setStep('complete');
             onComplete();
