@@ -14,8 +14,11 @@ import {
   transformStartRequest,
   useGenerateFromSession,
   ResilientEventSource,
+  assetKeys,
+  creatorMediaKeys,
   type SSEEvent,
 } from '@aurastream/api-client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSimpleAnalytics } from '@aurastream/shared';
 import type { 
   CreationType, 
@@ -56,6 +59,7 @@ interface StreamController {
 
 export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCoreProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { trackGenerationStarted, trackGenerationCompleted, trackGenerationFailed } = useSimpleAnalytics();
   const [step, setStep] = useState<Step>('type');
   const [creationType, setCreationType] = useState<CreationType | null>(null);
@@ -177,6 +181,9 @@ export function ProfileCreatorCore({ canCreate, onComplete }: ProfileCreatorCore
               height: asset.height,
             });
             trackGenerationCompleted(asset.asset_type || asset.assetType, currentJobId);
+            // Invalidate asset queries so the library updates
+            queryClient.invalidateQueries({ queryKey: assetKeys.all });
+            queryClient.invalidateQueries({ queryKey: creatorMediaKeys.all });
             setIsGenerating(false);
             setStep('complete');
             onComplete();
