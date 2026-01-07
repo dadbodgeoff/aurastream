@@ -350,30 +350,22 @@ export class GIFEncoder {
       }
     }
 
-    // Dynamic import - wrapped in try/catch for environments without the module
-    try {
-      // @ts-expect-error - gif.js may not be installed, fallback to CDN
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const module = await (import('gif.js') as Promise<any>);
-      return module.default || module;
-    } catch {
-      // Fallback: try loading from CDN
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src =
-          'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js';
-        script.onload = () => {
-          const win = window as unknown as WindowWithGIF;
-          if (win.GIF) {
-            resolve(win.GIF);
-          } else {
-            reject(new Error('gif.js failed to load'));
-          }
-        };
-        script.onerror = () => reject(new Error('Failed to load gif.js'));
-        document.head.appendChild(script);
-      });
-    }
+    // Load from CDN - gif.js is not bundled to avoid build issues
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src =
+        'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js';
+      script.onload = () => {
+        const win = window as unknown as WindowWithGIF;
+        if (win.GIF) {
+          resolve(win.GIF);
+        } else {
+          reject(new Error('gif.js failed to load'));
+        }
+      };
+      script.onerror = () => reject(new Error('Failed to load gif.js'));
+      document.head.appendChild(script);
+    });
   }
 }
 
