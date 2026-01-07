@@ -88,7 +88,10 @@ import {
   BeatCounter,
   ReactivityMapper,
   ExportPanel as ExportPanelV2,
+  ActiveEffectsBar,
+  PropertyInspector,
   type ExportOptions,
+  type EffectCategory,
 } from './ui';
 
 // Lazy load AnimationCanvas
@@ -159,6 +162,9 @@ export function AlertAnimationStudioV2({
   // AI Suggestion state
   const [showSuggestionBanner, setShowSuggestionBanner] = useState(true);
   const [appliedSuggestion, setAppliedSuggestion] = useState(false);
+
+  // Active Effects state
+  const [selectedEffect, setSelectedEffect] = useState<EffectCategory | null>(null);
 
   // Audio state
   const [audioMappings, setAudioMappings] = useState<AudioReactiveMapping[]>([]);
@@ -293,6 +299,35 @@ export function AlertAnimationStudioV2({
     await v2Actions.loadAudio(file);
     v2Actions.startAudio();
   }, [v2Actions]);
+
+  // Active Effects handlers
+  const handleToggleEffect = useCallback((category: EffectCategory, enabled: boolean) => {
+    // For now, toggling off removes the effect (future: could store disabled state)
+    if (!enabled) {
+      const newConfig = { ...animationConfig };
+      switch (category) {
+        case 'entry': newConfig.entry = null; break;
+        case 'loop': newConfig.loop = null; break;
+        case 'depth': newConfig.depthEffect = null; break;
+        case 'particles': newConfig.particles = null; break;
+      }
+      handleConfigChange(newConfig);
+    }
+  }, [animationConfig, handleConfigChange]);
+
+  const handleRemoveEffect = useCallback((category: EffectCategory) => {
+    const newConfig = { ...animationConfig };
+    switch (category) {
+      case 'entry': newConfig.entry = null; break;
+      case 'loop': newConfig.loop = null; break;
+      case 'depth': newConfig.depthEffect = null; break;
+      case 'particles': newConfig.particles = null; break;
+    }
+    handleConfigChange(newConfig);
+    if (selectedEffect === category) {
+      setSelectedEffect(null);
+    }
+  }, [animationConfig, handleConfigChange, selectedEffect]);
 
   // Export handler
   const handleV2Export = useCallback(async (
@@ -557,6 +592,17 @@ export function AlertAnimationStudioV2({
           </div>
         )}
 
+        {/* Active Effects Bar */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800/50 bg-[#12121a]/50">
+          <ActiveEffectsBar
+            config={animationConfig}
+            onToggleEffect={handleToggleEffect}
+            onRemoveEffect={handleRemoveEffect}
+            onSelectEffect={setSelectedEffect}
+            selectedEffect={selectedEffect}
+          />
+        </div>
+
         {/* Main Content Area */}
         <div className="flex flex-1 overflow-hidden">
           {/* Canvas Area */}
@@ -706,6 +752,18 @@ export function AlertAnimationStudioV2({
                   <Loader2 className="h-10 w-10 animate-spin text-purple-400" />
                   <p className="mt-4 text-sm text-gray-300">Generating depth map...</p>
                   <p className="text-xs text-gray-500">Enables 3D parallax effects</p>
+                </div>
+              )}
+
+              {/* Property Inspector - Floating Panel */}
+              {selectedEffect && (
+                <div className="absolute top-4 right-4 w-72 z-10">
+                  <PropertyInspector
+                    config={animationConfig}
+                    selectedEffect={selectedEffect}
+                    onConfigChange={handleConfigChange}
+                    onClose={() => setSelectedEffect(null)}
+                  />
                 </div>
               )}
             </div>

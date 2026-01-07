@@ -2,7 +2,8 @@
  * Animation Studio V2 - UI Components
  *
  * Comprehensive UI component library for the Alert Animation Studio.
- * Includes timeline editing, audio visualization, and export controls.
+ * Includes timeline editing, audio visualization, export controls,
+ * and active effects management.
  *
  * @module ui
  */
@@ -71,3 +72,29 @@ export type {
   VideoExportUIProps,
   VideoExportConfig,
 } from './export';
+
+// ============================================================================
+// Active Effects Components
+// ============================================================================
+
+export {
+  ActiveEffectsBar,
+  PropertyInspector,
+  extractActiveEffects,
+  getCategoryInfo,
+  getEffectMeta,
+  getEffectPropertySchema,
+  EFFECT_COLOR_CLASSES,
+} from './effects';
+
+export type {
+  ActiveEffectsBarProps,
+  PropertyInspectorProps,
+  EffectCategory,
+  EffectInfo,
+  EffectColor,
+  EffectPropertySchema,
+  PropertyDefinition,
+  EffectStackItem,
+  EffectStackProps,
+} from './effects';
